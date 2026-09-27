@@ -2252,6 +2252,10 @@ int Version_Number(void)
                  GitShortSHA1);
     }
 
+    // Also show when it was built, to tell test builds apart.
+    size_t len = strlen(VersionText);
+    snprintf(VersionText + len, sizeof(VersionText) - len, " %s", BuildStamp);
+
     return (1);
 }
 

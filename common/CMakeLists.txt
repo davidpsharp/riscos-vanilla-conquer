@@ -3,8 +3,17 @@ set(GIT_PRE_CONFIGURE_FILE "gitinfo.cpp.in")
 set(GIT_POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/gitinfo.cpp")
 include(GitWatcher)
 
+# The build date and time, regenerated on every build. The extra output never
+# exists, so the command always runs; the file only changes once a minute.
+set(BUILD_STAMP_FILE "${CMAKE_CURRENT_BINARY_DIR}/buildstamp.cpp")
+add_custom_command(
+    OUTPUT ${BUILD_STAMP_FILE} ${CMAKE_CURRENT_BINARY_DIR}/buildstamp.always
+    COMMAND ${CMAKE_COMMAND} -DOUT=${BUILD_STAMP_FILE} -P ${CMAKE_CURRENT_SOURCE_DIR}/buildstamp.cmake
+    COMMENT "Recording build time")
+
 set(COMMON_SRC
     ${GIT_POST_CONFIGURE_FILE}
+    ${BUILD_STAMP_FILE}
     _diptabl.cpp
     alloc.cpp
     auduncmp.cpp

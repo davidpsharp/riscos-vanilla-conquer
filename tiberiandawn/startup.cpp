@@ -35,6 +35,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "common/gitinfo.h"
 #include "common/ini.h"
 #include "common/paths.h"
 #include "common/utfargs.h"
@@ -204,6 +205,8 @@ int main(int argc, char** argv)
     // Output is usually redirected to a file by !Run; don't lose it on a crash.
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
+    // Record which build wrote this log.
+    fprintf(stderr, "Vanilla Conquer TD %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
 #endif
     UtfArgs args(argc, argv);
     CCDebugString("C&C95 - Starting up.\n");

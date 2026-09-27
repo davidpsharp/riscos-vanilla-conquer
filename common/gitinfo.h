@@ -24,4 +24,7 @@ extern bool GitUncommittedChanges;
 extern bool GitHaveInfo;
 extern int GitRevision;
 
+// When this binary was built, e.g. "2026-09-27 21:05 UTC".
+extern const char BuildStamp[];
+
 #endif
