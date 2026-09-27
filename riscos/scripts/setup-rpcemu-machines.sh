@@ -13,9 +13,12 @@ DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
 HOSTFS=${VC_WORK:-$HOME/vcport-work}/hostfs
 mkdir -p "$HOSTFS"
 
-# make_machine <name> <template> <rom> <vnc port> <hostcmd port> <mac> <vram MB> <ram MB>
+# make_machine <name> <template> <rom> <vnc port> <hostcmd port> <mac> <vram MB> <ram MB> <host sound 0/1>
+# Host sound is off on the headless test machines: RPCEmu reopens the host audio
+# device when the guest changes sample rate, which stalls the emulator for as
+# long as the device takes to open (10s for some devices on macOS).
 make_machine() {
-    local name=$1 template=$2 rom=$3 vnc=$4 hostcmd=$5 mac=$6 vram=$7 mem=$8
+    local name=$1 template=$2 rom=$3 vnc=$4 hostcmd=$5 mac=$6 vram=$7 mem=$8 sound=$9
     local mdir="$DATADIR/machines/$name" tdir="$DATADIR/machines/$template"
     [ -d "$tdir" ] || { echo "template machine '$template' missing" >&2; exit 1; }
     mkdir -p "$mdir/hostfs"
@@ -37,7 +40,7 @@ rom_dir=$rom
 mem_size=$mem
 model=RPCSA
 vram_size=$vram
-sound_enabled=1
+sound_enabled=$sound
 refresh_rate=60
 cdrom_enabled=0
 mouse_following=1
@@ -60,6 +63,6 @@ CFG
     echo "machine '$name': ${vram}MB VRAM, ${mem}MB RAM, vnc $vnc, hostcmd tcp:127.0.0.1:$hostcmd, hostfs $mdir/hostfs"
 }
 
-make_machine "VC SA RO371" "RISC OS 3.71" ROM371 5920 5921 52:56:43:00:03:71 2 128
-make_machine "VC SA RO371 1MB" "RISC OS 3.71" ROM371 5940 5941 52:56:43:01:03:71 1 64
-make_machine "VC SA RO530" "RISC OS 5.30" ROM530 5930 5931 52:56:43:00:05:30 2 128
+make_machine "VC SA RO371" "RISC OS 3.71" ROM371 5920 5921 52:56:43:00:03:71 2 128 1
+make_machine "VC SA RO371 1MB" "RISC OS 3.71" ROM371 5940 5941 52:56:43:01:03:71 1 64 0
+make_machine "VC SA RO530" "RISC OS 5.30" ROM530 5930 5931 52:56:43:00:05:30 2 128 0
