@@ -2,6 +2,7 @@
 
 #ifdef USE_SHORT_FILENAMES
 #include <errno.h>
+#include <set>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -37,6 +38,27 @@ static FILE* Traced(FILE* fp, const char* path, const char* mode)
 
 static FILE* Short_Fopen(const char* path, const char* mode);
 
+/*
+** Paths that failed to open for reading. The game probes for the same missing
+** files over and over (every search path, both name forms, for each Open and
+** Is_Available), and every probe costs several filing system calls. Remember
+** failures until the game itself creates or deletes something.
+*/
+static std::set<std::string> Missing;
+
+static FILE* Read_Fopen(const char* path, const char* mode)
+{
+    if (Missing.count(path) != 0) {
+        errno = ENOENT;
+        return nullptr;
+    }
+    FILE* fp = Traced(fopen(path, mode), path, mode);
+    if (fp == nullptr && errno == ENOENT) {
+        Missing.insert(path);
+    }
+    return fp;
+}
+
 FILE* RISCOS_Fopen(const char* path, const char* mode)
 {
     return Short_Fopen(path, mode);
@@ -46,11 +68,15 @@ static FILE* Short_Fopen(const char* path, const char* mode)
 {
     std::string short_path;
 
-    if (!RISCOS_Short_Path(path, short_path)) {
-        return Traced(fopen(path, mode), path, mode);
+    bool writing = strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr || strchr(mode, '+') != nullptr;
+
+    if (writing) {
+        Missing.clear();
     }
 
-    bool writing = strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr;
+    if (!RISCOS_Short_Path(path, short_path)) {
+        return writing ? Traced(fopen(path, mode), path, mode) : Read_Fopen(path, mode);
+    }
 
     if (writing) {
         // Create the extension directory on demand.
@@ -61,9 +87,9 @@ static FILE* Short_Fopen(const char* path, const char* mode)
         return Traced(fopen(short_path.c_str(), mode), short_path.c_str(), mode);
     }
 
-    FILE* fp = Traced(fopen(short_path.c_str(), mode), short_path.c_str(), mode);
+    FILE* fp = Read_Fopen(short_path.c_str(), mode);
     if (fp == nullptr) {
-        fp = Traced(fopen(path, mode), path, mode);
+        fp = Read_Fopen(path, mode);
     }
     return fp;
 }
@@ -71,6 +97,7 @@ static FILE* Short_Fopen(const char* path, const char* mode)
 int RISCOS_Unlink(const char* path)
 {
     std::string short_path;
+    Missing.clear();
 
     if (RISCOS_Short_Path(path, short_path) && unlink(short_path.c_str()) == 0) {
         return 0;

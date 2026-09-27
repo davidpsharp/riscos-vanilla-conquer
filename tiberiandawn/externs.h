@@ -135,6 +135,7 @@ extern int Frame;
 extern void* SpeechBuffer;
 extern int PreserveVQAScreen;
 extern bool BreakoutAllowed;
+extern bool PlayLogo;
 extern bool Brokeout;
 
 extern GameOptionsClass Options;

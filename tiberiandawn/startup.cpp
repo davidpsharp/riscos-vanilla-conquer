@@ -439,6 +439,7 @@ int main(int argc, char** argv)
             Special.IsFromInstall = ini.Get_Bool("Intro", "PlayIntro", true);
         }
         SlowPalette = ini.Get_Bool("Options", "SlowPalette", false);
+        PlayLogo = ini.Get_Bool("Intro", "PlayLogo", true);
 
         /*
         ** Regardless of whether we should run it or not, here we're

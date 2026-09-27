@@ -72,6 +72,22 @@ Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM
 
 **Not yet done:** sound (Phase 3).
 
+## Start-up and loading times
+
+Measured on RPCEmu, StrongARM, RISC OS 3.71:
+
+| | Time |
+| --- | --- |
+| Launch → main menu | ~27 s with the Westwood logo; 2.4 s with `PlayLogo=No` or Esc |
+| Title screen → menu buttons | 1.2 s |
+| Movie-less launch → GDI 1 playing | ~4 s |
+| Loading a save, from the menu | 3.3 s |
+| Loading a save, from inside a mission | 2.1 s |
+
+Almost all of the remaining wait is the movies, which play in real time: the logo is 27.9 s and the GDI 1 briefing 36.6 s. Esc skips any movie. `PlayLogo=No` in the `[Intro]` section of `INI.CONQUER` skips the logo at start-up.
+
+Why it's this fast: on RISC OS the game skips `Resolve_File`'s case-fixing directory scans, and `RISCOS_Fopen` remembers files that don't exist, so repeated probes are free. `scripts/profile.py` is a sampling profiler over the RPCEmu debugger, and `scripts/time-menu.sh` measures start-up.
+
 ## Filenames (10-character FileCore)
 
 RISC OS 3.x FileCore allows 10-character leaf names and silently truncates longer ones. UnixLib stores `TEMPICNH.MIX` as `TEMPICNH/MIX` (12 characters), which becomes `TEMPICNH/M`. So on RISC OS, `NAME.EXT` files are kept the traditional way, in an `EXT` directory:

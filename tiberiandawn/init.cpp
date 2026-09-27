@@ -483,7 +483,7 @@ bool Init_Game(int, char*[])
     **	Play the introduction movies.
     */
     CCDebugString("C&C95 - About to play the intro movie\n");
-    if (!Special.IsFromInstall)
+    if (!Special.IsFromInstall && PlayLogo)
         Play_Intro(true);
 
     /*

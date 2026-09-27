@@ -102,6 +102,7 @@ VQAConfig AnimControl;
 
 int PreserveVQAScreen;       // Used for screen mode transition control.
 bool BreakoutAllowed = true; // "true" if aborting of movies is allowed.
+bool PlayLogo = true;        // Play the Westwood logo movie at start-up ([Intro] PlayLogo).
 bool Brokeout;               // Was the movie broken out of?
 bool SlowPalette = true;     // Slow palette flag set?
 
