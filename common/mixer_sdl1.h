@@ -55,5 +55,7 @@ struct MixerStats
     int OutputSamples;     // Callback size in frames.
 };
 void Mixer_Get_Stats(MixerStats& stats);
+// Bytes queued and played since the channel was last stopped.
+void Mixer_Get_Channel_Counts(MixerChannel* ch, unsigned& queued, unsigned& played);
 
 #endif // COMMON_MIXER_SDL1_H

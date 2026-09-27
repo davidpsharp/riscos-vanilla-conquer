@@ -2,6 +2,15 @@
 // built on the software mixer in mixer_sdl1.cpp.
 #include "soundio_imp.h"
 #include "mixer_sdl1.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+// With VC_FPSLOG set, log each sound's start and stop, with bytes queued and played.
+static bool Sound_Log()
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    return enabled;
+}
 
 struct SampleTrackerTypeImp
 {
@@ -82,10 +91,27 @@ void SoundImp_Shutdown_Sample(SampleTrackerTypeImp* st)
 
 void SoundImp_Start_Sample(SampleTrackerTypeImp* st)
 {
+    if (Sound_Log()) {
+        unsigned queued, played;
+        Mixer_Get_Channel_Counts(st->Channel, queued, played);
+        fprintf(stderr, "sound: start %p, %u bytes queued\n", (void*)st, queued);
+    }
     Mixer_Play(st->Channel);
 }
 
 void SoundImp_Stop_Sample(SampleTrackerTypeImp* st)
 {
+    if (Sound_Log()) {
+        unsigned queued, played;
+        Mixer_Get_Channel_Counts(st->Channel, queued, played);
+        if (queued != 0) {
+            fprintf(stderr,
+                    "sound: stop %p, %u bytes queued, %u played%s\n",
+                    (void*)st,
+                    queued,
+                    played,
+                    played < queued ? " - CUT SHORT" : "");
+        }
+    }
     Mixer_Stop(st->Channel);
 }

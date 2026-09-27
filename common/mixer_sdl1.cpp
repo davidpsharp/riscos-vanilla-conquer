@@ -1,6 +1,7 @@
 #include "mixer_sdl1.h"
 
 #include <SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,6 +39,9 @@ struct MixerChannel
     bool Playing;
     bool Paused;
     bool Starved; // Stopped because it ran out of data; resumes when more is queued.
+
+    unsigned BytesQueued; // Since the last Mixer_Stop, for diagnostics.
+    unsigned BytesPlayed;
 };
 
 enum
@@ -89,6 +93,7 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
         // Move on to the next queued slot when this one runs out.
         while (slot->State == SLOT_QUEUED && ch->Frame >= slot->Length / bytes_per_frame) {
             ch->Frame -= unsigned(slot->Length / bytes_per_frame);
+            ch->BytesPlayed += unsigned(slot->Length);
             slot->State = SLOT_DONE;
             ch->Head = (ch->Head + 1) % ch->SlotCount;
             slot = &ch->Slots[ch->Head];
@@ -192,6 +197,17 @@ bool Mixer_Init(int rate, bool reverse_channels)
 
     OutputRate = desired.freq;
     OutputSamples = desired.samples;
+
+    if (getenv("VC_FPSLOG") != nullptr) {
+        char driver[32] = "?";
+        SDL_AudioDriverName(driver, sizeof(driver));
+        fprintf(stderr,
+                "audio: driver %s, %d Hz, %d frames per callback (%u bytes)\n",
+                driver,
+                desired.freq,
+                desired.samples,
+                unsigned(desired.size));
+    }
     ReverseChannels = reverse_channels;
     AudioOpen = true;
     SDL_PauseAudio(0);
@@ -327,6 +343,7 @@ bool Mixer_Queue(MixerChannel* ch, const void* data, size_t len)
 
     SDL_LockAudio();
     slot->State = SLOT_QUEUED;
+    ch->BytesQueued += unsigned(len);
     ch->Tail = (ch->Tail + 1) % ch->SlotCount;
     if (ch->Starved) {
         ch->Starved = false;
@@ -371,6 +388,8 @@ void Mixer_Stop(MixerChannel* ch)
     ch->Playing = false;
     ch->Paused = false;
     ch->Starved = false;
+    ch->BytesQueued = 0;
+    ch->BytesPlayed = 0;
     ch->Head = 0;
     ch->Tail = 0;
     ch->Frame = 0;
@@ -378,6 +397,14 @@ void Mixer_Stop(MixerChannel* ch)
     for (int i = 0; i < MIXER_MAX_BUFFERS; ++i) {
         ch->Slots[i].State = SLOT_FREE;
     }
+    SDL_UnlockAudio();
+}
+
+void Mixer_Get_Channel_Counts(MixerChannel* ch, unsigned& queued, unsigned& played)
+{
+    SDL_LockAudio();
+    queued = ch->BytesQueued;
+    played = ch->BytesPlayed;
     SDL_UnlockAudio();
 }
 

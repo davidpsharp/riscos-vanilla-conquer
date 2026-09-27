@@ -38,6 +38,9 @@
 /*= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =*/
 
 #include "framelimit.h"
+#ifdef SDL1AUDIO_BUILD
+#include "mixer_sdl1.h"
+#endif
 #include "gbuffer.h"
 #include "palette.h"
 #include "video.h"
@@ -617,6 +620,19 @@ static void Log_Frame_Rate(Uint32 render_ms)
                 (Logic_Frame_Count - last_logic) * 1000.0 / (now - start),
                 double(render_total) / frames,
                 SDL1_Mouse_Button_Events - last_buttons);
+#ifdef SDL1AUDIO_BUILD
+        MixerStats audio;
+        static MixerStats last_audio;
+        Mixer_Get_Stats(audio);
+        fprintf(stderr,
+                "audio: %u callbacks, %.0f frames/s mixed (%d Hz), longest gap %ums, %u dry\n",
+                audio.Callbacks - last_audio.Callbacks,
+                (audio.FramesMixed - last_audio.FramesMixed) * 1000.0 / (now - start),
+                audio.OutputRate,
+                audio.MaxGapMs,
+                audio.DryCount - last_audio.DryCount);
+        last_audio = audio;
+#endif
         last_buttons = SDL1_Mouse_Button_Events;
         last_logic = Logic_Frame_Count;
         start = now;
