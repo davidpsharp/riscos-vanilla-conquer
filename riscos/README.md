@@ -50,7 +50,27 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 - `sdltest` in RPCEmu, 640×480×8 full screen with a full software redraw every frame: 24.5 fps on RO 3.71 and 19.9 fps on RO 5.30.
 - GCCSDK defaults to `-mstructure-size-boundary=32` (APCS), which pads every struct to a multiple of 4 bytes. The game depends on x86 struct sizes, so the toolchain sets `=8`. Without it, GDI 1 crashed within seconds with a zeroed object.
 - The RISC OS SDL 1.2 port queues a mouse motion event on every pump. `WWKeyboardClassSDL1::Fill_Buffer_From_System` therefore pumps once and then drains the queue.
-- **Status:** TD starts GDI mission 1 (`-AUTOSTART=G1`) on StrongARM RISC OS 3.71 and 5.30 under RPCEmu. Sound is not implemented yet.
+- RISC OS SDL switches to relative mouse mode when the cursor is hidden in fullscreen, so on RISC OS the game uses a transparent cursor instead.
+- UnixLib's `fnmatch` ignores `FNM_CASEFOLD`, so `Find_First` folds case itself.
+- The SDL1 `To_ASCII` indexed an SDL2 scancode table with SDL1 key symbols. Typed text was garbage on every SDL1 platform.
+
+## Playtest status (RISC OS 3.71, StrongARM, RPCEmu)
+
+Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM, 64 MB RAM).
+
+**Works on both:**
+- intro/logo movies and the main menu
+- GDI 1 via `-AUTOSTART=G1`
+- selecting units, box-select, move and attack orders, deploying the MCV
+- building and placing a Power Plant
+- edge scrolling, the Esc options menu
+- text entry, and Save/Load (including a save made on the other machine)
+
+**Speed:** 15.5 logic fps at normal speed, the 15 fps target. Uncapped (`GameSpeed=0`) it reaches 119 fps, which is the 120 fps frame limiter. RPCEmu's dynarec is faster than a real StrongARM, so real-hardware speed is still to be measured.
+
+**Video:** the game uses a 640×400 8bpp mode (250 KB), which fits either VRAM size.
+
+**Not yet done:** sound (Phase 3). RISC OS 3.7 FileCore's 10-character filename limit also needs handling for game data on a real disc; HostFS doesn't have the limit.
 
 ## Day-to-day loop
 
