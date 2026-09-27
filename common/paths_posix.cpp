@@ -59,7 +59,11 @@ namespace
             } else {
                 struct passwd* pw = nullptr;
                 struct passwd pwd;
+#ifdef _SC_GETPW_R_SIZE_MAX
                 long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+#else
+                long bufsize = -1;
+#endif
 
                 if (bufsize < 0) {
                     bufsize = 16384;
@@ -118,8 +122,22 @@ namespace
 #define PROC_SELF_EXE "/proc/self/exe"
 #endif
 
+#if defined(__riscos__)
+/*
+** On RISC OS the application directory is found through the <App$Dir> system
+** variable that !Run sets. UnixLib maps "/<Var$Dir>/file" to "<Var$Dir>.file".
+*/
+#define RISCOS_APP_DIR "/<VanillaConquer$Dir>"
+#endif
+
 const char* PathsClass::Program_Path()
 {
+#if defined(__riscos__)
+    if (ProgramPath.empty()) {
+        ProgramPath = RISCOS_APP_DIR;
+    }
+    return ProgramPath.c_str();
+#endif
     if (ProgramPath.empty()) {
         /*
         ** Adapted from https://github.com/gpakosz/whereami
@@ -184,7 +202,12 @@ const char* PathsClass::Data_Path()
             Program_Path();
         }
 
+#if defined(__riscos__)
+        // Game data lives inside the application directory.
+        DataPath = ProgramPath;
+#else
         DataPath = ProgramPath.substr(0, ProgramPath.find_last_of("/")) + SEP + "share";
+#endif
 
         if (!Suffix.empty()) {
             DataPath += SEP + Suffix;
@@ -199,6 +222,14 @@ const char* PathsClass::User_Path()
     if (UserPath.empty()) {
 #ifdef __APPLE__
         UserPath = User_Home() + "/Library/Application Support/Vanilla-Conquer";
+#elif defined(__riscos__)
+        // Choices$Write exists on RISC OS 3.5+ with the new-style !Boot; fall
+        // back to the application directory on machines without it.
+        if (std::getenv("Choices$Write") != nullptr) {
+            UserPath = "/<Choices$Write>/VanillaConquer";
+        } else {
+            UserPath = Program_Path();
+        }
 #else
         UserPath = Get_Posix_Default("XDG_CONFIG_HOME", ".config") + "/vanilla-conquer";
 #endif

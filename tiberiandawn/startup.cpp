@@ -200,6 +200,11 @@ int DLL_Startup(const char* command_line_in)
 
 int main(int argc, char** argv)
 {
+#ifdef __riscos__
+    // Output is usually redirected to a file by !Run; don't lose it on a crash.
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+#endif
     UtfArgs args(argc, argv);
     CCDebugString("C&C95 - Starting up.\n");
 
