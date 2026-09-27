@@ -8,6 +8,7 @@ Usage: vnc.py <port> <command> [args] [<command> [args]] ...
   shot <out.png>                 save a screenshot
   move <x> <y>                   move the pointer
   click <x> <y> [select|menu|adjust]
+  hold <x> <y> <seconds>         press Select for a while, like a real click
   drag <x1> <y1> <x2> <y2>       drag with select (box-select units)
   key <name|0xsym> ...           press keys: esc, ret, space, tab, f1..f12, up/down/left/right, a-z
   slowkey <hold s> <name|0xsym> ...  like key, but holds each key down for <hold> seconds
@@ -61,11 +62,24 @@ while args:
         x, y = int(args.pop(0)), int(args.pop(0))
         button = args.pop(0) if args and args[0] in ("select", "menu", "adjust") else "select"
         r._vnc_click(x, y, button)
+    elif c == "hold":
+        # hold <x> <y> <seconds>: press Select, wait, release, like a real click.
+        x, y, secs = int(args.pop(0)), int(args.pop(0)), float(args.pop(0))
+        sock, _, _ = r._vnc_connect()
+        try:
+            sock.sendall(r.struct.pack(">BBHH", 5, 0, x, y))
+            time.sleep(0.05)
+            sock.sendall(r.struct.pack(">BBHH", 5, 1, x, y))
+            time.sleep(secs)
+            sock.sendall(r.struct.pack(">BBHH", 5, 0, x, y))
+            time.sleep(0.1)
+        finally:
+            sock.close()
     elif c == "drag":
         r._vnc_drag(*(int(args.pop(0)) for _ in range(4)))
     elif c == "key":
         syms = []
-        while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
+        while args and args[0] not in ("shot", "move", "click", "hold", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
             k = args.pop(0)
             syms.append(int(k, 16) if k.startswith("0x") else KEYS.get(k, ord(k[0])))
         r._vnc_send_keys(syms)
@@ -73,7 +87,7 @@ while args:
         hold = float(args.pop(0))
         sock, _, _ = r._vnc_connect()
         try:
-            while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
+            while args and args[0] not in ("shot", "move", "click", "hold", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
                 k = args.pop(0)
                 sym = int(k, 16) if k.startswith("0x") else KEYS.get(k, ord(k[0]))
                 sock.sendall(r.struct.pack(">BBHI", 4, 1, 0, sym))

@@ -52,7 +52,7 @@ unsigned SDL1_Mouse_Button_Events = 0;
 ** the position passed to the game, SDL's current mouse state (where the cursor
 ** is drawn) and, on RISC OS, where the OS pointer really is.
 */
-static void Log_Mouse_Button(const SDL_Event& event, int x, int y)
+static void Log_Mouse_Button(const SDL_Event& event, int x, int y, bool stored)
 {
     static const bool enabled = getenv("VC_FPSLOG") != nullptr;
     if (!enabled) {
@@ -78,7 +78,20 @@ static void Log_Mouse_Button(const SDL_Event& event, int x, int y)
     int os_y = Sint16(block[3] | (block[4] << 8));
     fprintf(stderr, "; OS pointer %d,%d (OS units)", os_x, os_y);
 #endif
-    fprintf(stderr, "\n");
+    fprintf(stderr, "%s\n", stored ? "" : " - DROPPED, keyboard buffer full");
+}
+
+// Also with VC_FPSLOG: print key events, to spot keys the OS reports as stuck down.
+static void Log_Key(const SDL_Event& event)
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    if (enabled) {
+        fprintf(stderr,
+                "key: %s sym %d (%s)\n",
+                event.type == SDL_KEYDOWN ? "down" : "up",
+                int(event.key.keysym.sym),
+                SDL_GetKeyName(event.key.keysym.sym));
+    }
 }
 
 void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
@@ -101,6 +114,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             exit(0);
             break;
         case SDL_KEYDOWN:
+            Log_Key(event);
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 /* Switching to full screen is handled in the key up event */
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
@@ -108,6 +122,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             }
             break;
         case SDL_KEYUP:
+            Log_Key(event);
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 Toggle_Video_Fullscreen();
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
@@ -150,8 +165,8 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 y = event.button.y / scale_y;
             }
 
-            Put_Mouse_Message(key, x, y, event.type == SDL_MOUSEBUTTONDOWN ? false : true);
-            Log_Mouse_Button(event, x, y);
+            bool stored = Put_Mouse_Message(key, x, y, event.type == SDL_MOUSEBUTTONDOWN ? false : true);
+            Log_Mouse_Button(event, x, y, stored);
         } break;
 
         case SDL_ACTIVEEVENT:
