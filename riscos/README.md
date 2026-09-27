@@ -11,7 +11,7 @@ Vanilla Conquer for RISC OS. The first target is a StrongARM Risc PC running RIS
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |
 | `scripts/setup-rpcemu-machines.sh` | Create the `VC SA RO371` and `VC SA RO530` StrongARM machines in RPCEmu Extended |
-| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `build/hostfs/modules` |
+| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `~/vcport-work/hostfs/modules` |
 | `scripts/screenshot.sh` | Grab a machine's screen as PNG over VNC |
 | `tests/` | Toolchain smoke tests: `hello`, `unaligned`, `sdltest` |
 
@@ -30,7 +30,7 @@ RPCEmu Extended must be installed at `/Applications/RPCEmu.app`, with its data d
 riscos/scripts/setup-rpcemu-machines.sh
 riscos/scripts/fetch-runtime.sh
 riscos/scripts/build-tests.sh
-mkdir -p build/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb build/hostfs/tests/
+mkdir -p ~/vcport-work/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb ~/vcport-work/hostfs/tests/
 
 RPCEMU=/Applications/RPCEmu.app/Contents/MacOS
 $RPCEMU/rpcemu --machine "VC SA RO371" --headless &      # VNC 5920, HostCmd 5921
@@ -40,7 +40,7 @@ $RPCEMU/rpcemu-run --tcp 127.0.0.1:5921 -- 'Filer_Run HostFS:$.vc.tests.runsdl' 
 riscos/scripts/screenshot.sh 5920 build/shot.png
 ```
 
-`HostFS:$.vc` in each machine points at `build/hostfs` in this repo.
+`HostFS:$.vc` in each machine points at `~/vcport-work/hostfs`.
 
 ## Findings so far
 
