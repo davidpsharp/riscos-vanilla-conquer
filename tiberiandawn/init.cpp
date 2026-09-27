@@ -47,6 +47,7 @@
 #include "common/wspudp.h"
 #include "common/paths.h"
 #include "common/winasm.h"
+#include "common/framelimit.h"
 #include <time.h>
 
 /****************************************
@@ -509,6 +510,12 @@ bool Init_Game(int, char*[])
         Set_Palette(Palette);
         Blit_Hid_Page_To_Seen_Buff();
         Show_Mouse();
+        /*
+        ** Present the title screen now. The new palette is already live, so until
+        ** a frame is rendered the last intro movie frame is shown in the title
+        ** palette, and caching the mixfiles below can take seconds on slow machines.
+        */
+        Frame_Limiter(FL_FORCE_RENDER);
     }
     Call_Back();
 
