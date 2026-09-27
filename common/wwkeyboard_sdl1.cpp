@@ -16,9 +16,9 @@
 #include "macros.h"
 #include "wwkeyboard_sdl1.h"
 #include "video.h"
-#include "sdl_keymap.h"
 #include "settings.h"
 #include <SDL.h>
+#include <string.h>
 
 void Focus_Loss();
 void Focus_Restore();
@@ -114,21 +114,46 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 
 KeyASCIIType WWKeyboardClassSDL1::To_ASCII(unsigned short key)
 {
+    /*
+    ** SDL 1.2 key symbols for printable keys are their unshifted ASCII values
+    ** (unlike the SDL2 scancodes sdl_keymap.h is indexed by), as are Return,
+    ** Escape, Backspace and Tab. Apply a US layout shift map on top.
+    */
+    static const char shift_from[] = "`1234567890-=[]\\;',./";
+    static const char shift_to[] = "~!@#$%^&*()_+{}|:\"<>?";
+
     if (key & WWKEY_RLS_BIT) {
         return KA_NONE;
     }
 
+    bool shift = (key & WWKEY_SHIFT_BIT) || (SDL_GetModState() & KMOD_SHIFT);
     key &= 0xFF; // drop all mods
 
-    if (key > ARRAY_SIZE(sdl_keymap) / 2 - 1) {
+    switch (key) {
+    case SDLK_RETURN:
+    case SDLK_ESCAPE:
+    case SDLK_BACKSPACE:
+    case SDLK_TAB:
+        return KeyASCIIType(key);
+    default:
+        break;
+    }
+
+    if (key < ' ' || key > '~') {
         return KA_NONE;
     }
 
-    if (SDL_GetModState() & KMOD_SHIFT) {
-        return sdl_keymap[key + ARRAY_SIZE(sdl_keymap) / 2];
-    } else {
-        return sdl_keymap[key];
+    if (shift) {
+        if (key >= 'a' && key <= 'z') {
+            return KeyASCIIType(key - 'a' + 'A');
+        }
+        const char* pos = strchr(shift_from, key);
+        if (pos != nullptr) {
+            return KeyASCIIType(shift_to[pos - shift_from]);
+        }
     }
+
+    return KeyASCIIType(key);
 }
 
 WWKeyboardClass* CreateWWKeyboardClass(void)
