@@ -70,7 +70,14 @@ Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM
 
 **Video:** the game uses a 640×400 8bpp mode (250 KB), which fits either VRAM size.
 
-**Not yet done:** sound (Phase 3).
+## Sound
+
+There's no OpenAL on RISC OS, so SDL builds without OpenAL use a small software mixer on SDL 1.2's audio callback (`common/mixer_sdl1.cpp`). Its channels mimic the OpenAL sources that `soundio_common.cpp` and the VQA player expect. `soundio_sdl1.cpp` handles effects, music and speech, and `vqaaudio_sdl1.cpp` handles movie soundtracks. On RISC OS, SDL plays through **DigitalRenderer**, which `!Run` loads from `System:Modules` or from `!VanillaTD.Modules`. If audio can't be opened, the game runs silently.
+
+**How it was verified:**
+- **macOS:** `SDL_AUDIODRIVER=disk` writes the mixed output to a file. The logo, music, speech and effects all decode as real audio (zero-crossing rate 0.01–0.08). A capture is in `~/vcport-work/td-audio-mac.wav`.
+- **RISC OS 3.71 and 5.30 (RPCEmu):** `scripts/capture-mixer.py` breaks on `Mixer_Callback` and reads back the buffer it filled. The output is real audio in both the logo movie and GDI 1. Playback is paced at 22009 and 22207 frames/s against 22050 expected (from `Mixer_Frames_Mixed`), so the sound hardware consumes it in real time.
+- **Cost:** the game still runs at 15.6 logic fps. Uncapped throughput drops by about 5.5% (827 vs 876 fps), mostly from UnixLib's pthread audio thread rather than the mixing itself.
 
 ## Start-up and loading times
 
