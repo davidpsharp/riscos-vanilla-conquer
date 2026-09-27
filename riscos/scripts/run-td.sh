@@ -25,6 +25,8 @@ done
 sleep 4 # let the desktop finish starting
 rm -f "$WORK/hostfs/!VanillaTD/stdout" "$WORK/hostfs/!VanillaTD/stderr"
 APP=${VC_APP:-'HostFS:$.vc.!VanillaTD'}
-printf 'Run %s %s\n' "$APP" "$*" > "$WORK/hostfs/runtd,feb"
+# VC_RUN_PRE: extra *commands (';'-separated) to run first, e.g. "Set VC_KEYLOG 1".
+( IFS=';'; for c in ${VC_RUN_PRE:-}; do printf '%s\n' "$c"; done ) > "$WORK/hostfs/runtd,feb"
+printf 'Run %s %s\n' "$APP" "$*" >> "$WORK/hostfs/runtd,feb"
 "$M/rpcemu-run" --tcp 127.0.0.1:$PORT -- 'Filer_Run HostFS:$.vc.runtd' >/dev/null
 echo "launched on $NAME: $*"
