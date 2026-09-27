@@ -55,6 +55,10 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 - UnixLib's `fnmatch` ignores `FNM_CASEFOLD`, so `Find_First` folds case itself.
 - The SDL1 `To_ASCII` indexed an SDL2 scancode table with SDL1 key symbols. Typed text was garbage on every SDL1 platform.
 
+## Real hardware
+
+**Kinetic StrongARM Risc PC, 2 MB VRAM:** GDI mission 1 played through to the end (build `e9b66f3`, the first built without halfword instructions). The monitor has no 640×400 mode, so the game runs centred in 640×480. Measured with `VC_FPSLOG`: 26–30 frames presented per second, 13.4–14.2 game logic fps against a target of 15, and about 10–16 ms per full-screen copy.
+
 ## Playtest status (RISC OS 3.71, StrongARM, RPCEmu)
 
 Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM, 64 MB RAM).
