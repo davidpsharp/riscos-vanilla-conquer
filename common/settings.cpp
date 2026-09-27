@@ -26,7 +26,13 @@ SettingsClass::SettingsClass()
     Video.Height = 0;
     Video.Boxing = true;
     Video.BoxingAspectRatio = "16:10";
+#ifdef __riscos__
+    // Each presented frame is a full 640x400 copy to screen memory, which a Risc PC's
+    // memory bus can't sustain at 120 per second. Game logic runs at 15 fps anyway.
+    Video.FrameLimit = 30;
+#else
     Video.FrameLimit = 120;
+#endif
     Video.InterpolationMode = 2;
     Video.HardwareCursor = false;
     Video.DOSMode = false;
