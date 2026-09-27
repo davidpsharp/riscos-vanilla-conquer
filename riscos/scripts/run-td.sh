@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Reset a test machine, wait for it to boot, then launch !VanillaTD as a
 # desktop task with the given arguments. Output goes to !VanillaTD.stdout/stderr.
-# Usage: run-td.sh <371|530> [game args...]    e.g. run-td.sh 371 -AUTOSTART=G1
+# Usage: run-td.sh <371|371-1mb|530> [game args...]    e.g. run-td.sh 371 -AUTOSTART=G1
 set -euo pipefail
 WORK=${VC_WORK:-$HOME/vcport-work}
 DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
 M=/Applications/RPCEmu.app/Contents/MacOS
 case "$1" in
     371) NAME="VC SA RO371" PORT=5921 ;;
+    371-1mb) NAME="VC SA RO371 1MB" PORT=5941 ;;
     530) NAME="VC SA RO530" PORT=5931 ;;
     *) echo "unknown machine $1" >&2; exit 2 ;;
 esac

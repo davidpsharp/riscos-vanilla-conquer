@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(hello hello.cpp)
 add_executable(unaligned unaligned.c)
+add_executable(dirprobe dirprobe.c)
 
 find_package(SDL REQUIRED)
 add_executable(sdltest sdltest.cpp)
@@ -14,7 +15,7 @@ target_include_directories(sdltest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(sdltest PRIVATE ${SDL_LIBRARY})
 
 if(RISCOS)
-    foreach(t hello unaligned sdltest)
+    foreach(t hello unaligned sdltest dirprobe)
         riscos_make_aif(${t})
     endforeach()
 endif()

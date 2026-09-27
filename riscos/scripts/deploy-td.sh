@@ -15,6 +15,12 @@ else
     BDIR=build/riscos EXTRA=
 fi
 
+# CMAKE_<LANG>_FLAGS_INIT from the toolchain file only applies to a fresh
+# cache, so start over whenever the toolchain file has changed.
+if [ -f "$ROOT/$BDIR/CMakeCache.txt" ] && [ "$ROOT/riscos/cmake/riscos-gccsdk.cmake" -nt "$ROOT/$BDIR/CMakeCache.txt" ]; then
+    rm -rf "${ROOT:?}/$BDIR"
+fi
+
 if [ "${1:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/sdk.sh" bash -c "
         cmake -S . -B $BDIR -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake \
