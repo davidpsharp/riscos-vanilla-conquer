@@ -35,8 +35,26 @@ mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaTD/* "$APP/"
 cp "$ROOT/$BDIR/vanillatd,ff8" "$APP/!RunImage,ff8"
 cp "$WORK/hostfs/modules/SharedULib,ffa" "$APP/Modules/"
+# Lay the data out as RISC OS 3.x FileCore needs it: leaf names of at most
+# 10 characters, with NAME.EXT stored as EXT.NAME (see common/riscos_fs.h).
+mkdir -p "$APP/MIX" "$APP/INI"
 for f in "$WORK"/tddata/*.MIX; do
-    ln -f "$f" "$APP/"
+    name=$(basename "$f" .MIX)
+    ln -f "$f" "$APP/MIX/$name"
+    rm -f "$APP/$name.MIX" # older long-name layout
 done
-[ -f "$APP/CONQUER.INI" ] || cp "$WORK/tddata/CONQUER.INI" "$APP/"
+if [ ! -f "$APP/INI/CONQUER" ]; then
+    if [ -f "$APP/CONQUER.INI" ]; then
+        mv "$APP/CONQUER.INI" "$APP/INI/CONQUER"
+    else
+        cp "$WORK/tddata/CONQUER.INI" "$APP/INI/CONQUER"
+    fi
+fi
+
+# Every leaf name in the application must fit a 10 character filing system.
+too_long=$(cd "$APP" && find . -mindepth 1 | sed 's|,[0-9a-f][0-9a-f][0-9a-f]$||' | awk -F/ 'length($NF) > 10 {print}')
+if [ -n "$too_long" ]; then
+    echo "warning: names longer than 10 characters in !VanillaTD:" >&2
+    echo "$too_long" >&2
+fi
 echo "deployed to $APP"

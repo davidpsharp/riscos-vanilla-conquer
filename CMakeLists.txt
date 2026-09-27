@@ -36,6 +36,7 @@ option(BUILD_TESTS "Build unit tests." OFF)
 option(BUILD_TOOLS "Build modding utilities." OFF)
 option(BUILD_WITH_UBSAN "Build with undefined behavior sanitizer" OFF)
 option(BUILD_WITH_ASAN "Build with address sanitizer" OFF)
+option(SHORT_FILENAMES "Store NAME.EXT files as EXT/NAME (always on for RISC OS)" OFF)
 option(GERMAN "Use German instead of English." OFF)
 option(FRENCH "Use French instead of English." OFF)
 
@@ -86,6 +87,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_FIND_FRAMEWORK "LAST")
 
 add_definitions(-DTRUE_FALSE_DEFINED)
+
+if(SHORT_FILENAMES)
+    add_definitions(-DSHORT_FILENAMES)
+endif()
 
 if(GERMAN)
     add_definitions(-DGERMAN)

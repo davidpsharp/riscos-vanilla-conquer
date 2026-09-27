@@ -75,6 +75,7 @@ set(COMMON_SRC
     readline.cpp
     rect.cpp
     rgb.cpp
+    riscos_fs.cpp
     rndstraw.cpp
     settings.cpp
     sha.cpp

@@ -70,7 +70,28 @@ Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM
 
 **Video:** the game uses a 640×400 8bpp mode (250 KB), which fits either VRAM size.
 
-**Not yet done:** sound (Phase 3). RISC OS 3.7 FileCore's 10-character filename limit also needs handling for game data on a real disc; HostFS doesn't have the limit.
+**Not yet done:** sound (Phase 3).
+
+## Filenames (10-character FileCore)
+
+RISC OS 3.x FileCore allows 10-character leaf names and silently truncates longer ones. UnixLib stores `TEMPICNH.MIX` as `TEMPICNH/MIX` (12 characters), which becomes `TEMPICNH/M`. So on RISC OS, `NAME.EXT` files are kept the traditional way, in an `EXT` directory:
+
+```
+!VanillaTD.!Run            !VanillaTD.MIX.CONQUER     (CONQUER.MIX)
+!VanillaTD.!RunImage       !VanillaTD.MIX.TEMPICNH    (TEMPICNH.MIX)
+!VanillaTD.INI.CONQUER     (CONQUER.INI)
+!VanillaTD.000.SAVEGAME    (SAVEGAME.000, created by the game)
+```
+
+- **Reading:** the game tries the short form first, then the plain name, so data copied with long names still works on HostFS or a long-filename disc.
+- **Writing:** the extension directory is created when needed. See `common/riscos_fs.h`.
+- **Directory scans:** `Find_First` searches both layouts.
+- **Deploying:** `deploy-td.sh` lays the data out this way and warns about any name over 10 characters.
+- **Testing on the Mac:** build with `-DSHORT_FILENAMES=ON`, and set `VC_FSLOG=1` to trace file opens.
+
+This was verified by copying the app (without `MIX.MOVIES`, since the 256 MB HardDisc4 can't hold it) to `ADFS::HardDisc4.$` on RISC OS 3.71. From there, GDI 1, Save and Load all work.
+
+Without `MIX.MOVIES` the game just skips the movies, so it can be left out on small discs. SCORES (37 MB) holds the music, which isn't used until sound is implemented.
 
 ## Day-to-day loop
 

@@ -2,6 +2,7 @@
 # Reset a test machine, wait for it to boot, then launch !VanillaTD as a
 # desktop task with the given arguments. Output goes to !VanillaTD.stdout/stderr.
 # Usage: run-td.sh <371|371-1mb|530> [game args...]    e.g. run-td.sh 371 -AUTOSTART=G1
+# VC_APP overrides the application path, e.g. VC_APP='ADFS::HardDisc4.$.!VanillaTD'.
 set -euo pipefail
 WORK=${VC_WORK:-$HOME/vcport-work}
 DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
@@ -23,6 +24,7 @@ for _ in $(seq 1 60); do
 done
 sleep 4 # let the desktop finish starting
 rm -f "$WORK/hostfs/!VanillaTD/stdout" "$WORK/hostfs/!VanillaTD/stderr"
-printf 'Run HostFS:$.vc.!VanillaTD %s\n' "$*" > "$WORK/hostfs/runtd,feb"
+APP=${VC_APP:-'HostFS:$.vc.!VanillaTD'}
+printf 'Run %s %s\n' "$APP" "$*" > "$WORK/hostfs/runtd,feb"
 "$M/rpcemu-run" --tcp 127.0.0.1:$PORT -- 'Filer_Run HostFS:$.vc.runtd' >/dev/null
 echo "launched on $NAME: $*"

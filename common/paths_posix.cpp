@@ -226,7 +226,7 @@ const char* PathsClass::User_Path()
         // Choices$Write exists on RISC OS 3.5+ with the new-style !Boot; fall
         // back to the application directory on machines without it.
         if (std::getenv("Choices$Write") != nullptr) {
-            UserPath = "/<Choices$Write>/VanillaConquer";
+            UserPath = "/<Choices$Write>/VConquer"; // Leaf names must fit in 10 characters.
         } else {
             UserPath = Program_Path();
         }

@@ -58,7 +58,12 @@
 #include "file.h"
 #include "wwstd.h"
 
-#ifndef _WIN32
+#include "riscos_fs.h"
+#if defined(USE_SHORT_FILENAMES)
+#include <unistd.h>
+#define _unlink         RISCOS_Unlink
+#define raw_fopen(x, y) RISCOS_Fopen(x, y)
+#elif !defined(_WIN32)
 #include <unistd.h>
 #define _unlink         unlink
 #define raw_fopen(x, y) fopen(x, y)
