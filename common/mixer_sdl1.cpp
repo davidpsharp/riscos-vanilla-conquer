@@ -47,6 +47,11 @@ static MixerChannel* Channels[MAX_MIXER_CHANNELS];
 
 // Total output frames mixed; read by debugging tools to check playback pacing.
 volatile unsigned Mixer_Frames_Mixed = 0;
+static unsigned Callbacks = 0;
+static unsigned LastCallbackMs = 0;
+static unsigned MaxGapMs = 0;
+static unsigned DryCount = 0;
+static int OutputSamples = 0;
 static bool AudioOpen = false;
 static bool ReverseChannels = false;
 static int OutputRate = 22050;
@@ -90,6 +95,7 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
         if (slot->State != SLOT_QUEUED) {
             // Out of data: stop, as an OpenAL source would.
             ch->Playing = false;
+            ++DryCount;
             ch->Frame = 0;
             ch->Frac = 0;
             break;
@@ -125,6 +131,12 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 
     memset(mix, 0, sizeof(int) * 2 * frames);
     Mixer_Frames_Mixed += frames;
+
+    unsigned now = SDL_GetTicks();
+    if (Callbacks++ != 0 && now - LastCallbackMs > MaxGapMs) {
+        MaxGapMs = now - LastCallbackMs;
+    }
+    LastCallbackMs = now;
 
     for (int c = 0; c < MAX_MIXER_CHANNELS; ++c) {
         MixerChannel* ch = Channels[c];
@@ -176,6 +188,7 @@ bool Mixer_Init(int rate, bool reverse_channels)
     }
 
     OutputRate = desired.freq;
+    OutputSamples = desired.samples;
     ReverseChannels = reverse_channels;
     AudioOpen = true;
     SDL_PauseAudio(0);
@@ -197,6 +210,19 @@ void Mixer_Pause(bool pause)
     if (AudioOpen) {
         SDL_PauseAudio(pause ? 1 : 0);
     }
+}
+
+void Mixer_Get_Stats(MixerStats& stats)
+{
+    SDL_LockAudio();
+    stats.Callbacks = Callbacks;
+    stats.FramesMixed = Mixer_Frames_Mixed;
+    stats.MaxGapMs = MaxGapMs;
+    stats.DryCount = DryCount;
+    stats.OutputRate = OutputRate;
+    stats.OutputSamples = OutputSamples;
+    MaxGapMs = 0;
+    SDL_UnlockAudio();
 }
 
 bool Mixer_Is_Open()

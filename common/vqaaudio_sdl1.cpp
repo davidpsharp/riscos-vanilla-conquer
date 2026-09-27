@@ -17,6 +17,8 @@
 #include "vqatask.h"
 #include <algorithm>
 #include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // SDL 1.2 port of vqaaudio_openal.cpp, streaming movie audio through the
@@ -78,10 +80,60 @@ static bool Queue_Audio()
     return true;
 }
 
+/*
+** With VC_AUDIOLOG set, print movie audio pacing to stderr once a second: how
+** often the mixer callback runs and how much it mixes, against how far the
+** loader and drawer get. The video waits on the audio, so a slow or stalled
+** callback shows up here as few frames per second.
+*/
+static unsigned CopyFullCount = 0;
+
+static void Log_Audio_Pacing(VQAHandle* handle)
+{
+    static const bool enabled = getenv("VC_AUDIOLOG") != nullptr;
+    static unsigned last_ms = 0;
+    static MixerStats last;
+
+    if (!enabled) {
+        return;
+    }
+
+    unsigned now = unsigned(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+    if (last_ms != 0 && now - last_ms < 1000) {
+        return;
+    }
+
+    MixerStats stats;
+    Mixer_Get_Stats(stats);
+    if (last_ms != 0) {
+        VQAData* data = handle->VQABuf;
+        fprintf(stderr,
+                "vqa audio: %ums callbacks %u (max gap %ums) mixed %u frames (%dHz, %d/callback) dry %u | "
+                "loaded %d drawn %d skipped %u full %u\n",
+                now - last_ms,
+                stats.Callbacks - last.Callbacks,
+                stats.MaxGapMs,
+                stats.FramesMixed - last.FramesMixed,
+                stats.OutputRate,
+                stats.OutputSamples,
+                stats.DryCount - last.DryCount,
+                data->Loader.CurFrameNum,
+                data->Drawer.LastFrameNum,
+                data->Audio.NumSkipped,
+                CopyFullCount);
+    }
+    last = stats;
+    last_ms = now;
+}
+
 void VQA_AudioCallback()
 {
     if (!VQAAudioPaused && AudioVQAHandle) {
         VQAAudio* audio = &AudioVQAHandle->VQABuf->Audio;
+
+        Log_Audio_Pacing(AudioVQAHandle);
 
         if (audio->MixerChan != nullptr) {
             // Work out if we have any space to buffer more data right now.
@@ -278,6 +330,7 @@ int VQA_CopyAudio(VQAHandle* handle)
                 }
 
                 if (audio->IsLoaded[next_block] == 1) {
+                    ++CopyFullCount;
                     return -10;
                 }
 

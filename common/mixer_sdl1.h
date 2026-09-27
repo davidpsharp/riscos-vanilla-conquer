@@ -40,4 +40,16 @@ void Mixer_Stop(MixerChannel* ch);
 // True while the channel is playing and still has queued data.
 bool Mixer_Is_Playing(MixerChannel* ch);
 
+// Running totals for diagnosing playback pacing.
+struct MixerStats
+{
+    unsigned Callbacks;    // Audio callbacks so far.
+    unsigned FramesMixed;  // Output frames mixed so far.
+    unsigned MaxGapMs;     // Longest gap between callbacks since the last call.
+    unsigned DryCount;     // Times a channel ran out of queued data.
+    int OutputRate;
+    int OutputSamples;     // Callback size in frames.
+};
+void Mixer_Get_Stats(MixerStats& stats);
+
 #endif // COMMON_MIXER_SDL1_H

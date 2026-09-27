@@ -9,6 +9,9 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+#ifdef __riscos__
+#include <sched.h>
+#endif
 #include "vqatask.h"
 #include "vqaaudio.h"
 #include "vqaconfig.h"
@@ -112,6 +115,9 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
         }
 
         while (mode != 1) {
+#ifdef __riscos__
+            bool waiting = false;
+#endif
             if (data->Flags & (VQA_DATA_FLAG_VIDEO_MEMORY_SET | VQA_DATA_FLAG_8)) {
                 break;
             }
@@ -126,6 +132,9 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
                         data->Flags |= VQA_DATA_FLAG_VIDEO_MEMORY_SET;
                         rc = VQAERR_NONE;
                     }
+#ifdef __riscos__
+                    waiting = true;
+#endif
 
                 } else {
                     ++data->LoadedFrames;
@@ -148,6 +157,17 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
                     if (data->Flags & VQA_DATA_FLAG_VIDEO_MEMORY_SET && rc == VQAERR_NOBUFFER) {
                         data->Flags |= VQA_DATA_FLAG_8;
                     }
+#ifdef __riscos__
+                    /*
+                    ** Nothing to load or draw yet: usually the audio buffer is full and we are
+                    ** waiting for the SDL audio thread to play some of it. UnixLib threads
+                    ** only switch on a timer tick, so spinning here starves that thread and
+                    ** on real hardware slows the movie to a crawl. Let it run.
+                    */
+                    if (waiting) {
+                        sched_yield();
+                    }
+#endif
                 } else {
                     ++data->DrawnFrames;
 
