@@ -360,8 +360,16 @@ bool Init_Game(int, char*[])
         found = Find_First(scan_path, 0, &ffd);
         while (found) {
             char* ptr = (char*)ffd->GetName();
-            new MFCD(ptr);
-            MFCD::Cache(ptr);
+            /*
+            ** "sc*.mix" is meant for addon scenario mixfiles (SC-000.MIX etc.), but on
+            ** case-insensitive searches it also matches SCORES.MIX, the music, which is
+            ** registered separately and streamed. Caching it read ~40MB into memory
+            ** before the intro (seconds on slow machines, and too big for RISC OS 3.x).
+            */
+            if (stricmp(ptr, "SCORES.MIX") != 0) {
+                new MFCD(ptr);
+                MFCD::Cache(ptr);
+            }
             found = Find_Next(ffd);
         }
         if (ffd) {
