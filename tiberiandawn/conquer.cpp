@@ -446,6 +446,19 @@ void Keyboard_Process(KeyNumType& input)
     }
 #endif
 
+#if !defined(VIRGIN_CHEAT_KEYS) && !defined(CHEAT_KEYS)
+    /*
+    ** -PLAYTEST testing keys: Alt+W wins and Alt+L loses the current mission.
+    */
+    if (Debug_Playtest && input == (KN_W | KN_ALT_BIT)) {
+        PlayerPtr->Blockage = false;
+        PlayerPtr->Flag_To_Win();
+    }
+    if (Debug_Playtest && input == (KN_L | KN_ALT_BIT)) {
+        PlayerPtr->Flag_To_Lose();
+    }
+#endif
+
 #ifdef VIRGIN_CHEAT_KEYS
     if (Debug_Playtest && input == (KN_W | KN_ALT_BIT)) {
         PlayerPtr->Blockage = false;

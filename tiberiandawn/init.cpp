@@ -849,6 +849,15 @@ bool Select_Game(bool fade)
             process = false;
             AutoStartScenario = 0;
             Theme.Fade_Out();
+
+            /*
+            ** Select that side's disc before the scenario name is chosen, as
+            ** winning the previous mission would have done.
+            */
+            if (RequiredCD != -2 && Scen.Scenario != 1) {
+                RequiredCD = AutoStartPlayer == SCEN_PLAYER_NOD ? 1 : 0;
+                Force_CD_Available(RequiredCD);
+            }
         }
 
         while (process) {
@@ -1943,6 +1952,14 @@ bool Parse_Command_Line(int argc, char* argv[])
         /*
         **	Allow "attract" mode
         */
+        /*
+        **	-PLAYTEST: Alt+W wins and Alt+L loses the current mission, for testing.
+        */
+        if (stricmp(string, "-PLAYTEST") == 0) {
+            Debug_Playtest = true;
+            continue;
+        }
+
         if (strnicmp(string, "-AUTOSTART=", strlen("-AUTOSTART=")) == 0) {
             const char* arg = string + strlen("-AUTOSTART=");
             AutoStartPlayer = (arg[0] == 'N' || arg[0] == 'n') ? SCEN_PLAYER_NOD : SCEN_PLAYER_GDI;
