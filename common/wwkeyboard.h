@@ -56,109 +56,116 @@ typedef enum
 
 #ifdef SDL1_BUILD
 #include <SDL_keysym.h>
+/*
+** SDL 1.2 key symbols for non-ASCII keys (keypad, arrows, F keys, modifiers...)
+** are 256-322, but the keyboard code packs modifier flags into bits 8 and up
+** (WWKEY_SHIFT_BIT etc.) and strips them to track key state. Fold those keys
+** into the otherwise unused 128-255 range (dropping SDL's "world" keys).
+*/
+#define SDL1_VK(k) ((k) >= 256 ? (k) - 128 : (k))
 #define VK_NONE            SDLK_UNKNOWN
 #define VK_LBUTTON         0x01
 #define VK_RBUTTON         0x02
 #define VK_MBUTTON         0x03
 #define VK_MOUSEWHEEL_UP   0x04
 #define VK_MOUSEWHEEL_DOWN 0x05
-#define VK_BACK            SDLK_BACKSPACE
-#define VK_TAB             SDLK_TAB
-#define VK_CLEAR           SDLK_CLEAR
-#define VK_RETURN          SDLK_RETURN
-#define VK_SHIFT           SDLK_LSHIFT
-#define VK_CONTROL         SDLK_LCTRL
-#define VK_MENU            SDLK_LALT
-#define VK_PAUSE           SDLK_PAUSE
-#define VK_CAPITAL         SDLK_CAPSLOCK
-#define VK_ESCAPE          SDLK_ESCAPE
-#define VK_SPACE           SDLK_SPACE
-#define VK_PRIOR           SDLK_PAGEUP
-#define VK_NEXT            SDLK_PAGEDOWN
-#define VK_END             SDLK_END
-#define VK_HOME            SDLK_HOME
-#define VK_LEFT            SDLK_LEFT
-#define VK_UP              SDLK_UP
-#define VK_RIGHT           SDLK_RIGHT
-#define VK_DOWN            SDLK_DOWN
+#define VK_BACK            SDL1_VK(SDLK_BACKSPACE)
+#define VK_TAB             SDL1_VK(SDLK_TAB)
+#define VK_CLEAR           SDL1_VK(SDLK_CLEAR)
+#define VK_RETURN          SDL1_VK(SDLK_RETURN)
+#define VK_SHIFT           SDL1_VK(SDLK_LSHIFT)
+#define VK_CONTROL         SDL1_VK(SDLK_LCTRL)
+#define VK_MENU            SDL1_VK(SDLK_LALT)
+#define VK_PAUSE           SDL1_VK(SDLK_PAUSE)
+#define VK_CAPITAL         SDL1_VK(SDLK_CAPSLOCK)
+#define VK_ESCAPE          SDL1_VK(SDLK_ESCAPE)
+#define VK_SPACE           SDL1_VK(SDLK_SPACE)
+#define VK_PRIOR           SDL1_VK(SDLK_PAGEUP)
+#define VK_NEXT            SDL1_VK(SDLK_PAGEDOWN)
+#define VK_END             SDL1_VK(SDLK_END)
+#define VK_HOME            SDL1_VK(SDLK_HOME)
+#define VK_LEFT            SDL1_VK(SDLK_LEFT)
+#define VK_UP              SDL1_VK(SDLK_UP)
+#define VK_RIGHT           SDL1_VK(SDLK_RIGHT)
+#define VK_DOWN            SDL1_VK(SDLK_DOWN)
 #define VK_SELECT          SDLK_UNKNOWN //SELECT
-#define VK_PRINT           SDLK_PRINT
-#define VK_INSERT          SDLK_INSERT
-#define VK_DELETE          SDLK_DELETE
-#define VK_NUMPAD0         SDLK_KP0
-#define VK_NUMPAD1         SDLK_KP1
-#define VK_NUMPAD2         SDLK_KP2
-#define VK_NUMPAD3         SDLK_KP3
-#define VK_NUMPAD4         SDLK_KP4
-#define VK_NUMPAD5         SDLK_KP5
-#define VK_NUMPAD6         SDLK_KP6
-#define VK_NUMPAD7         SDLK_KP7
-#define VK_NUMPAD8         SDLK_KP8
-#define VK_NUMPAD9         SDLK_KP9
-#define VK_MULTIPLY        SDLK_KP_MULTIPLY
-#define VK_ADD             SDLK_KP_PLUS
-#define VK_SUBTRACT        SDLK_KP_MINUS
-#define VK_DIVIDE          SDLK_KP_DIVIDE
-#define VK_0               SDLK_0
-#define VK_1               SDLK_1
-#define VK_2               SDLK_2
-#define VK_3               SDLK_3
-#define VK_4               SDLK_4
-#define VK_5               SDLK_5
-#define VK_6               SDLK_6
-#define VK_7               SDLK_7
-#define VK_8               SDLK_8
-#define VK_9               SDLK_9
-#define VK_A               SDLK_a
-#define VK_B               SDLK_b
-#define VK_C               SDLK_c
-#define VK_D               SDLK_d
-#define VK_E               SDLK_e
-#define VK_F               SDLK_f
-#define VK_G               SDLK_g
-#define VK_H               SDLK_h
-#define VK_I               SDLK_i
-#define VK_J               SDLK_j
-#define VK_K               SDLK_k
-#define VK_L               SDLK_l
-#define VK_M               SDLK_m
-#define VK_N               SDLK_n
-#define VK_O               SDLK_o
-#define VK_P               SDLK_p
-#define VK_Q               SDLK_q
-#define VK_R               SDLK_r
-#define VK_S               SDLK_s
-#define VK_T               SDLK_t
-#define VK_U               SDLK_u
-#define VK_V               SDLK_v
-#define VK_W               SDLK_w
-#define VK_X               SDLK_x
-#define VK_Y               SDLK_y
-#define VK_Z               SDLK_z
-#define VK_F1              SDLK_F1
-#define VK_F2              SDLK_F2
-#define VK_F3              SDLK_F3
-#define VK_F4              SDLK_F4
-#define VK_F5              SDLK_F5
-#define VK_F6              SDLK_F6
-#define VK_F7              SDLK_F7
-#define VK_F8              SDLK_F8
-#define VK_F9              SDLK_F9
-#define VK_F10             SDLK_F10
-#define VK_F11             SDLK_F11
-#define VK_F12             SDLK_F12
-#define VK_NUMLOCK         SDLK_NUMLOCK
-#define VK_SCROLL          SDLK_SCROLLOCK
-#define VK_NONE_BA         SDLK_SEMICOLON
-#define VK_NONE_BB         SDLK_EQUALS
-#define VK_NONE_BC         SDLK_COMMA
-#define VK_NONE_BD         SDLK_MINUS
-#define VK_NONE_BE         SDLK_PERIOD
-#define VK_NONE_BF         SDLK_SLASH
+#define VK_PRINT           SDL1_VK(SDLK_PRINT)
+#define VK_INSERT          SDL1_VK(SDLK_INSERT)
+#define VK_DELETE          SDL1_VK(SDLK_DELETE)
+#define VK_NUMPAD0         SDL1_VK(SDLK_KP0)
+#define VK_NUMPAD1         SDL1_VK(SDLK_KP1)
+#define VK_NUMPAD2         SDL1_VK(SDLK_KP2)
+#define VK_NUMPAD3         SDL1_VK(SDLK_KP3)
+#define VK_NUMPAD4         SDL1_VK(SDLK_KP4)
+#define VK_NUMPAD5         SDL1_VK(SDLK_KP5)
+#define VK_NUMPAD6         SDL1_VK(SDLK_KP6)
+#define VK_NUMPAD7         SDL1_VK(SDLK_KP7)
+#define VK_NUMPAD8         SDL1_VK(SDLK_KP8)
+#define VK_NUMPAD9         SDL1_VK(SDLK_KP9)
+#define VK_MULTIPLY        SDL1_VK(SDLK_KP_MULTIPLY)
+#define VK_ADD             SDL1_VK(SDLK_KP_PLUS)
+#define VK_SUBTRACT        SDL1_VK(SDLK_KP_MINUS)
+#define VK_DIVIDE          SDL1_VK(SDLK_KP_DIVIDE)
+#define VK_0               SDL1_VK(SDLK_0)
+#define VK_1               SDL1_VK(SDLK_1)
+#define VK_2               SDL1_VK(SDLK_2)
+#define VK_3               SDL1_VK(SDLK_3)
+#define VK_4               SDL1_VK(SDLK_4)
+#define VK_5               SDL1_VK(SDLK_5)
+#define VK_6               SDL1_VK(SDLK_6)
+#define VK_7               SDL1_VK(SDLK_7)
+#define VK_8               SDL1_VK(SDLK_8)
+#define VK_9               SDL1_VK(SDLK_9)
+#define VK_A               SDL1_VK(SDLK_a)
+#define VK_B               SDL1_VK(SDLK_b)
+#define VK_C               SDL1_VK(SDLK_c)
+#define VK_D               SDL1_VK(SDLK_d)
+#define VK_E               SDL1_VK(SDLK_e)
+#define VK_F               SDL1_VK(SDLK_f)
+#define VK_G               SDL1_VK(SDLK_g)
+#define VK_H               SDL1_VK(SDLK_h)
+#define VK_I               SDL1_VK(SDLK_i)
+#define VK_J               SDL1_VK(SDLK_j)
+#define VK_K               SDL1_VK(SDLK_k)
+#define VK_L               SDL1_VK(SDLK_l)
+#define VK_M               SDL1_VK(SDLK_m)
+#define VK_N               SDL1_VK(SDLK_n)
+#define VK_O               SDL1_VK(SDLK_o)
+#define VK_P               SDL1_VK(SDLK_p)
+#define VK_Q               SDL1_VK(SDLK_q)
+#define VK_R               SDL1_VK(SDLK_r)
+#define VK_S               SDL1_VK(SDLK_s)
+#define VK_T               SDL1_VK(SDLK_t)
+#define VK_U               SDL1_VK(SDLK_u)
+#define VK_V               SDL1_VK(SDLK_v)
+#define VK_W               SDL1_VK(SDLK_w)
+#define VK_X               SDL1_VK(SDLK_x)
+#define VK_Y               SDL1_VK(SDLK_y)
+#define VK_Z               SDL1_VK(SDLK_z)
+#define VK_F1              SDL1_VK(SDLK_F1)
+#define VK_F2              SDL1_VK(SDLK_F2)
+#define VK_F3              SDL1_VK(SDLK_F3)
+#define VK_F4              SDL1_VK(SDLK_F4)
+#define VK_F5              SDL1_VK(SDLK_F5)
+#define VK_F6              SDL1_VK(SDLK_F6)
+#define VK_F7              SDL1_VK(SDLK_F7)
+#define VK_F8              SDL1_VK(SDLK_F8)
+#define VK_F9              SDL1_VK(SDLK_F9)
+#define VK_F10             SDL1_VK(SDLK_F10)
+#define VK_F11             SDL1_VK(SDLK_F11)
+#define VK_F12             SDL1_VK(SDLK_F12)
+#define VK_NUMLOCK         SDL1_VK(SDLK_NUMLOCK)
+#define VK_SCROLL          SDL1_VK(SDLK_SCROLLOCK)
+#define VK_NONE_BA         SDL1_VK(SDLK_SEMICOLON)
+#define VK_NONE_BB         SDL1_VK(SDLK_EQUALS)
+#define VK_NONE_BC         SDL1_VK(SDLK_COMMA)
+#define VK_NONE_BD         SDL1_VK(SDLK_MINUS)
+#define VK_NONE_BE         SDL1_VK(SDLK_PERIOD)
+#define VK_NONE_BF         SDL1_VK(SDLK_SLASH)
 #define VK_NONE_C0         SDLK_UNKNOWN //GRAVE
-#define VK_NONE_DB         SDLK_LEFTBRACKET
-#define VK_NONE_DC         SDLK_BACKSLASH
-#define VK_NONE_DD         SDLK_RIGHTBRACKET
+#define VK_NONE_DB         SDL1_VK(SDLK_LEFTBRACKET)
+#define VK_NONE_DC         SDL1_VK(SDLK_BACKSLASH)
+#define VK_NONE_DD         SDL1_VK(SDLK_RIGHTBRACKET)
 #define VK_NONE_DE         SDLK_UNKNOWN //APOSTROPHE
 
 #elif defined(SDL2_BUILD)
@@ -795,7 +802,7 @@ typedef enum KeyNumType : unsigned short
 #ifdef SDL2_BUILD
     KN_RALT = SDL_SCANCODE_RALT,
 #elif defined(SDL1_BUILD)
-    KN_RALT = SDLK_RALT,
+    KN_RALT = SDL1_VK(SDLK_RALT),
 #else
     KN_RALT = VK_MENU,
 #endif
@@ -803,7 +810,7 @@ typedef enum KeyNumType : unsigned short
 #ifdef SDL2_BUILD
     KN_RCTRL = SDL_SCANCODE_RCTRL,
 #elif defined(SDL1_BUILD)
-    KN_RCTRL = SDLK_RCTRL,
+    KN_RCTRL = SDL1_VK(SDLK_RCTRL),
 #else
     KN_RCTRL = VK_CONTROL,
 #endif
@@ -813,7 +820,7 @@ typedef enum KeyNumType : unsigned short
 #ifdef SDL2_BUILD
     KN_RSHIFT = SDL_SCANCODE_RSHIFT,
 #elif defined(SDL1_BUILD)
-    KN_RSHIFT = SDLK_RSHIFT,
+    KN_RSHIFT = SDL1_VK(SDLK_RSHIFT),
 #else
     KN_RSHIFT = VK_SHIFT,
 #endif

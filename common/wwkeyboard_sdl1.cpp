@@ -24,6 +24,18 @@ void Focus_Loss();
 void Focus_Restore();
 void Process_Network();
 
+/*
+** Converts an SDL 1.2 key symbol to this backend's key code (see SDL1_VK in
+** wwkeyboard.h), or 0 for keys the game has no use for.
+*/
+static unsigned short SDL1_Key(SDLKey sym)
+{
+    if (sym >= SDLK_WORLD_0 && sym <= SDLK_WORLD_95) {
+        return 0; // Their codes are reused for keys above 255.
+    }
+    return (unsigned short)SDL1_VK(sym);
+}
+
 WWKeyboardClassSDL1::~WWKeyboardClassSDL1()
 {
 }
@@ -50,15 +62,15 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
         case SDL_KEYDOWN:
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 /* Switching to full screen is handled in the key up event */
-            } else {
-                Put_Key_Message(event.key.keysym.sym, false);
+            } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
+                Put_Key_Message(key, false);
             }
             break;
         case SDL_KEYUP:
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 Toggle_Video_Fullscreen();
-            } else {
-                Put_Key_Message(event.key.keysym.sym, true);
+            } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
+                Put_Key_Message(key, true);
             }
             break;
         case SDL_MOUSEMOTION:
@@ -135,8 +147,24 @@ KeyASCIIType WWKeyboardClassSDL1::To_ASCII(unsigned short key)
     case SDLK_BACKSPACE:
     case SDLK_TAB:
         return KeyASCIIType(key);
+    case SDL1_VK(SDLK_KP_ENTER):
+        return KA_RETURN;
+    case SDL1_VK(SDLK_KP_PERIOD):
+        return KA_PERIOD;
+    case SDL1_VK(SDLK_KP_DIVIDE):
+        return KA_SLASH;
+    case SDL1_VK(SDLK_KP_MULTIPLY):
+        return KA_ASTERISK;
+    case SDL1_VK(SDLK_KP_MINUS):
+        return KA_MINUS;
+    case SDL1_VK(SDLK_KP_PLUS):
+        return KA_PLUS;
     default:
         break;
+    }
+
+    if (key >= SDL1_VK(SDLK_KP0) && key <= SDL1_VK(SDLK_KP9)) {
+        return KeyASCIIType('0' + key - SDL1_VK(SDLK_KP0));
     }
 
     if (key < ' ' || key > '~') {

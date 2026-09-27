@@ -62,7 +62,10 @@
 #include "hsv.h"
 #include "options.h"
 
-#ifdef SDL_BUILD
+#if defined(SDL1_BUILD)
+// SDL 1.2 key codes differ from SDL2's (and changed with SDL1_VK), so keep them separate.
+char const* const OptionsClass::HotkeyName = "SDL1Hotkeys";
+#elif defined(SDL_BUILD)
 char const* const OptionsClass::HotkeyName = "SDLHotkeys";
 #else
 char const* const OptionsClass::HotkeyName = "WinHotkeys";

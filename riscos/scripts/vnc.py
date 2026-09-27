@@ -11,6 +11,7 @@ Usage: vnc.py <port> <command> [args] [<command> [args]] ...
   drag <x1> <y1> <x2> <y2>       drag with select (box-select units)
   key <name|0xsym> ...           press keys: esc, ret, space, tab, f1..f12, up/down/left/right, a-z
   slowkey <hold s> <name|0xsym> ...  like key, but holds each key down for <hold> seconds
+  down <key> / up <key>          hold or release a key (e.g. down ctrl click 300 200 up ctrl)
   wait <seconds>
   save <x> <y> <w> <h> <out.raw>  save a screen region (raw RGBX) as a reference
   until <x> <y> <w> <h> <ref.raw> <timeout>  wait until the region matches the reference
@@ -64,7 +65,7 @@ while args:
         r._vnc_drag(*(int(args.pop(0)) for _ in range(4)))
     elif c == "key":
         syms = []
-        while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "wait", "save", "until", "changes"):
+        while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
             k = args.pop(0)
             syms.append(int(k, 16) if k.startswith("0x") else KEYS.get(k, ord(k[0])))
         r._vnc_send_keys(syms)
@@ -72,13 +73,22 @@ while args:
         hold = float(args.pop(0))
         sock, _, _ = r._vnc_connect()
         try:
-            while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "wait", "save", "until", "changes"):
+            while args and args[0] not in ("shot", "move", "click", "drag", "key", "slowkey", "down", "up", "wait", "save", "until", "changes"):
                 k = args.pop(0)
                 sym = int(k, 16) if k.startswith("0x") else KEYS.get(k, ord(k[0]))
                 sock.sendall(r.struct.pack(">BBHI", 4, 1, 0, sym))
                 time.sleep(hold)
                 sock.sendall(r.struct.pack(">BBHI", 4, 0, 0, sym))
                 time.sleep(hold)
+        finally:
+            sock.close()
+    elif c in ("down", "up"):
+        k = args.pop(0)
+        sym = int(k, 16) if k.startswith("0x") else KEYS.get(k, ord(k[0]))
+        sock, _, _ = r._vnc_connect()
+        try:
+            sock.sendall(r.struct.pack(">BBHI", 4, 1 if c == "down" else 0, 0, sym))
+            time.sleep(0.1)
         finally:
             sock.close()
     elif c == "wait":
