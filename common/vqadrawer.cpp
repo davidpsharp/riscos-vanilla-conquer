@@ -10,6 +10,9 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "vqadrawer.h"
+
+// Total movie frames skipped to keep up; read by debugging tools.
+volatile unsigned VQA_Frames_Skipped = 0;
 //#include "dialog.h"
 #include "lcw.h"
 #include "unvqbuff.h"
@@ -288,6 +291,9 @@ int VQA_SelectFrame(VQAHandle* handle)
                 }
 
                 if (curframe->Flags & 4) {
+                    if (vqabuf->Drawer.Flags & 1) {
+                        VQA_Palette_Skipped(); // An earlier skipped palette is superseded.
+                    }
                     if (curframe->Flags & 8) {
                         curframe->PaletteSize = LCW_Uncompress((curframe->PalOffset + curframe->Palette),
                                                                curframe->Palette,
@@ -308,6 +314,7 @@ int VQA_SelectFrame(VQAHandle* handle)
                 curframe = curframe->Next;
                 vqabuf->Drawer.CurFrame = curframe;
                 ++vqabuf->Drawer.NumSkipped;
+                ++VQA_Frames_Skipped;
             }
 
             vqabuf->Drawer.LastFrame = curframe->FrameNum;

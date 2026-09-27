@@ -67,6 +67,7 @@
 #include "common/paths.h"
 #include "common/vqatask.h"
 #include "common/vqaloader.h"
+#include "common/vqapalette.h"
 #include "common/settings.h"
 #include "common/winasm.h"
 
@@ -2079,6 +2080,7 @@ int Load_Interpolated_Palettes(char const* filename, bool add)
     }
 
     PaletteCounter = 0;
+    VQA_Reset_Palette_Tracking();
     return (num_palettes);
 }
 

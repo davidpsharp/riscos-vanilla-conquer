@@ -32,6 +32,7 @@
  * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/vqapalette.h"
 #include "function.h"
 #include "textblit.h"
 #include "common/vqatask.h"
@@ -274,6 +275,7 @@ void Choose_Side(void)
         }
         if (gdibrief) {
             PaletteCounter = gdi_start_palette;
+            VQA_Reset_Palette_Tracking();
             VQA_Play(gdibrief, VQAMODE_RUN);
             VQA_Close(gdibrief);
             VQA_Free(gdibrief);

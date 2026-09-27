@@ -20,6 +20,25 @@ int VQNumBytes;
 bool VQSlowpal;
 bool VQPaletteChange = false;
 
+/*
+** Movies are scaled up with a precomputed interpolation table per palette
+** change, selected by PaletteCounter in the order the changes occur. Changes
+** that are never applied (skipped frames, or a newer change flagged before the
+** old one was set) still have to advance the counter, or every later frame is
+** interpolated with the wrong table.
+*/
+static unsigned VQPalettesSkipped = 0;
+
+void VQA_Palette_Skipped()
+{
+    ++VQPalettesSkipped;
+}
+
+void VQA_Reset_Palette_Tracking()
+{
+    VQPalettesSkipped = 0;
+}
+
 extern unsigned char* InterpolatedPalettes[100];
 extern bool PalettesRead;
 extern unsigned PaletteCounter;
@@ -29,6 +48,9 @@ extern unsigned PaletteCounter;
  */
 void VQA_Flag_To_Set_Palette(uint8_t* palette, int numbytes, bool slowpal)
 {
+    if (VQPaletteChange) {
+        VQA_Palette_Skipped(); // The pending change is replaced before it was applied.
+    }
     VQPalette = palette;
     VQNumBytes = numbytes;
     VQSlowpal = slowpal;
@@ -45,6 +67,9 @@ void VQA_SetPalette(uint8_t* palette, int numbytes, bool slowpal)
     }
 
     Increase_Palette_Luminance(palette, 15, 15, 15, 63);
+
+    PaletteCounter += VQPalettesSkipped;
+    VQPalettesSkipped = 0;
 
     if (PalettesRead && InterpolationTable) {
         void* paletteinterpol = (void*)&InterpolationTable->PaletteInterpolationTable;

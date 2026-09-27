@@ -20,6 +20,10 @@ extern bool VQSlowpal;
 extern bool VQPaletteChange;
 
 void VQA_Flag_To_Set_Palette(uint8_t* palette, int numbytes, bool slowpal);
+// Records a movie palette change that was dropped (frame skipped or superseded).
+void VQA_Palette_Skipped();
+// Call whenever PaletteCounter is reset for a new movie.
+void VQA_Reset_Palette_Tracking();
 void VQA_SetPalette(uint8_t* palette, int numbytes, bool slowpal);
 void Check_VQ_Palette_Set();
 
