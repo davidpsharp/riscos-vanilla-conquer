@@ -55,6 +55,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "gadget.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "filepcx.h"
 #include "wwmouse.h"
 #ifdef _WIN32
@@ -591,6 +593,22 @@ KeyNumType GadgetClass::Input(void)
     /*
     **	If "sticky" processing is active, then only process the stuck gadget.
     */
+    /*
+    **	With VC_FPSLOG set, trace what the gadgets see: every event, and every frame
+    **	while a gadget is held, to debug clicks that don't register.
+    */
+    static const bool trace = getenv("VC_FPSLOG") != nullptr;
+    GadgetClass* stuck_before = StuckOn;
+    if (trace && (key != 0 || StuckOn != nullptr)) {
+        fprintf(stderr,
+                "gadget: key %04x flags %04x at %d,%d stuck %s\n",
+                unsigned(key),
+                flags,
+                mousex,
+                mousey,
+                StuckOn != nullptr ? "yes" : "no");
+    }
+
     if (StuckOn) {
         StuckOn->Draw_Me(false);
         GadgetClass* oldstuck = StuckOn;
@@ -636,6 +654,9 @@ KeyNumType GadgetClass::Input(void)
                     **	performed, then bail from further processing (speed reasons?).
                     */
                     if (next_button->Clicked_On(key, flags, mousex, mousey)) {
+                        if (trace && key != 0) {
+                            fprintf(stderr, "gadget: taken by id %d\n", next_button->Get_ID());
+                        }
 
                         /*
                         **	Some buttons will require repainting when they perform some action.
@@ -649,6 +670,9 @@ KeyNumType GadgetClass::Input(void)
                 next_button = next_button->Get_Next();
             }
         }
+    }
+    if (trace && stuck_before != nullptr && StuckOn == nullptr) {
+        fprintf(stderr, "gadget: released stuck gadget, returning %04x\n", unsigned(key));
     }
     return (key);
 }

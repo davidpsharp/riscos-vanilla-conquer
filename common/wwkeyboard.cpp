@@ -52,6 +52,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "wwkeyboard.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "video.h"
 #include "miscasm.h"
 #include <string.h>
@@ -482,6 +484,10 @@ unsigned char WWKeyboardClass::Get_Scroll_Direction()
  *=============================================================================================*/
 void WWKeyboardClass::Clear(void)
 {
+    static const bool trace = getenv("VC_FPSLOG") != nullptr;
+    if (trace && Get_Bit(DownState, KN_LMOUSE)) {
+        fprintf(stderr, "keyboard: Clear() while left button down, from %p\n", __builtin_return_address(0));
+    }
     /*
     **	Extract any windows pending keyboard message events and then clear out the keyboard
     **	buffer.
