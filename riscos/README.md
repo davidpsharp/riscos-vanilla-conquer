@@ -95,6 +95,35 @@ Almost all of the remaining wait is the movies, which play in real time: the log
 
 Why it's this fast: on RISC OS the game skips `Resolve_File`'s case-fixing directory scans, and `RISCOS_Fopen` remembers files that don't exist, so repeated probes are free. `scripts/profile.py` is a sampling profiler over the RPCEmu debugger, and `scripts/time-menu.sh` measures start-up.
 
+## GDI and Nod discs
+
+The GDI and Nod CDs differ only in `GENERAL.MIX` (scenarios and briefings) and `MOVIES.MIX`. `prepare-td-data.sh <GDI.iso> --movies --nod <Nod.iso>` stores those per disc. `deploy-td.sh` then lays the app out like this:
+
+```
+!VanillaTD.MIX.*               shared data (CONQUER, SCORES, SOUNDS, ...)
+!VanillaTD.gdi.MIX.GENERAL     GDI disc (plus .MOVIES)
+!VanillaTD.nod.MIX.GENERAL     Nod disc (plus .MOVIES)
+```
+
+The game picks `gdi` or `nod` according to the side being played (`Force_CD_Available`). `GENERAL` and `MOVIES` must not also be at the top level, or they would shadow the other side's copies.
+
+**Tested on RO 3.71:**
+- Nod mission 1 via `-AUTOSTART=N1`, and via Start New Game → Select Transmission → Nod, with the Nod briefing.
+- Saving a Nod game, loading a GDI save from it, and loading the Nod save back.
+
+The movies are about 430 MB per side and can be left out on small discs.
+
+## Keys
+
+SDL 1.2 numbers non-ASCII keys (modifiers, arrows, F keys, keypad) 256–322, which collided with the keyboard code's modifier bits. `SDL1_VK` folds them into 128–255.
+
+**Tested on RO 3.71:**
+- Shift, Ctrl and Alt are tracked correctly: Shift-click adds to the selection, Ctrl gives the force-attack cursor and Alt the force-move cursor.
+- The F9–F12 bookmarks work: Ctrl/Shift/Alt+F9 sets one, F9 jumps back.
+- Home works.
+
+Hotkeys are stored in `[SDL1Hotkeys]`.
+
 ## Filenames (10-character FileCore)
 
 RISC OS 3.x FileCore allows 10-character leaf names and silently truncates longer ones. UnixLib stores `TEMPICNH.MIX` as `TEMPICNH/MIX` (12 characters), which becomes `TEMPICNH/M`. So on RISC OS, `NAME.EXT` files are kept the traditional way, in an `EXT` directory:

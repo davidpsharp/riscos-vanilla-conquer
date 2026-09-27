@@ -39,11 +39,28 @@ cp "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 # Lay the data out as RISC OS 3.x FileCore needs it: leaf names of at most
 # 10 characters, with NAME.EXT stored as EXT.NAME (see common/riscos_fs.h).
 mkdir -p "$APP/MIX" "$APP/INI"
+HAVE_DISCS=
+[ -d "$WORK/tddata/cd" ] && HAVE_DISCS=1
 for f in "$WORK"/tddata/*.MIX; do
     name=$(basename "$f" .MIX)
-    ln -f "$f" "$APP/MIX/$name"
     rm -f "$APP/$name.MIX" # older long-name layout
+    # With per-disc data, GENERAL and MOVIES come from the gdi/nod directories
+    # only, or the top-level copies would shadow the other side's.
+    if [ -n "$HAVE_DISCS" ] && { [ "$name" = GENERAL ] || [ "$name" = MOVIES ]; }; then
+        rm -f "$APP/MIX/$name"
+        continue
+    fi
+    ln -f "$f" "$APP/MIX/$name"
 done
+if [ -n "$HAVE_DISCS" ]; then
+    for disc in "$WORK"/tddata/cd/*; do
+        side=$(basename "$disc")
+        mkdir -p "$APP/$side/MIX"
+        for f in "$disc"/*.MIX; do
+            ln -f "$f" "$APP/$side/MIX/$(basename "$f" .MIX)"
+        done
+    done
+fi
 if [ ! -f "$APP/INI/CONQUER" ]; then
     if [ -f "$APP/CONQUER.INI" ]; then
         mv "$APP/CONQUER.INI" "$APP/INI/CONQUER"
