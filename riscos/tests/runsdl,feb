@@ -1,0 +1,4 @@
+RMEnsure SharedUnixLibrary 1.16 RMLoad HostFS:$.vc.modules.SharedULib
+Dir HostFS:$.vc.tests
+WimpSlot -min 2048K
+Run HostFS:$.vc.tests.sdltest 20
