@@ -1,7 +1,7 @@
 #include "file.h"
 #include <string.h>
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__riscos__)
 static void Resolve_File_Single(char* fname)
 {
     Find_File_Data* ffblk;
@@ -24,7 +24,10 @@ static void Resolve_File_Single(char* fname)
 
 void Resolve_File(char* fname)
 {
-#ifndef _WIN32
+    // Fixes up filename case on case-sensitive filing systems. RISC OS filing
+    // systems are case-insensitive, and the directory scans this does are very
+    // slow there (seconds per screen change), so skip it.
+#if !defined(_WIN32) && !defined(__riscos__)
     // step through each sub-directory before going for the win
     char* next = fname;
     while (next = strchr(next, '/')) {
