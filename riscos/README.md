@@ -106,7 +106,27 @@ Almost all of the remaining wait is the movies, which play in real time: the log
 
 Why it's this fast: on RISC OS the game skips `Resolve_File`'s case-fixing directory scans, and `RISCOS_Fopen` remembers files that don't exist, so repeated probes are free. `scripts/profile.py` is a sampling profiler over the RPCEmu debugger, and `scripts/time-menu.sh` measures start-up.
 
-## GDI and Nod discs
+## Installing the game data on RISC OS
+
+The game data isn't redistributable, so `!VanillaTD` ships without it. `!VanillaTD.Prepare` installs it from the freeware C&C95 (C&C Gold) CD images, on the RISC OS machine itself. Run it once per disc:
+
+```
+*Obey <path>.!VanillaTD.Prepare <path>.CNC95_GDI/iso [-nomovies] [-force]
+*Obey <path>.!VanillaTD.Prepare <path>.CNC95_Nod/iso [-nomovies]
+```
+
+It runs `Utils.vcprep` (source in `tools/vcprep`), which:
+- reads the ISO image directly, with no CDFS or mounting needed;
+- unpacks the files in `INSTALL/SETUP.Z` (InstallShield 3, PKWARE implode; decompressed with Mark Adler's `blast.c`);
+- writes the short-filename layout below, with filetypes set;
+- checks every file against a known CRC-32 and says which disc it is from `GENERAL.MIX`.
+
+The shared files are identical on both discs, so the second run skips them, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS discs aren't supported. Other versions of the C&C95 discs would fail the checksums.
+
+**Tested:**
+- Natively on macOS against both ISOs, where its output matches `prepare-td-data.sh`.
+- On RO 3.71 (RPCEmu): writing to ADFS, and through `Prepare` with both discs. GDI 1 and Nod 1 then start from the prepared app.
+
 
 The GDI and Nod CDs differ only in `GENERAL.MIX` (scenarios and briefings) and `MOVIES.MIX`. `prepare-td-data.sh <GDI.iso> --movies --nod <Nod.iso>` stores those per disc. `deploy-td.sh` then lays the app out like this:
 

@@ -27,13 +27,18 @@ if [ "${1:-}" != --no-build ]; then
             -DCMAKE_BUILD_TYPE=Release -DRISCOS_EXTRA_FLAGS=$EXTRA \
             -DBUILD_VANILLARA=OFF -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=OFF >/dev/null &&
         cmake --build $BDIR &&
-        elf2aif $BDIR/vanillatd $BDIR/vanillatd,ff8"
+        elf2aif $BDIR/vanillatd $BDIR/vanillatd,ff8 &&
+        cmake -S riscos/tools -B build/riscos-tools -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake -DCMAKE_BUILD_TYPE=Release >/dev/null &&
+        cmake --build build/riscos-tools"
 fi
 
 [ -d "$WORK/hostfs/modules" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
 mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaTD/* "$APP/"
 cp "$ROOT/$BDIR/vanillatd,ff8" "$APP/!RunImage,ff8"
+mkdir -p "$APP/Utils"
+cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"
 cp "$WORK/hostfs/modules/SharedULib,ffa" "$APP/Modules/"
 cp "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 # Lay the data out as RISC OS 3.x FileCore needs it: leaf names of at most
