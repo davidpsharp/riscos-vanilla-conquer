@@ -10,6 +10,30 @@
 #include <unistd.h>
 #include <limits.h>
 #include <fnmatch.h>
+#include <ctype.h>
+
+/*
+** Case-insensitive wildcard match. FNM_CASEFOLD is a GNU extension that some C
+** libraries (e.g. RISC OS UnixLib) accept but ignore, so fold case ourselves.
+*/
+static bool Match_No_Case(const char* pattern, const char* name)
+{
+    char lpattern[PATH_MAX];
+    char lname[PATH_MAX];
+    size_t i;
+
+    for (i = 0; pattern[i] != '\0' && i < sizeof(lpattern) - 1; ++i) {
+        lpattern[i] = (char)tolower((unsigned char)pattern[i]);
+    }
+    lpattern[i] = '\0';
+
+    for (i = 0; name[i] != '\0' && i < sizeof(lname) - 1; ++i) {
+        lname[i] = (char)tolower((unsigned char)name[i]);
+    }
+    lname[i] = '\0';
+
+    return fnmatch(lpattern, lname, FNM_PATHNAME) == 0;
+}
 
 class Find_File_Data_Posix : public Find_File_Data
 {
@@ -76,7 +100,7 @@ bool Find_File_Data_Posix::FindNextWithFilter()
         if (DirEntry == nullptr) {
             return false;
         }
-        if (fnmatch(FileFilter, DirEntry->d_name, FNM_PATHNAME | FNM_CASEFOLD) == 0) {
+        if (Match_No_Case(FileFilter, DirEntry->d_name)) {
             strcpy(FullName, DirName);
             strcat(FullName, DirEntry->d_name);
             break;
