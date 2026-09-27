@@ -106,11 +106,11 @@ int32_t CRCEngine::operator()(void const* buffer, size_t length)
         **	Perform the fast 'bulk' processing by reading long word sized
         **	data blocks.
         */
-        int32_t const* longptr = (int32_t const*)dataptr;
         int longcount = bytes_left / sizeof(int32_t); // Whole 'long' elements remaining.
         while (longcount--) {
             int32_t l;
-            memcpy(&l, longptr++, sizeof(int32_t));
+            memcpy(&l, dataptr, sizeof(int32_t)); // dataptr may be unaligned.
+            dataptr += sizeof(int32_t);
             CRC = lrotl(CRC, 1) + le32toh(l);
             bytes_left -= sizeof(int32_t);
         }
@@ -119,7 +119,6 @@ int32_t CRCEngine::operator()(void const* buffer, size_t length)
         **	If there are remainder bytes, then process these by adding them
         **	to the staging buffer.
         */
-        dataptr = (char const*)longptr;
         while (bytes_left) {
             operator()(*dataptr);
             dataptr++;

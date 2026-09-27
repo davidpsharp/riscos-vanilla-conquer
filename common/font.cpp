@@ -324,12 +324,11 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
     int base_x = x;
 
     if (FontPtr != nullptr) {
-        const unsigned short* datalist = reinterpret_cast<const unsigned short*>(
-            reinterpret_cast<const char*>(FontPtr) + le16toh(fntheader->OffsetBlockOffset));
+        // The offset and line tables may be unaligned, so index them as bytes.
+        const char* datalist = reinterpret_cast<const char*>(FontPtr) + le16toh(fntheader->OffsetBlockOffset);
         const unsigned char* widthlist =
             reinterpret_cast<const unsigned char*>(FontPtr) + le16toh(fntheader->WidthBlockOffset);
-        const unsigned short* linelist = reinterpret_cast<const unsigned short*>(reinterpret_cast<const char*>(FontPtr)
-                                                                                 + le16toh(fntheader->HeightOffset));
+        const char* linelist = reinterpret_cast<const char*>(FontPtr) + le16toh(fntheader->HeightOffset);
 
         int fntheight = fntheader->MaxHeight;
         int ydisplace = FontYSpacing + fntheight;
@@ -400,11 +399,11 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
                 x += FontXSpacing + char_width;
                 int next_line = pitch - char_width;
                 unsigned short dlist;
-                memcpy(&dlist, datalist + char_num, sizeof(unsigned short));
+                memcpy(&dlist, datalist + char_num * sizeof(unsigned short), sizeof(unsigned short));
                 dlist = le16toh(dlist);
                 const unsigned char* char_data = reinterpret_cast<const unsigned char*>(FontPtr) + dlist;
                 short char_lle;
-                memcpy(&char_lle, linelist + char_num, sizeof(short));
+                memcpy(&char_lle, linelist + char_num * sizeof(short), sizeof(short));
                 char_lle = le16toh(char_lle);
                 int char_ypos = char_lle & 0xFF;
                 int char_lines = char_lle >> 8;

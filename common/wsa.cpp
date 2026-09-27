@@ -830,13 +830,12 @@ unsigned int Get_Animation_Size(void const* handle)
 static unsigned int Get_Resident_Frame_Offset(char* file_buffer, int frame)
 {
     unsigned int frame0_size;
-    uint32_t* lptr;
 
     // If there is a frame 0, the calculate its size.
-    lptr = (uint32_t*)file_buffer;
+    // file_buffer may be unaligned, so read through a byte pointer.
     uint32_t x1, x0;
-    memcpy(&x0, lptr, sizeof(uint32_t));
-    memcpy(&x1, lptr + 1, sizeof(uint32_t));
+    memcpy(&x0, file_buffer, sizeof(uint32_t));
+    memcpy(&x1, file_buffer + sizeof(uint32_t), sizeof(uint32_t));
 
     x0 = le32toh(x0);
     x1 = le32toh(x1);
@@ -848,8 +847,7 @@ static unsigned int Get_Resident_Frame_Offset(char* file_buffer, int frame)
     }
 
     // Return the offset into RAM for the frame.
-    lptr += frame;
-    memcpy(&x0, lptr, sizeof(uint32_t));
+    memcpy(&x0, file_buffer + frame * sizeof(uint32_t), sizeof(uint32_t));
     x0 = le32toh(x0);
     if (x0)
         return (x0 - (frame0_size + WSA_FILE_HEADER_SIZE));

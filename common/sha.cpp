@@ -37,6 +37,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include <stdlib.h>
+#include <string.h>
 //#include	<iostream.h>
 #include "sha.h"
 #include "endianness.h"
@@ -214,7 +215,8 @@ int SHAEngine::Result(void* result) const
     **	last 8 bytes of the pseudo-source data.
     */
     memset(&partial[partialcount], '\0', SRC_BLOCK_SIZE - partialcount);
-    *(int32_t*)(&partial[SRC_BLOCK_SIZE - 4]) = htobe32((length * 8));
+    int32_t bitlength = htobe32((length * 8));
+    memcpy(&partial[SRC_BLOCK_SIZE - 4], &bitlength, sizeof(bitlength)); // partial may be unaligned.
     Process_Block(&partial[0], acc);
 
     memcpy((char*)&FinalResult, &acc, sizeof(acc));
