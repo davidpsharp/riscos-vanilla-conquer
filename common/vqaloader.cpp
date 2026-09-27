@@ -10,6 +10,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "vqaloader.h"
+#include <algorithm>
 #include "soscomp.h"
 #include "auduncmp.h"
 #include "file.h"
@@ -241,6 +242,27 @@ int VQA_Load_VPTZ(VQAHandle* handle, unsigned iffsize)
     return VQAERR_NONE;
 }
 
+/*
+** The SND loaders stage audio in TempBuf (sized for about two frames' worth)
+** once playback has started, even when a chunk is bigger than that, which
+** overflowed the heap. Grow TempBuf to fit before using it.
+*/
+static bool VQA_Reserve_TempBuf(VQAAudio* audio, unsigned needed)
+{
+    if (needed <= audio->TempBufLen) {
+        return true;
+    }
+
+    uint8_t* bigger = (uint8_t*)realloc(audio->TempBuf, needed);
+    if (bigger == nullptr) {
+        return false;
+    }
+
+    audio->TempBuf = bigger;
+    audio->TempBufLen = needed;
+    return true;
+}
+
 int VQA_Load_SND0(VQAHandle* handle, unsigned iffsize)
 {
     VQAConfig* config = &handle->Config;
@@ -257,6 +279,9 @@ int VQA_Load_SND0(VQAHandle* handle, unsigned iffsize)
     }
 
     if (size_aligned <= audio->TempBufLen || audio->AudBufPos) {
+        if (!VQA_Reserve_TempBuf(audio, size_aligned)) {
+            return VQAERR_NOMEM;
+        }
         if (handle->StreamHandler(handle, VQACMD_READ, audio->TempBuf, size_aligned)) {
             return VQAERR_READ;
         }
@@ -303,6 +328,9 @@ int VQA_Load_SND1(VQAHandle* handle, unsigned iffsize)
     size_aligned -= sizeof(snd1hdr);
 
     if ((unsigned)snd1hdr.OutSize <= audio->TempBufLen || audio->AudBufPos > 0) {
+        if (!VQA_Reserve_TempBuf(audio, std::max((unsigned)snd1hdr.OutSize, (unsigned)size_aligned))) {
+            return VQAERR_NOMEM;
+        }
         if (snd1hdr.OutSize == snd1hdr.Size) {
             if (handle->StreamHandler(handle, VQACMD_READ, audio->TempBuf, size_aligned)) {
                 return VQAERR_READ;
@@ -363,6 +391,9 @@ int VQA_Load_SND2(VQAHandle* handle, unsigned iffsize)
     unsigned decomp_size = iffsize * (handle->VQABuf->Audio.BitsPerSample / 4);
 
     if (decomp_size <= handle->VQABuf->Audio.TempBufLen || handle->VQABuf->Audio.AudBufPos != 0) {
+        if (!VQA_Reserve_TempBuf(audio, std::max((unsigned)decomp_size, (unsigned)size_aligned))) {
+            return VQAERR_NOMEM;
+        }
         void* buffer = &audio->TempBuf[handle->VQABuf->Audio.TempBufLen - size_aligned];
 
         if (handle->StreamHandler(handle, VQACMD_READ, buffer, size_aligned)) {
@@ -789,13 +820,19 @@ void VQA_Close(VQAHandle* handle)
 
 int VQA_LoadFrame(VQAHandle* handle)
 {
-    unsigned iffsize;
     bool frame_loaded = false;
     VQAData* data = handle->VQABuf;
     VQALoader* loader = &data->Loader;
     VQADrawer* drawer = &handle->VQABuf->Drawer;
     VQAFrameNode* curframe = data->Loader.CurFrame;
     VQAChunkHeader* chunk = &data->Chunk;
+    /*
+    ** When resuming an audio chunk after VQAERR_SLEEPING (data->Flags & 4) its
+    ** header isn't read again, so take the size from the saved header. This was
+    ** left uninitialised, which only worked where the stale value happened to
+    ** survive on the stack.
+    */
+    unsigned iffsize = be32toh(chunk->Size);
 
     if (handle->Header.Frames <= data->Loader.CurFrameNum) {
         return VQAERR_ERROR;
