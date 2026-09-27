@@ -40,6 +40,8 @@ WWKeyboardClassSDL1::~WWKeyboardClassSDL1()
 {
 }
 
+unsigned SDL1_Mouse_Button_Events = 0;
+
 void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 {
 #ifdef NETWORKING
@@ -79,6 +81,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP: {
             int x, y;
+            ++SDL1_Mouse_Button_Events;
 
             switch (event.button.button) {
             case SDL_BUTTON_LEFT:

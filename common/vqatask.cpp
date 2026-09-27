@@ -162,9 +162,11 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
                     ** Nothing to load or draw yet: usually the audio buffer is full and we are
                     ** waiting for the SDL audio thread to play some of it. UnixLib threads
                     ** only switch on a timer tick, so spinning here starves that thread and
-                    ** on real hardware slows the movie to a crawl. Let it run.
+                    ** on real hardware slows the movie to a crawl. Let it run. Only yield
+                    ** while movie audio is playing: without an audio thread UnixLib treats
+                    ** a yield as a fatal error.
                     */
-                    if (waiting) {
+                    if (waiting && (data->Audio.Flags & VQA_AUDIO_FLAG_AUDIO_DMA_TIMER)) {
                         sched_yield();
                     }
 #endif

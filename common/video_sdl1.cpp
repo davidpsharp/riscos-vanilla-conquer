@@ -46,6 +46,10 @@
 #include "debugstring.h"
 
 #include <SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vector>
 
 extern WWKeyboardClass* Keyboard;
 static SDL_Surface* window;
@@ -504,37 +508,125 @@ public:
 
     void RenderSurface()
     {
+        /*
+        ** Draw the software cursor into the frame before copying it to the screen, then
+        ** put back what was under it. Drawing it on the screen after the copy leaves it
+        ** missing for part of every frame, which flickers badly on real hardware.
+        */
+        SDL_Rect area = {0, 0, 0, 0};
+        bool cursor = !Get_Mouse_State() && hwcursor.Surface != nullptr;
+
+        if (cursor) {
+            int x, y;
+            Get_Video_Mouse(x, y);
+            SDL_Rect dst =
+                Make_SDL_Rect(x - hwcursor.HotX, y - hwcursor.HotY, hwcursor.Surface->w, hwcursor.Surface->h);
+            area = dst;
+            cursor = Save_Area(area);
+            if (cursor) {
+                SDL_BlitSurface(hwcursor.Surface, nullptr, surface, &dst);
+            }
+        }
+
         SDL_BlitSurface(surface, NULL, window, NULL);
 
-        if (!Get_Mouse_State() && hwcursor.Surface != nullptr) {
-            /*
-            ** Draw software emulated cursor.
-            */
-            int x, y;
-            SDL_Rect dst;
-
-            Get_Video_Mouse(x, y);
-
-            dst.x = x - hwcursor.HotX;
-            dst.y = y - hwcursor.HotY;
-            dst.w = hwcursor.Surface->w;
-            dst.h = hwcursor.Surface->h;
-
-            SDL_BlitSurface(hwcursor.Surface, nullptr, window, &dst);
+        if (cursor) {
+            Restore_Area(area);
         }
 
         SDL_Flip(window);
     }
 
 private:
+    /*
+    ** Copies the part of "area" inside the surface to a side buffer, clipping "area" to
+    ** match. Raw copies, as SDL would remap colours between 8 bit palettes.
+    */
+    bool Save_Area(SDL_Rect& area)
+    {
+        int x0 = area.x < 0 ? 0 : area.x;
+        int y0 = area.y < 0 ? 0 : area.y;
+        int x1 = area.x + area.w > surface->w ? surface->w : area.x + area.w;
+        int y1 = area.y + area.h > surface->h ? surface->h : area.y + area.h;
+
+        if (x1 <= x0 || y1 <= y0) {
+            return false;
+        }
+        area = Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
+        under.resize(size_t(area.w) * area.h);
+
+        SDL_LockSurface(surface);
+        for (int row = 0; row < area.h; ++row) {
+            memcpy(&under[size_t(row) * area.w],
+                   static_cast<Uint8*>(surface->pixels) + (area.y + row) * surface->pitch + area.x,
+                   area.w);
+        }
+        SDL_UnlockSurface(surface);
+        return true;
+    }
+
+    void Restore_Area(const SDL_Rect& area)
+    {
+        SDL_LockSurface(surface);
+        for (int row = 0; row < area.h; ++row) {
+            memcpy(static_cast<Uint8*>(surface->pixels) + (area.y + row) * surface->pitch + area.x,
+                   &under[size_t(row) * area.w],
+                   area.w);
+        }
+        SDL_UnlockSurface(surface);
+    }
+
     SDL_Surface* surface;
     GBC_Enum flags;
+    std::vector<Uint8> under; // What the software cursor covers while it is drawn.
 };
+
+// Mouse button events seen by the SDL1 keyboard code, for the VC_FPSLOG report.
+extern unsigned SDL1_Mouse_Button_Events;
+
+/*
+** With VC_FPSLOG set, print frames presented per second and the time spent copying
+** them to the screen every 5 seconds, to measure speed on real hardware.
+*/
+static void Log_Frame_Rate(Uint32 render_ms)
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    static Uint32 start = 0;
+    static unsigned frames = 0;
+    static Uint32 render_total = 0;
+    static unsigned last_buttons = 0;
+
+    if (!enabled) {
+        return;
+    }
+
+    Uint32 now = SDL_GetTicks();
+    if (start == 0) {
+        start = now;
+    }
+    ++frames;
+    render_total += render_ms;
+
+    if (now - start >= 5000) {
+        fprintf(stderr,
+                "fps: %.1f over %ums, copy to screen %.1fms/frame, mouse button events %u\n",
+                frames * 1000.0 / (now - start),
+                now - start,
+                double(render_total) / frames,
+                SDL1_Mouse_Button_Events - last_buttons);
+        last_buttons = SDL1_Mouse_Button_Events;
+        start = now;
+        frames = 0;
+        render_total = 0;
+    }
+}
 
 void Video_Render_Frame()
 {
     if (frontSurface) {
+        Uint32 before = SDL_GetTicks();
         frontSurface->RenderSurface();
+        Log_Frame_Rate(SDL_GetTicks() - before);
     }
 }
 
