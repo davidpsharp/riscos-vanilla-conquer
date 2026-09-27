@@ -131,6 +131,22 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         return false;
     }
 
+#ifdef __riscos__
+    /*
+    ** The RISC OS SDL port switches to relative mouse mode (re-centring the pointer
+    ** every poll) when the cursor is hidden and input is grabbed, which fullscreen
+    ** always does. That fights any absolute pointer source, e.g. an emulator
+    ** following the host mouse. Keep the cursor "visible" but fully transparent so
+    ** SDL reports the absolute OS pointer position instead.
+    */
+    static Uint8 blank_cursor_bits[8] = {0};
+    static SDL_Cursor* blank_cursor = SDL_CreateCursor(blank_cursor_bits, blank_cursor_bits, 8, 8, 0, 0);
+    if (blank_cursor != nullptr) {
+        SDL_SetCursor(blank_cursor);
+        SDL_ShowCursor(SDL_ENABLE);
+    }
+#endif
+
     SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
     SDL_WM_SetCaption("Vanilla Conquer", NULL);
 
