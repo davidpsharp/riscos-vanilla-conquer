@@ -95,6 +95,9 @@ typedef struct
     ALuint OpenALSource;
     ALuint AudioBuffers[OPENAL_BUFFER_COUNT];
 #endif
+#ifdef SDL1AUDIO_BUILD
+    struct MixerChannel* MixerChan;
+#endif
 } VQAAudio;
 
 int VQA_StartTimerInt(VQAHandle* handle, int a2);

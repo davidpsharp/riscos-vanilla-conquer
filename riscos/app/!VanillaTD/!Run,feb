@@ -4,5 +4,8 @@ Set VanillaConquer$Dir <Obey$Dir>
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaConquer$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
+| DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
+RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
+RMEnsure DigitalRenderer 0.56 RMLoad <VanillaConquer$Dir>.Modules.DRenderer
 WimpSlot -min 20000K -max 20000K
 Run <VanillaConquer$Dir>.!RunImage %*0 >/<VanillaConquer$Dir>/stdout 2>/<VanillaConquer$Dir>/stderr
