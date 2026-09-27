@@ -26,6 +26,8 @@ public:
     void Add(int x, int y, int dx, int dy, int w, int h);
     void Clear(void);
     void Update(void);
+    // True if the text to be blitted differs from the previous call (or the list changed).
+    bool Changed(void);
 
 private:
     typedef struct
@@ -40,6 +42,7 @@ private:
 
     BlitEntryType BlitListo[MAX_ENTRIES];
     int Count;
+    unsigned LastChecksum;
 };
 
 extern GraphicBufferClass* TextPrintBuffer;

@@ -21,10 +21,14 @@ class GraphicViewPortClass;
 extern unsigned char* InterpolationPalette;
 extern bool InterpolationPaletteChanged;
 
+// first_row/last_row limit the scaling to that band of source rows (inclusive);
+// the default scales the whole buffer.
 void Interpolate_2X_Scale(GraphicBufferClass* source,
                           GraphicViewPortClass* dest,
                           char const* palette_file_name,
-                          int mode);
+                          int mode,
+                          int first_row = 0,
+                          int last_row = -1);
 void Read_Interpolation_Palette(char const* palette_file_name);
 void Write_Interpolation_Palette(char const* palette_file_name);
 void Increase_Palette_Luminance(unsigned char* InterpolationPalette,

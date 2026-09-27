@@ -278,7 +278,9 @@ void Increase_Palette_Luminance(unsigned char* palette,
 void Interpolate_2X_Scale(GraphicBufferClass* source,
                           GraphicViewPortClass* dest,
                           char const* palette_file_name,
-                          int mode)
+                          int mode,
+                          int first_row,
+                          int last_row)
 {
 // Don't think we need this. ST - 12/20/2018 2:25PM
 #ifndef REMASTER_BUILD
@@ -365,6 +367,29 @@ void Interpolate_2X_Scale(GraphicBufferClass* source,
     int h = source->Get_Height();
 
     /*
+    **	Limit to a band of source rows if asked. Modes -1, 0 and 1 treat each row on
+    **	its own, so the band is just an offset; mode 2 blends with the next row.
+    */
+    if (last_row < 0 || last_row >= h) {
+        last_row = h - 1;
+    }
+    if (first_row < 0) {
+        first_row = 0;
+    }
+    if (first_row > 0 || last_row < h - 1) {
+        if (first_row > last_row) {
+            mode = -2; // Nothing to do.
+        } else if (mode == 2) {
+            Asm_Interpolate_Line_Interpolate_Rows(src_ptr, dest_ptr, h, src_width, dest_width, first_row, last_row);
+            mode = -2;
+        } else {
+            src_ptr += first_row * src_width;
+            dest_ptr += first_row * dest_width;
+            h = last_row - first_row + 1;
+        }
+    }
+
+    /*
     ** Call the appropriate assembly language copy routine
     */
     switch (mode) {
@@ -375,15 +400,15 @@ void Interpolate_2X_Scale(GraphicBufferClass* source,
         break;
 
     case 0:
-        Asm_Interpolate(src_ptr, dest_ptr, source->Get_Height(), src_width, dest_width);
+        Asm_Interpolate(src_ptr, dest_ptr, h, src_width, dest_width);
         break;
 
     case 1:
-        Asm_Interpolate_Line_Double(src_ptr, dest_ptr, source->Get_Height(), src_width, dest_width);
+        Asm_Interpolate_Line_Double(src_ptr, dest_ptr, h, src_width, dest_width);
         break;
 
     case 2:
-        Asm_Interpolate_Line_Interpolate(src_ptr, dest_ptr, source->Get_Height(), src_width, dest_width);
+        Asm_Interpolate_Line_Interpolate(src_ptr, dest_ptr, h, src_width, dest_width);
         break;
     }
 

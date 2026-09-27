@@ -41,7 +41,9 @@ bool SoundImp_ResumeSound()
 
 SampleTrackerTypeImp* SoundImp_Init_Sample(int bits_per_sample, bool stereo, int rate)
 {
-    MixerChannel* ch = Mixer_Create_Channel(bits_per_sample, stereo ? 2 : 1, rate);
+    // More queue than OpenAL's 2 buffers: on a real Risc PC the SDL audio thread drains
+    // the queue in bursts, and 2 x 8 KB ran dry between refills, cutting speech short.
+    MixerChannel* ch = Mixer_Create_Channel(bits_per_sample, stereo ? 2 : 1, rate, 6);
     if (ch == nullptr) {
         return nullptr;
     }

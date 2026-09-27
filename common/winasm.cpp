@@ -124,3 +124,30 @@ void Asm_Interpolate_Line_Interpolate(void* src, void* dst, int src_height, int 
     dptr += pitch;
     // memcpy(dptr, buff_offset1, 2 * src_width);
 }
+
+void Asm_Interpolate_Line_Interpolate_Rows(
+    void* src, void* dst, int src_height, int src_width, int dst_pitch, int first, int last)
+{
+    unsigned char* top = InterpolationTable->TopLine;
+    unsigned char* bottom = InterpolationTable->BottomLine;
+    unsigned char* sptr = (unsigned char*)(src);
+    int pitch = dst_pitch / 2;
+
+    Interpolate_X_Axis(sptr + first * src_width, top, src_width);
+
+    for (int i = first; i <= last; ++i) {
+        unsigned char* dptr = (unsigned char*)(dst) + 2 * i * pitch;
+        memcpy(dptr, top, 2 * src_width);
+
+        // The row below is blended with the next source row; the last row has none.
+        if (i + 1 < src_height) {
+            Interpolate_X_Axis(sptr + (i + 1) * src_width, bottom, src_width);
+            Interpolate_Y_Axis(top, bottom, InterpolationTable->LineBuffer, src_width);
+            memcpy(dptr + pitch, InterpolationTable->LineBuffer, 2 * src_width);
+
+            unsigned char* tmp = top;
+            top = bottom;
+            bottom = tmp;
+        }
+    }
+}

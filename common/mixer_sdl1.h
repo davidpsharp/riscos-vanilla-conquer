@@ -11,7 +11,8 @@
 
 enum
 {
-    MIXER_BUFFERS_PER_CHANNEL = 2,
+    MIXER_BUFFERS_PER_CHANNEL = 2, // Default queue length, as for the OpenAL backend.
+    MIXER_MAX_BUFFERS = 8,
 };
 
 struct MixerChannel;
@@ -21,7 +22,10 @@ void Mixer_Shutdown();
 void Mixer_Pause(bool pause);
 bool Mixer_Is_Open();
 
-MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate);
+// buffers: queue length, up to MIXER_MAX_BUFFERS. A channel that runs out of queued
+// data stops, but resumes by itself when more is queued (unlike an OpenAL source),
+// so a late refill causes a gap rather than cutting the sound off.
+MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate, int buffers = MIXER_BUFFERS_PER_CHANNEL);
 void Mixer_Destroy_Channel(MixerChannel* ch);
 
 void Mixer_Set_Format(MixerChannel* ch, int bits_per_sample, int channels, int rate);

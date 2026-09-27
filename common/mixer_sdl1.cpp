@@ -21,7 +21,8 @@ struct MixerSlot
 
 struct MixerChannel
 {
-    MixerSlot Slots[MIXER_BUFFERS_PER_CHANNEL];
+    MixerSlot Slots[MIXER_MAX_BUFFERS];
+    int SlotCount;
     int Head; // Slot being played.
     int Tail; // Next slot to fill.
 
@@ -36,6 +37,7 @@ struct MixerChannel
     unsigned Gain; // 16.16 fixed point.
     bool Playing;
     bool Paused;
+    bool Starved; // Stopped because it ran out of data; resumes when more is queued.
 };
 
 enum
@@ -88,13 +90,14 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
         while (slot->State == SLOT_QUEUED && ch->Frame >= slot->Length / bytes_per_frame) {
             ch->Frame -= unsigned(slot->Length / bytes_per_frame);
             slot->State = SLOT_DONE;
-            ch->Head = (ch->Head + 1) % MIXER_BUFFERS_PER_CHANNEL;
+            ch->Head = (ch->Head + 1) % ch->SlotCount;
             slot = &ch->Slots[ch->Head];
         }
 
         if (slot->State != SLOT_QUEUED) {
-            // Out of data: stop, as an OpenAL source would.
+            // Out of data: stop until more is queued.
             ch->Playing = false;
+            ch->Starved = true;
             ++DryCount;
             ch->Frame = 0;
             ch->Frac = 0;
@@ -230,7 +233,7 @@ bool Mixer_Is_Open()
     return AudioOpen;
 }
 
-MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate)
+MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate, int buffers)
 {
     MixerChannel* ch = (MixerChannel*)calloc(1, sizeof(MixerChannel));
     if (ch == nullptr) {
@@ -241,6 +244,7 @@ MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate)
     ch->Channels = channels > 1 ? 2 : 1;
     ch->Rate = rate > 0 ? rate : 22050;
     ch->Gain = 0x10000;
+    ch->SlotCount = buffers < 1 ? 1 : (buffers > MIXER_MAX_BUFFERS ? MIXER_MAX_BUFFERS : buffers);
     Update_Step(ch);
 
     SDL_LockAudio();
@@ -271,7 +275,7 @@ void Mixer_Destroy_Channel(MixerChannel* ch)
     }
     SDL_UnlockAudio();
 
-    for (int i = 0; i < MIXER_BUFFERS_PER_CHANNEL; ++i) {
+    for (int i = 0; i < MIXER_MAX_BUFFERS; ++i) {
         free(ch->Slots[i].Data);
     }
     free(ch);
@@ -323,7 +327,11 @@ bool Mixer_Queue(MixerChannel* ch, const void* data, size_t len)
 
     SDL_LockAudio();
     slot->State = SLOT_QUEUED;
-    ch->Tail = (ch->Tail + 1) % MIXER_BUFFERS_PER_CHANNEL;
+    ch->Tail = (ch->Tail + 1) % ch->SlotCount;
+    if (ch->Starved) {
+        ch->Starved = false;
+        ch->Playing = true;
+    }
     SDL_UnlockAudio();
     return true;
 }
@@ -332,7 +340,7 @@ int Mixer_Free_Buffers(MixerChannel* ch)
 {
     int count = 0;
     SDL_LockAudio();
-    for (int i = 0; i < MIXER_BUFFERS_PER_CHANNEL; ++i) {
+    for (int i = 0; i < ch->SlotCount; ++i) {
         if (ch->Slots[i].State != SLOT_QUEUED) {
             ++count;
         }
@@ -346,6 +354,7 @@ void Mixer_Play(MixerChannel* ch)
     SDL_LockAudio();
     ch->Paused = false;
     ch->Playing = ch->Slots[ch->Head].State == SLOT_QUEUED;
+    ch->Starved = !ch->Playing;
     SDL_UnlockAudio();
 }
 
@@ -361,11 +370,12 @@ void Mixer_Stop(MixerChannel* ch)
     SDL_LockAudio();
     ch->Playing = false;
     ch->Paused = false;
+    ch->Starved = false;
     ch->Head = 0;
     ch->Tail = 0;
     ch->Frame = 0;
     ch->Frac = 0;
-    for (int i = 0; i < MIXER_BUFFERS_PER_CHANNEL; ++i) {
+    for (int i = 0; i < MIXER_MAX_BUFFERS; ++i) {
         ch->Slots[i].State = SLOT_FREE;
     }
     SDL_UnlockAudio();

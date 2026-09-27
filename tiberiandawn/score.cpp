@@ -45,6 +45,9 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "common/interpal.h"
+#include <string.h>
+#include <vector>
 #include "textblit.h"
 #include "common/irandom.h"
 #include "common/framelimit.h"
@@ -94,6 +97,8 @@ int ControlQ; // cheat key to skip past score/mapsel screens
 bool StillUpdating;
 
 GraphicBufferClass* PseudoSeenBuff;
+
+static void Present_Score_Frame(bool draw_mouse);
 GraphicBufferClass* TextPrintBuffer;
 
 unsigned char RemapCiv[256] = {
@@ -514,6 +519,7 @@ int Alloc_Object(ScoreAnimClass* obj)
 }
 
 TextBlitClass::TextBlitClass(void)
+    : LastChecksum(0)
 {
     Clear();
 }
@@ -536,6 +542,39 @@ void TextBlitClass::Add(int x, int y, int dx, int dy, int w, int h)
 void TextBlitClass::Clear(void)
 {
     Count = 0;
+}
+
+/*
+** Checksums the source regions of the queued text blits, so Call_Back_Delay can
+** tell whether anything it draws has changed since the last frame.
+*/
+bool TextBlitClass::Changed(void)
+{
+    unsigned sum = unsigned(Count) * 0x9E3779B1u;
+    if (TextPrintBuffer != nullptr && TextPrintBuffer->Lock()) {
+        const unsigned char* base = (const unsigned char*)TextPrintBuffer->Get_Offset();
+        int pitch = TextPrintBuffer->Get_Width() + TextPrintBuffer->Get_XAdd() + TextPrintBuffer->Get_Pitch();
+        int bw = TextPrintBuffer->Get_Width();
+        int bh = TextPrintBuffer->Get_Height();
+        for (int i = 0; i < Count; i++) {
+            const BlitEntryType& e = BlitListo[i];
+            sum = (sum << 5 | sum >> 27) ^ unsigned(e.SourceX * 7919 + e.SourceY * 31 + e.DestX * 17 + e.DestY);
+            for (int y = e.SourceY; y < e.SourceY + e.Height && y < bh; y++) {
+                if (y < 0 || e.SourceX < 0) {
+                    continue;
+                }
+                const unsigned char* row = base + y * pitch + e.SourceX;
+                int w = e.SourceX + e.Width > bw ? bw - e.SourceX : e.Width;
+                for (int x = 0; x < w; x++) {
+                    sum = (sum << 5 | sum >> 27) ^ row[x];
+                }
+            }
+        }
+        TextPrintBuffer->Unlock();
+    }
+    bool changed = sum != LastChecksum;
+    LastChecksum = sum;
+    return changed;
 }
 
 void TextBlitClass::Update(void)
@@ -1625,9 +1664,7 @@ void ScoreClass::Input_Name(char str[], int xpos, int ypos, char const pal[])
         /*
         ** Extra font related stuff. ST - 7/29/96 2:22PM
         */
-        Interpolate_2X_Scale(PseudoSeenBuff, &HidPage, NULL, Settings.Video.InterpolationMode);
-        BlitList.Update();
-        Blit_Hid_Page_To_Seen_Buff();
+        Present_Score_Frame(false);
 
         if (Keyboard->Check()) {
             key = Keyboard->Get();
@@ -1922,6 +1959,89 @@ void Draw_Bar_Graphs(int i, int gkilled, int nkilled, int ckilled)
  * HISTORY:                                                                *
  *   04/13/1995 BWG : Created.                                             *
  *=========================================================================*/
+/*
+** Works out what Call_Back_Delay has to redraw: the band of 320x200 rows that
+** changed since the last frame (first_row > last_row if none), and whether
+** anything else drawn on top (the text overlay, the mouse) changed.
+*/
+static bool Score_Frame_Changes(int& first_row, int& last_row);
+
+/*
+** Scales the 320x200 score/map screen (PseudoSeenBuff) to HidPage, adds the
+** hi-res text overlay and copies it to the visible page, redoing only the rows
+** that changed and nothing at all if the frame is unchanged.
+*/
+static void Present_Score_Frame(bool draw_mouse)
+{
+    int first_row, last_row;
+    if (Score_Frame_Changes(first_row, last_row)) {
+        if (first_row <= last_row) {
+            Interpolate_2X_Scale(PseudoSeenBuff, &HidPage, NULL, Settings.Video.InterpolationMode, first_row, last_row);
+        }
+        BlitList.Update();
+        if (draw_mouse) {
+            WWMouse->Draw_Mouse(&HidPage);
+        }
+        Blit_Hid_Page_To_Seen_Buff();
+        if (draw_mouse) {
+            WWMouse->Erase_Mouse(&HidPage, true);
+        }
+    }
+}
+
+static bool Score_Frame_Changes(int& first_row, int& last_row)
+{
+    static std::vector<unsigned char> last;
+    static const void* last_buffer = nullptr;
+    static int last_x = -1, last_y = -1, last_state = -1;
+
+    bool overlay = BlitList.Changed(); // Always call, to keep its checksum current.
+
+    int mx = Get_Mouse_X(), my = Get_Mouse_Y(), state = Get_Mouse_State();
+    if (mx != last_x || my != last_y || state != last_state) {
+        last_x = mx;
+        last_y = my;
+        last_state = state;
+        overlay = true;
+    }
+
+    first_row = 0;
+    last_row = -1;
+    if (PseudoSeenBuff == nullptr || !PseudoSeenBuff->Lock()) {
+        last_row = 199;
+        return true;
+    }
+    const unsigned char* pixels = (const unsigned char*)PseudoSeenBuff->Get_Offset();
+    int width = PseudoSeenBuff->Get_Width();
+    int height = PseudoSeenBuff->Get_Height();
+    size_t size = size_t(width) * height;
+
+    if (last_buffer != pixels || last.size() != size || InterpolationPaletteChanged) {
+        last.assign(pixels, pixels + size);
+        last_buffer = pixels;
+        last_row = height - 1;
+    } else {
+        int first = -1, final = -1;
+        for (int y = 0; y < height; ++y) {
+            size_t offset = size_t(y) * width;
+            if (memcmp(&last[offset], pixels + offset, width) != 0) {
+                memcpy(&last[offset], pixels + offset, width);
+                if (first < 0) {
+                    first = y;
+                }
+                final = y;
+            }
+        }
+        if (first >= 0) {
+            // Mode 2 blends each row with the one below, so redo the row above too.
+            first_row = first > 0 ? first - 1 : 0;
+            last_row = final;
+        }
+    }
+    PseudoSeenBuff->Unlock();
+    return overlay || first_row <= last_row;
+}
+
 void Call_Back_Delay(int time)
 {
     CountDownTimerClass cd;
@@ -1947,11 +2067,15 @@ void Call_Back_Delay(int time)
         // BlitList.Update();
         //}else{
         Animate_Score_Objs();
-        Interpolate_2X_Scale(PseudoSeenBuff, &HidPage, NULL, Settings.Video.InterpolationMode);
-        BlitList.Update();
-        WWMouse->Draw_Mouse(&HidPage);
-        Blit_Hid_Page_To_Seen_Buff();
-        WWMouse->Erase_Mouse(&HidPage, true);
+
+        /*
+        **	Scaling the 320x200 score/map screen up and copying it to the visible page
+        **	costs three full-screen passes, done every frame even when nothing moved.
+        **	On a real Risc PC that made the map colouring and the name entry crawl, so
+        **	only rescale the rows that changed, and skip the copy when the picture,
+        **	the text overlay and the mouse are all unchanged.
+        */
+        Present_Score_Frame(true);
         //}
 
         Frame_Limiter();
