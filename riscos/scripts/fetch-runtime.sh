@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Fetch the RISC OS runtime modules our binaries need into build/hostfs/modules:
+# Fetch the RISC OS runtime modules our binaries need into ~/vcport-work/hostfs/modules:
 #   SharedULib - SharedUnixLibrary, required by every GCCSDK program
 #   DRenderer  - digital sound renderer, used by SDL audio
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-OUT="$ROOT/build/hostfs/modules"
+OUT="${VC_WORK:-$HOME/vcport-work}/hostfs/modules"
 BASE=https://www.riscos.info/packages/arm/Develop/gcc
 mkdir -p "$OUT"
 tmp=$(mktemp -d)
