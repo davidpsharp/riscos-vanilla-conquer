@@ -1,0 +1,34 @@
+-- offset +1
+ldr [rn]                   0x11443322  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, rm]               0x11443322  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn], #4 (post)        0x11443322  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, #4]! (pre, +4)    0x55887766  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrh [rn]                  0x00002211  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrsh [rn]                 0x00002211  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+str [rn] of a1b2c3d4       0xa1b2c3d4  buf: d4 c3 b2 a1 55 66 77 88 99 aa bb cc
+strh [rn] of a1b2          0x0000a1b2  buf: b2 a1 33 44 55 66 77 88 99 aa bb cc
+ldmia {r,r} first          0x88776655  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldmia {r,r} second         0x44332211  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+-- offset +2
+ldr [rn]                   0x22114433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, rm]               0x22114433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn], #4 (post)        0x22114433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, #4]! (pre, +4)    0x66558877  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrh [rn]                  0x00004433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrsh [rn]                 0x00004433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+str [rn] of a1b2c3d4       0xa1b2c3d4  buf: d4 c3 b2 a1 55 66 77 88 99 aa bb cc
+strh [rn] of a1b2          0x0000a1b2  buf: 11 22 b2 a1 55 66 77 88 99 aa bb cc
+ldmia {r,r} first          0x88776655  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldmia {r,r} second         0x44332211  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+-- offset +3
+ldr [rn]                   0x33221144  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, rm]               0x33221144  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn], #4 (post)        0x33221144  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldr [rn, #4]! (pre, +4)    0x77665588  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrh [rn]                  0x00004433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldrsh [rn]                 0x00004433  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+str [rn] of a1b2c3d4       0xa1b2c3d4  buf: d4 c3 b2 a1 55 66 77 88 99 aa bb cc
+strh [rn] of a1b2          0x0000a1b2  buf: 11 22 b2 a1 55 66 77 88 99 aa bb cc
+ldmia {r,r} first          0x88776655  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+ldmia {r,r} second         0x44332211  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
+memcpy at +1 (reference)   0x55443322  buf: 11 22 33 44 55 66 77 88 99 aa bb cc
