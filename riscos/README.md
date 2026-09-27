@@ -7,7 +7,7 @@ Vanilla Conquer for RISC OS. The first target is a StrongARM Risc PC running RIS
 | Path | Purpose |
 | --- | --- |
 | `docker/Dockerfile` | Cross-build image: GCCSDK 4.7.4 (`arm-unknown-riscos`), CMake, Ninja, SDL 1.2 |
-| `cmake/riscos-gccsdk.cmake` | CMake toolchain file (`-mcpu=strongarm -fsigned-char`, static link, `riscos_make_aif()`) |
+| `cmake/riscos-gccsdk.cmake` | CMake toolchain file (`-march=armv3m -mtune=strongarm -fsigned-char`, static link, `riscos_make_aif()`) |
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |
 | `scripts/setup-rpcemu-machines.sh` | Create the `VC SA RO371` and `VC SA RO530` StrongARM machines in RPCEmu Extended |
@@ -48,6 +48,7 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 - An unaligned `LDR` on StrongARM returns the word **rotated** and raises no fault, and RPCEmu does the same. Misaligned accesses therefore corrupt data silently. Find them with the macOS UBSan build (`-DBUILD_WITH_UBSAN=ON`).
 - GCCSDK's libstdc++ is built without `_GLIBCXX_USE_C99`. `compat/cxx11_compat.h` covers the gap.
 - `sdltest` in RPCEmu, 640×480×8 full screen with a full software redraw every frame: 24.5 fps on RO 3.71 and 19.9 fps on RO 5.30.
+- **No halfword instructions on a real Risc PC.** On a real Kinetic StrongARM Risc PC, `STRH` to heap memory left the upper byte unwritten. The keyboard queue then returned mouse clicks with garbage in the high byte, so most clicks were ignored. RPCEmu emulates `LDRH`/`STRH` correctly, so only real hardware showed it. The toolchain now builds for `-march=armv3m -mtune=strongarm`, like GCCSDK's own libraries, so no `LDRH`/`STRH` is generated. Check with `objdump -d | grep -E '(ldr|str)[a-z]*h'`.
 - GCCSDK defaults to `-mstructure-size-boundary=32` (APCS), which pads every struct to a multiple of 4 bytes. The game depends on x86 struct sizes, so the toolchain sets `=8`. Without it, GDI 1 crashed within seconds with a zeroed object.
 - The RISC OS SDL 1.2 port queues a mouse motion event on every pump. `WWKeyboardClassSDL1::Fill_Buffer_From_System` therefore pumps once and then drains the queue.
 - RISC OS SDL switches to relative mouse mode when the cursor is hidden in fullscreen, so on RISC OS the game uses a transparent cursor instead.

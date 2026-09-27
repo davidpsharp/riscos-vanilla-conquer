@@ -17,9 +17,11 @@ fi
 
 # CMAKE_<LANG>_FLAGS_INIT from the toolchain file only applies to a fresh
 # cache, so start over whenever the toolchain file has changed.
-if [ -f "$ROOT/$BDIR/CMakeCache.txt" ] && [ "$ROOT/riscos/cmake/riscos-gccsdk.cmake" -nt "$ROOT/$BDIR/CMakeCache.txt" ]; then
-    rm -rf "${ROOT:?}/$BDIR"
-fi
+for dir in "$BDIR" build/riscos-tools; do
+    if [ -f "$ROOT/$dir/CMakeCache.txt" ] && [ "$ROOT/riscos/cmake/riscos-gccsdk.cmake" -nt "$ROOT/$dir/CMakeCache.txt" ]; then
+        rm -rf "${ROOT:?}/$dir"
+    fi
+done
 
 if [ "${1:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/sdk.sh" bash -c "
