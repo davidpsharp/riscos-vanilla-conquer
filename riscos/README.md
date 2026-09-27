@@ -70,6 +70,17 @@ Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM
 
 **Video:** the game uses a 640×400 8bpp mode (250 KB), which fits either VRAM size.
 
+### Campaign flow (RISC OS 3.71, 1 MB VRAM)
+
+Tested using `-PLAYTEST` (Alt+W wins, Alt+L loses) and `-AUTOSTART=<G|N><n>[A-D]`:
+- **Win GDI 1:** victory movie → score screen → Top Scores initials entry → campaign map → territory info → GDI 2 briefing → GDI 2, with credits carried over.
+- **Lose GDI 2:** defeat movie → "replay this mission?" → Yes restarts GDI 2.
+- **Winter theatre:** GDI 8 variant A renders correctly.
+- **Stability:** a 10-minute session in GDI 8 held 15.5–15.6 logic fps and real-time audio every minute, with crash traps armed and none hit.
+- **Load:** sending the army into battle stayed at 15.5 fps.
+
+`scripts/start-mission.sh <machine> <vnc> <mission> [args]` starts a mission and skips the movies.
+
 ## Sound
 
 There's no OpenAL on RISC OS, so SDL builds without OpenAL use a small software mixer on SDL 1.2's audio callback (`common/mixer_sdl1.cpp`). Its channels mimic the OpenAL sources that `soundio_common.cpp` and the VQA player expect. `soundio_sdl1.cpp` handles effects, music and speech, and `vqaaudio_sdl1.cpp` handles movie soundtracks. On RISC OS, SDL plays through **DigitalRenderer**, which `!Run` loads from `System:Modules` or from `!VanillaTD.Modules`. If audio can't be opened, the game runs silently.

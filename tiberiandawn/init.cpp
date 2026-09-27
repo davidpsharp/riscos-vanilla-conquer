@@ -56,11 +56,12 @@
 static void Play_Intro(bool for_real = false);
 
 /*
-** Set by -AUTOSTART=<G|N><n> to skip the menus and start campaign mission n
-** for GDI or Nod. Used for unattended testing.
+** Set by -AUTOSTART=<G|N><n>[A-D] to skip the menus and start campaign mission
+** n for GDI or Nod, optionally a specific variant. Used for unattended testing.
 */
 static int AutoStartScenario = 0;
 static ScenarioPlayerType AutoStartPlayer = SCEN_PLAYER_GDI;
+static ScenarioVarType AutoStartVar = SCEN_VAR_NONE; // Optional trailing A-D picks a variant.
 void Init_CDROM_Access(void);
 
 extern unsigned int RandNumb;
@@ -1425,7 +1426,8 @@ bool Select_Game(bool fade)
         if (Debug_Map) {
             Set_Scenario_Name(Scen.ScenarioName, Scen.Scenario, ScenPlayer, ScenDir, SCEN_VAR_A);
         } else {
-            Set_Scenario_Name(Scen.ScenarioName, Scen.Scenario, ScenPlayer, ScenDir);
+            Set_Scenario_Name(Scen.ScenarioName, Scen.Scenario, ScenPlayer, ScenDir, AutoStartVar);
+            AutoStartVar = SCEN_VAR_NONE;
         }
 
         /*
@@ -1964,6 +1966,13 @@ bool Parse_Command_Line(int argc, char* argv[])
             const char* arg = string + strlen("-AUTOSTART=");
             AutoStartPlayer = (arg[0] == 'N' || arg[0] == 'n') ? SCEN_PLAYER_NOD : SCEN_PLAYER_GDI;
             AutoStartScenario = atoi(arg + 1);
+            const char* var = arg + 1;
+            while (*var >= '0' && *var <= '9') {
+                ++var;
+            }
+            if (*var >= 'A' && *var <= 'D') {
+                AutoStartVar = ScenarioVarType(SCEN_VAR_A + (*var - 'A'));
+            }
             continue;
         }
 
