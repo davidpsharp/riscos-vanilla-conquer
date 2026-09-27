@@ -35,7 +35,13 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 #endif
     SDL_Event event;
 
-    while (!Is_Buffer_Full() && SDL_PollEvent(&event)) {
+    /*
+    ** Pump once, then drain only the events already queued. SDL_PollEvent pumps on
+    ** every call, and some SDL 1.2 ports (e.g. RISC OS) queue a fresh mouse motion
+    ** event on each pump, which would keep this loop from ever finishing.
+    */
+    SDL_PumpEvents();
+    while (!Is_Buffer_Full() && SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_ALLEVENTS) > 0) {
         unsigned short key;
         switch (event.type) {
         case SDL_QUIT:

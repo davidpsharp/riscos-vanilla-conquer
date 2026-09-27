@@ -68,6 +68,12 @@ static struct
 
 static void Update_HWCursor();
 
+static SDL_Rect Make_SDL_Rect(int x, int y, int w, int h)
+{
+    SDL_Rect r = {Sint16(x), Sint16(y), Uint16(w), Uint16(h)};
+    return r;
+}
+
 class SurfaceMonitorClassDummy : public SurfaceMonitorClass
 {
 
@@ -469,14 +475,14 @@ public:
 
     virtual void Blt(const Rect& destRect, VideoSurface* src, const Rect& srcRect, bool mask)
     {
-        SDL_Rect srcRectSDL = {srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height};
-        SDL_Rect destRectSDL = {destRect.X, destRect.Y, destRect.Width, destRect.Height};
+        SDL_Rect srcRectSDL = Make_SDL_Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height);
+        SDL_Rect destRectSDL = Make_SDL_Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height);
         SDL_BlitSurface(((VideoSurfaceSDL1*)src)->surface, &srcRectSDL, surface, &destRectSDL);
     }
 
     virtual void FillRect(const Rect& rect, unsigned char color)
     {
-        SDL_Rect rectSDL = {rect.X, rect.Y, rect.Width + 1, rect.Height + 1};
+        SDL_Rect rectSDL = Make_SDL_Rect(rect.X, rect.Y, rect.Width + 1, rect.Height + 1);
         SDL_FillRect(surface, &rectSDL, color);
     }
 
