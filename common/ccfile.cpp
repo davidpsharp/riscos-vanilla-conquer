@@ -43,6 +43,8 @@
  *   CCFileClass::Write -- Writes data to the file (non mixfile files only).                   *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include "ccfile.h"
 
 /***********************************************************************************************
@@ -450,11 +452,26 @@ int CCFileClass::Open(int rights)
             **	attached to the file handle.
             */
             char* dupfile = strdup(File_Name());
-            Open(mixfile->Filename, READ);
+            bool opened = Open(mixfile->Filename, READ);
+            int open_error = errno;
             Searching(false); // Disable multi-drive search.
             Set_Name(dupfile);
             Searching(true);
             free(dupfile);
+
+            /*
+            **	If the mixfile can no longer be opened (moved, deleted or out of handles),
+            **	fail here. Carrying on would call Size() on a closed file, which reopens
+            **	this file and recurses until the stack runs out.
+            */
+            if (!opened) {
+                fprintf(stderr,
+                        "CCFileClass: can't open '%s' to read '%s': %s\n",
+                        mixfile->Filename,
+                        File_Name(),
+                        strerror(open_error));
+                return false;
+            }
             Bias(0);
             Bias(start, length);
             Seek(0, SEEK_SET);
