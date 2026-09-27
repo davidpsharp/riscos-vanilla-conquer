@@ -19,10 +19,16 @@ set(RISCOS_CPU strongarm CACHE STRING "Target CPU passed to -mcpu")
 # which would replace the flags below.
 set(RISCOS_EXTRA_FLAGS "" CACHE STRING "Extra compiler flags for C and C++")
 
-# The game code was written for x86 where plain char is signed.
-set(CMAKE_C_FLAGS_INIT "-mcpu=${RISCOS_CPU} -fsigned-char ${RISCOS_EXTRA_FLAGS}")
+# -fsigned-char: the game code was written for x86, where plain char is signed.
+# -mstructure-size-boundary=8: GCCSDK defaults to 32 (APCS), which pads every
+#   struct to a multiple of 4 bytes, so struct {char[13]} is 16 bytes and
+#   one-byte bitfield structs and short/char unions grow to 4. The game relies
+#   on x86 sizes. Library structs containing an int or pointer lay out the same
+#   either way, so this stays compatible with UnixLib and SDL.
+set(RISCOS_ABI_FLAGS "-mcpu=${RISCOS_CPU} -fsigned-char -mstructure-size-boundary=8")
+set(CMAKE_C_FLAGS_INIT "${RISCOS_ABI_FLAGS} ${RISCOS_EXTRA_FLAGS}")
 set(CMAKE_CXX_FLAGS_INIT
-    "-mcpu=${RISCOS_CPU} -fsigned-char -include ${CMAKE_CURRENT_LIST_DIR}/../compat/cxx11_compat.h ${RISCOS_EXTRA_FLAGS}")
+    "${RISCOS_ABI_FLAGS} -include ${CMAKE_CURRENT_LIST_DIR}/../compat/cxx11_compat.h ${RISCOS_EXTRA_FLAGS}")
 # Static link so the binary can be converted to an AIF absolute and run on
 # RISC OS 3.7 without SharedLibs.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static")
