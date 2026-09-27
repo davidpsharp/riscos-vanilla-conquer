@@ -53,6 +53,13 @@
 **	Function prototypes for this module **
 *****************************************/
 static void Play_Intro(bool for_real = false);
+
+/*
+** Set by -AUTOSTART=<G|N><n> to skip the menus and start campaign mission n
+** for GDI or Nod. Used for unattended testing.
+*/
+static int AutoStartScenario = 0;
+static ScenarioPlayerType AutoStartPlayer = SCEN_PLAYER_GDI;
 void Init_CDROM_Access(void);
 
 extern unsigned int RandNumb;
@@ -807,6 +814,22 @@ bool Select_Game(bool fade)
                 Theme.Fade_Out();
             } else
                 PlaybackGame = false;
+        }
+
+        if (AutoStartScenario > 0) {
+            Scen.CDifficulty = DIFF_NORMAL;
+            Scen.Difficulty = DIFF_NORMAL;
+            Scen.CarryOverMoney = 0;
+            Scen.Scenario = AutoStartScenario;
+            BuildLevel = AutoStartScenario;
+            ScenPlayer = AutoStartPlayer;
+            ScenDir = SCEN_DIR_EAST;
+            Whom = AutoStartPlayer == SCEN_PLAYER_NOD ? HOUSE_BAD : HOUSE_GOOD;
+            GameToPlay = GAME_NORMAL;
+            selection = SEL_START_NEW_GAME;
+            process = false;
+            AutoStartScenario = 0;
+            Theme.Fade_Out();
         }
 
         while (process) {
@@ -1901,6 +1924,13 @@ bool Parse_Command_Line(int argc, char* argv[])
         /*
         **	Allow "attract" mode
         */
+        if (strnicmp(string, "-AUTOSTART=", strlen("-AUTOSTART=")) == 0) {
+            const char* arg = string + strlen("-AUTOSTART=");
+            AutoStartPlayer = (arg[0] == 'N' || arg[0] == 'n') ? SCEN_PLAYER_NOD : SCEN_PLAYER_GDI;
+            AutoStartScenario = atoi(arg + 1);
+            continue;
+        }
+
         if (strstr(string, "-ATTRACT")) {
             AllowAttract = true;
             continue;
