@@ -495,8 +495,12 @@ bool Init_Game(int, char*[])
     memset(CurrentPalette, 0x01, 768);
 
     if (!Special.IsFromInstall) {
+        /*
+        ** Only load the title screen here; it is shown below once its palette is
+        ** set. Blitting it now would briefly display it with the last palette of
+        ** the intro movie on backends that present immediately (e.g. SDL1).
+        */
         Load_Title_Screen(TitlePicture, &HidPage, Palette);
-        Blit_Hid_Page_To_Seen_Buff();
     }
 
     Hide_Mouse();
