@@ -13,6 +13,13 @@
 **
 ** Paths are native to the host: RISC OS paths on RISC OS, where the layout is
 ** MIX.<name>, gdi.MIX.GENERAL etc. as the game's short filename scheme expects.
+**
+** Licensing: this file is part of the Vanilla Conquer RISC OS port and is under
+** the GNU GPL v3, like the rest of the project. blast.c and blast.h (the PKWARE
+** DCL decompressor) are Copyright (C) 2003, 2012, 2013 Mark Adler, under the
+** zlib licence, and are included unmodified. The InstallShield 3 archive layout
+** follows unshieldv3 by Wolfgang Frisch (Apache License 2.0), used as a format
+** reference; no code was taken from it.
 */
 #include "blast.h"
 

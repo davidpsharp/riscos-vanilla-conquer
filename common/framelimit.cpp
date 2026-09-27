@@ -11,6 +11,8 @@
 
 extern WWMouseClass* WWMouse;
 
+unsigned Logic_Frame_Count = 0;
+
 #ifdef NEW_VIDEO_BUILD
 void Video_Render_Frame();
 #endif

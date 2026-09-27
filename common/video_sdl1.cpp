@@ -37,6 +37,7 @@
 
 /*= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =*/
 
+#include "framelimit.h"
 #include "gbuffer.h"
 #include "palette.h"
 #include "video.h"
@@ -595,6 +596,7 @@ static void Log_Frame_Rate(Uint32 render_ms)
     static unsigned frames = 0;
     static Uint32 render_total = 0;
     static unsigned last_buttons = 0;
+    static unsigned last_logic = 0;
 
     if (!enabled) {
         return;
@@ -609,12 +611,14 @@ static void Log_Frame_Rate(Uint32 render_ms)
 
     if (now - start >= 5000) {
         fprintf(stderr,
-                "fps: %.1f over %ums, copy to screen %.1fms/frame, mouse button events %u\n",
+                "fps: %.1f over %ums (game logic %.1f), copy to screen %.1fms/frame, mouse button events %u\n",
                 frames * 1000.0 / (now - start),
                 now - start,
+                (Logic_Frame_Count - last_logic) * 1000.0 / (now - start),
                 double(render_total) / frames,
                 SDL1_Mouse_Button_Events - last_buttons);
         last_buttons = SDL1_Mouse_Button_Events;
+        last_logic = Logic_Frame_Count;
         start = now;
         frames = 0;
         render_total = 0;

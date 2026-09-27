@@ -1759,6 +1759,7 @@ bool Main_Loop()
     **	counter.
     */
     Frame++;
+    ++Logic_Frame_Count;
 
     /*
     ** Very rarely, the human players will get a message from the computer.

@@ -10,4 +10,7 @@ enum FrameLimitFlags
 
 void Frame_Limiter(FrameLimitFlags flags = FL_FORCE_RENDER);
 
+// Game logic frames completed, counted by the game for speed diagnostics (VC_FPSLOG).
+extern unsigned Logic_Frame_Count;
+
 #endif /* FRAMELIMIT_H */

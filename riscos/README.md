@@ -121,6 +121,8 @@ It runs `Utils.vcprep` (source in `tools/vcprep`), which:
 - writes the short-filename layout below, with filetypes set;
 - checks every file against a known CRC-32 and says which disc it is from `GENERAL.MIX`.
 
+**Licences:** `vcprep.c` is GPL v3, like the rest of the project. `blast.c`/`blast.h` are Mark Adler's, under the zlib licence, and are included unmodified. The `SETUP.Z` layout follows [unshieldv3](https://github.com/wfr/unshieldv3) (Apache 2.0), used only as a format reference. All of these are compatible with GPL v3.
+
 The shared files are identical on both discs, so the second run skips them, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS discs aren't supported. Other versions of the C&C95 discs would fail the checksums.
 
 **Tested:**

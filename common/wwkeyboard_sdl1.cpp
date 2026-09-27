@@ -18,6 +18,11 @@
 #include "video.h"
 #include "settings.h"
 #include <SDL.h>
+#ifdef __riscos__
+#include <kernel.h>
+#endif
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void Focus_Loss();
@@ -41,6 +46,40 @@ WWKeyboardClassSDL1::~WWKeyboardClassSDL1()
 }
 
 unsigned SDL1_Mouse_Button_Events = 0;
+
+/*
+** With VC_FPSLOG set, print every mouse button event: the position SDL gave it,
+** the position passed to the game, SDL's current mouse state (where the cursor
+** is drawn) and, on RISC OS, where the OS pointer really is.
+*/
+static void Log_Mouse_Button(const SDL_Event& event, int x, int y)
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    if (!enabled) {
+        return;
+    }
+    int sx, sy;
+    SDL_GetMouseState(&sx, &sy);
+    fprintf(stderr,
+            "mouse: %s button %d at %d,%d -> game %d,%d; cursor at %d,%d",
+            event.type == SDL_MOUSEBUTTONDOWN ? "down" : "up",
+            event.button.button,
+            event.button.x,
+            event.button.y,
+            x,
+            y,
+            sx,
+            sy);
+#ifdef __riscos__
+    // OS_Word 21,4 reads the unbuffered pointer position, in OS units from the bottom left.
+    unsigned char block[5] = {4, 0, 0, 0, 0};
+    _kernel_osword(21, (int*)block);
+    int os_x = Sint16(block[1] | (block[2] << 8));
+    int os_y = Sint16(block[3] | (block[4] << 8));
+    fprintf(stderr, "; OS pointer %d,%d (OS units)", os_x, os_y);
+#endif
+    fprintf(stderr, "\n");
+}
 
 void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 {
@@ -112,6 +151,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             }
 
             Put_Mouse_Message(key, x, y, event.type == SDL_MOUSEBUTTONDOWN ? false : true);
+            Log_Mouse_Button(event, x, y);
         } break;
 
         case SDL_ACTIVEEVENT:
