@@ -50,9 +50,11 @@ bool SoundImp_ResumeSound()
 
 SampleTrackerTypeImp* SoundImp_Init_Sample(int bits_per_sample, bool stereo, int rate)
 {
-    // More queue than OpenAL's 2 buffers: on a real Risc PC the SDL audio thread drains
-    // the queue in bursts, and 2 x 8 KB ran dry between refills, cutting speech short.
-    MixerChannel* ch = Mixer_Create_Channel(bits_per_sample, stereo ? 2 : 1, rate, 6);
+    // Two buffers, as for OpenAL. A deeper queue breaks streamed music: starting a
+    // stream fills every free buffer at once, runs past the data read from disk so
+    // far, and the short read is taken as the end of the track. A channel that runs
+    // dry resumes when refilled (see mixer_sdl1.h), so gaps don't cut sounds short.
+    MixerChannel* ch = Mixer_Create_Channel(bits_per_sample, stereo ? 2 : 1, rate);
     if (ch == nullptr) {
         return nullptr;
     }

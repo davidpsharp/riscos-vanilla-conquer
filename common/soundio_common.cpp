@@ -858,6 +858,15 @@ bool Sample_Status(int index)
         return false;
     }
 
+    /*
+    **	A sample with more data still to queue is playing, even if the backend ran out
+    **	for a moment waiting for it. Otherwise a short gap in a music stream looks like
+    **	the end of the track and the theme player skips to the next one.
+    */
+    if (st->Service && st->MoreSource) {
+        return true;
+    }
+
     return SoundImp_Sample_Status(st->Imp);
 }
 
