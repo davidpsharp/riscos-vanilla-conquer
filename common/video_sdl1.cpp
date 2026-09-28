@@ -532,7 +532,7 @@ public:
             }
         }
 
-        SDL_BlitSurface(surface, NULL, window, NULL);
+        Present_Changed_Rows();
 
         if (cursor) {
             Restore_Area(area);
@@ -542,6 +542,53 @@ public:
     }
 
 private:
+    /*
+    ** Copies the frame to the screen, but only the rows that changed since the last
+    ** one. Writing to screen memory is the expensive part on a Risc PC (a full
+    ** 640x400 frame took ~15 ms, at up to 30 frames a second), while comparing
+    ** against a copy of the last frame stays in cached memory. Every couple of
+    ** seconds, and whenever the screen changes, the whole frame is sent anyway in
+    ** case something else drew on the screen.
+    */
+    void Present_Changed_Rows()
+    {
+        static std::vector<Uint8> last;
+        static SDL_Surface* last_window = nullptr;
+        static unsigned frames = 0;
+
+        if (surface->format->BitsPerPixel != 8 || window->format->BitsPerPixel != 8 || surface->w != window->w
+            || surface->h != window->h) {
+            SDL_BlitSurface(surface, NULL, window, NULL);
+            last_window = nullptr;
+            return;
+        }
+
+        int w = surface->w, h = surface->h;
+        bool full = last_window != window || last.size() != size_t(w) * h || ++frames % 60 == 0;
+        if (full) {
+            last.assign(size_t(w) * h, 0);
+            last_window = window;
+        }
+
+        if (SDL_LockSurface(surface) != 0) {
+            return;
+        }
+        if (SDL_LockSurface(window) != 0) {
+            SDL_UnlockSurface(surface);
+            return;
+        }
+        for (int y = 0; y < h; ++y) {
+            const Uint8* src = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
+            Uint8* copy = &last[size_t(y) * w];
+            if (full || memcmp(src, copy, w) != 0) {
+                memcpy(copy, src, w);
+                memcpy(static_cast<Uint8*>(window->pixels) + y * window->pitch, src, w);
+            }
+        }
+        SDL_UnlockSurface(window);
+        SDL_UnlockSurface(surface);
+    }
+
     /*
     ** Copies the part of "area" inside the surface to a side buffer, clipping "area" to
     ** match. Raw copies, as SDL would remap colours between 8 bit palettes.
