@@ -19,6 +19,38 @@
 #include "vqafile.h"
 #include "vqaloader.h"
 #include <string.h>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+
+/*
+** With VC_FPSLOG set, report any single frame load or draw that takes over 40 ms,
+** to find what stalls movie playback.
+*/
+static bool VQA_Trace_On()
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    return enabled;
+}
+
+static unsigned VQA_Trace_Ms()
+{
+    return VQA_Trace_On()
+               ? unsigned(std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::steady_clock::now().time_since_epoch())
+                              .count())
+               : 0;
+}
+
+static void VQA_Trace_Slow(const char* what, unsigned start, int frame)
+{
+    if (VQA_Trace_On()) {
+        unsigned took = VQA_Trace_Ms() - start;
+        if (took > 40) {
+            fprintf(stderr, "vqa: %s took %ums (frame %d)\n", what, took, frame);
+        }
+    }
+}
 
 bool VQAMovieDone = false;
 
@@ -125,7 +157,9 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
             if (data->Flags & VQA_DATA_FLAG_VIDEO_MEMORY_SET) {
                 VQAMovieDone = true;
             } else {
+                unsigned load_start = VQA_Trace_Ms();
                 rc = (VQAErrorType)VQA_LoadFrame(handle);
+                VQA_Trace_Slow("load", load_start, data->Loader.CurFrameNum);
 
                 if (rc != VQAERR_NONE) {
                     if (rc != VQAERR_NOBUFFER && rc != VQAERR_SLEEPING) {
@@ -147,7 +181,9 @@ VQAErrorType VQA_Play(VQAHandle* handle, VQAPlayMode mode)
                 drawer->CurFrame = drawer->CurFrame->Next;
 
             } else {
+                unsigned draw_start = VQA_Trace_Ms();
                 rc = (VQAErrorType)data->Draw_Frame(handle);
+                VQA_Trace_Slow("draw", draw_start, data->Drawer.LastFrameNum);
 
                 if (rc != VQAERR_NONE) {
                     if (rc == VQAERR_ERROR) {

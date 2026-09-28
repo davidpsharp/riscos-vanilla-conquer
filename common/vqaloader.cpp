@@ -1385,8 +1385,13 @@ VQAData* VQA_AllocBuffers(VQAHeader* header, VQAConfig* config)
             }
 
             if (config->AudioBufSize == -1) {
-                config->AudioBufSize =
-                    (audio->BytesPerSecond + (audio->BytesPerSecond / 2)) / config->HMIBufSize * config->HMIBufSize;
+                /*
+                ** 3 seconds of audio (the original used 1.5). Some movies, such as the GDI 1
+                ** briefing, store their audio far enough ahead of the video that with 1.5 s
+                ** the loader waited for audio to play before it could load the next frame,
+                ** so video only advanced a whole audio block (186 ms) at a time.
+                */
+                config->AudioBufSize = (audio->BytesPerSecond * 3) / config->HMIBufSize * config->HMIBufSize;
             }
 
             if (config->AudioBufSize <= 0) {
