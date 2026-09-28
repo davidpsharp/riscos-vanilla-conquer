@@ -3,8 +3,12 @@
 
 struct InterpolationTable* InterpolationTable = NULL;
 
+static void Interpolate_X_Axis(void* src, void* dst, int src_width);
+
 /**
  * Interpolates in X axis, leaves additional lines blank in the Y axis.
+ * Each line is built in a cached buffer and copied out in one go: writing the
+ * destination a byte at a time was much slower on a Risc PC.
  */
 void Asm_Interpolate(void* src, void* dst, int src_height, int src_width, int dst_pitch)
 {
@@ -12,16 +16,9 @@ void Asm_Interpolate(void* src, void* dst, int src_height, int src_width, int ds
     unsigned char* sptr = (unsigned char*)(src);
 
     while (src_height--) {
-        unsigned char* wptr = dptr;
-
-        for (int i = 0; i < src_width - 1; ++i) {
-            *wptr++ = *sptr;
-            *wptr++ = InterpolationTable->PaletteInterpolationTable[sptr[0]][sptr[1]];
-            ++sptr;
-        }
-
-        *wptr++ = *sptr++;
-        *wptr = 0;
+        Interpolate_X_Axis(sptr, InterpolationTable->LineBuffer, src_width);
+        memcpy(dptr, InterpolationTable->LineBuffer, 2 * src_width);
+        sptr += src_width;
         dptr += dst_pitch;
     }
 }
@@ -35,24 +32,11 @@ void Asm_Interpolate_Line_Double(void* src, void* dst, int src_height, int src_w
     unsigned char* sptr = (unsigned char*)(src);
 
     while (src_height--) {
-        unsigned char* wptr = dptr;
-        unsigned char* bptr = InterpolationTable->LineBuffer;
-
-        for (int i = 0; i < src_width - 1; ++i) {
-            *wptr++ = *sptr;
-            *bptr++ = *sptr;
-            *wptr++ = InterpolationTable->PaletteInterpolationTable[sptr[0]][sptr[1]];
-            *bptr++ = InterpolationTable->PaletteInterpolationTable[sptr[0]][sptr[1]];
-            ++sptr;
-        }
-
-        *wptr++ = *sptr;
-        *bptr++ = *sptr++;
-        *wptr = 0;
-        *bptr = 0;
-        dptr += dst_pitch / 2;
-        memcpy(dptr, InterpolationTable->LineBuffer, src_width * 2);
-        dptr += dst_pitch / 2;
+        Interpolate_X_Axis(sptr, InterpolationTable->LineBuffer, src_width);
+        memcpy(dptr, InterpolationTable->LineBuffer, 2 * src_width);
+        memcpy(dptr + dst_pitch / 2, InterpolationTable->LineBuffer, 2 * src_width);
+        sptr += src_width;
+        dptr += dst_pitch;
     }
 }
 
