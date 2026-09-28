@@ -198,6 +198,14 @@ void ThemeClass::AI(void)
             Play_Song(Pending);
             Pending = THEME_PICK_ANOTHER;
         }
+    }
+
+    /*
+    **	Keep all playing sounds fed, not just the music. This used to be skipped in quiet
+    **	mode (-XQ), so effects and speech stopped after their first buffers and anything
+    **	waiting for them to finish could hang.
+    */
+    if (SampleType) {
         Sound_Callback();
     }
 }
