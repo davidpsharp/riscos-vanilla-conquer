@@ -301,7 +301,8 @@ void Interpolate_2X_Scale(GraphicBufferClass* source,
         mode = -1;
 
     /* There is no need to create an interpolation palette if we are not interpolating.  */
-    if (mode != -1) {
+    /* Mode 3 doubles pixels without interpolating, so it doesn't need one either. */
+    if (mode != -1 && mode != 3) {
 
         /*
         **If a palette table exists on disk then read it in otherwise create it
@@ -409,6 +410,10 @@ void Interpolate_2X_Scale(GraphicBufferClass* source,
 
     case 2:
         Asm_Interpolate_Line_Interpolate(src_ptr, dest_ptr, h, src_width, dest_width);
+        break;
+
+    case 3:
+        Asm_Pixel_Double(src_ptr, dest_ptr, h, src_width, dest_width);
         break;
     }
 

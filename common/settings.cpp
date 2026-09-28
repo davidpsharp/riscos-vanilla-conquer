@@ -78,7 +78,7 @@ void SettingsClass::Load(INIClass& ini)
     /*
     ** VQA and WSA interpolation mode 0 = scanlines, 1 = vertical doubling, 2 = linear
     */
-    Video.InterpolationMode = Bound(ini.Get_Int("Video", "InterpolationMode", Video.InterpolationMode), 0, 2);
+    Video.InterpolationMode = Bound(ini.Get_Int("Video", "InterpolationMode", Video.InterpolationMode), 0, 3);
 
     /*
     ** Boxing and raw input require software cursor.

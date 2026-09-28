@@ -64,8 +64,10 @@ static void Interpolate_X_Axis(void* src, void* dst, int src_width)
     unsigned char* wptr = dptr;
 
     for (int i = 0; i < src_width - 1; ++i) {
-        *wptr++ = *sptr;
-        *wptr++ = InterpolationTable->PaletteInterpolationTable[sptr[0]][sptr[1]];
+        unsigned char a = sptr[0], b = sptr[1];
+        *wptr++ = a;
+        // Neighbours are often the same colour; skip the table (and a likely cache miss).
+        *wptr++ = a == b ? a : InterpolationTable->PaletteInterpolationTable[a][b];
         ++sptr;
     }
 
@@ -81,9 +83,8 @@ static void Interpolate_Y_Axis(void* top_line, void* bottom_line, void* middle_l
     int dst_width = 2 * src_width;
 
     for (int i = 0; i < dst_width; ++i) {
-        *mlp++ = InterpolationTable->PaletteInterpolationTable[*tlp][*blp];
-        ++tlp;
-        ++blp;
+        unsigned char a = *tlp++, b = *blp++;
+        *mlp++ = a == b ? a : InterpolationTable->PaletteInterpolationTable[a][b];
     }
 }
 
@@ -149,5 +150,29 @@ void Asm_Interpolate_Line_Interpolate_Rows(
             top = bottom;
             bottom = tmp;
         }
+    }
+}
+
+void Asm_Pixel_Double(void* src, void* dst, int src_height, int src_width, int dst_pitch)
+{
+    // Build each doubled line in a small buffer that stays in the cache, then copy it
+    // to both destination rows in bulk.
+    static unsigned char line[2 * 1024];
+    unsigned char* sptr = (unsigned char*)(src);
+    unsigned char* dptr = (unsigned char*)(dst);
+    int pitch = dst_pitch / 2;
+
+    if (src_width > 1024) {
+        src_width = 1024;
+    }
+
+    while (src_height--) {
+        for (int i = 0; i < src_width; ++i) {
+            line[2 * i] = line[2 * i + 1] = sptr[i];
+        }
+        memcpy(dptr, line, 2 * src_width);
+        memcpy(dptr + pitch, line, 2 * src_width);
+        sptr += src_width;
+        dptr += dst_pitch;
     }
 }

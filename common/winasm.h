@@ -18,6 +18,9 @@ void Asm_Interpolate_Line_Double(void* src, void* dst, int src_height, int src_w
 void Asm_Interpolate_Line_Interpolate(void* src, void* dst, int src_height, int src_width, int dst_pitch);
 // As Asm_Interpolate_Line_Interpolate for source rows first..last only; src and dst are
 // the whole buffers. Gives the same output rows as scaling the whole buffer.
+// Doubles pixels in both axes with no interpolation: much cheaper where memory is
+// slow and the 64 KB interpolation table doesn't fit in the cache (Risc PC).
+void Asm_Pixel_Double(void* src, void* dst, int src_height, int src_width, int dst_pitch);
 void Asm_Interpolate_Line_Interpolate_Rows(
     void* src, void* dst, int src_height, int src_width, int dst_pitch, int first, int last);
 
