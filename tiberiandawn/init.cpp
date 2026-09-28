@@ -516,15 +516,18 @@ bool Init_Game(int, char*[])
     Hide_Mouse();
     Wait_Vert_Blank();
     if (!Special.IsFromInstall) {
-        Set_Palette(Palette);
+        /*
+        ** Go through black: the palette takes effect at once, but the title screen
+        ** only reaches the display when a frame is presented (about 15 ms on a Risc
+        ** PC), so setting the title palette first showed the last intro movie frame
+        ** in the wrong colours for a moment. Present the title screen while the
+        ** palette is black, then give it its palette.
+        */
+        Set_Palette(BlackPalette);
         Blit_Hid_Page_To_Seen_Buff();
         Show_Mouse();
-        /*
-        ** Present the title screen now. The new palette is already live, so until
-        ** a frame is rendered the last intro movie frame is shown in the title
-        ** palette, and caching the mixfiles below can take seconds on slow machines.
-        */
         Frame_Limiter(FL_FORCE_RENDER);
+        Set_Palette(Palette);
     }
     Call_Back();
 
