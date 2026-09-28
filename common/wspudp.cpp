@@ -53,7 +53,10 @@ extern WWKeyboardClass* Keyboard;
 #include <stdio.h>
 #include <assert.h>
 
-#ifndef _WIN32
+#if defined(__riscos__)
+#include <net/if.h>
+#include <sys/ioctl.h>
+#elif !defined(_WIN32)
 #include <ifaddrs.h>
 #endif
 
@@ -245,6 +248,56 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
         unsigned char* a = new unsigned char[4];
         *((uint32_t*)a) = address;
         LocalAddresses.Add(a);
+    }
+#elif defined(__riscos__)
+    /*
+    ** UnixLib has no getifaddrs, so list the interfaces with SIOCGIFCONF. Broadcast to
+    ** 255.255.255.255 if no interface reports a broadcast address.
+    */
+    {
+        char buffer[16 * sizeof(struct ifreq)];
+        struct ifconf ifc;
+        bool have_broadcast = false;
+
+        ifc.ifc_len = sizeof(buffer);
+        ifc.ifc_buf = buffer;
+        if (ioctl(Socket, SIOCGIFCONF, &ifc) < 0) {
+            fprintf(stderr, "RA95: Can't list network interfaces: %s\n", strerror(errno));
+            ifc.ifc_len = 0;
+        }
+        for (int offset = 0; offset + (int)sizeof(struct ifreq) <= ifc.ifc_len; offset += sizeof(struct ifreq)) {
+            struct ifreq* ifr = (struct ifreq*)(buffer + offset);
+            if (ifr->ifr_addr.sa_family != AF_INET) {
+                continue;
+            }
+            struct in_addr address = ((struct sockaddr_in*)&ifr->ifr_addr)->sin_addr;
+            fprintf(stderr, "RA95: Found local address: %s on %s\n", inet_ntoa(address), ifr->ifr_name);
+
+            unsigned char* a = new unsigned char[4];
+            memcpy(a, &address.s_addr, 4);
+            LocalAddresses.Add(a);
+
+            struct ifreq query = *ifr;
+            if (ioctl(Socket, SIOCGIFFLAGS, &query) == 0 && (query.ifr_flags & IFF_BROADCAST)
+                && !(query.ifr_flags & IFF_LOOPBACK)) {
+                query = *ifr;
+                if (ioctl(Socket, SIOCGIFBRDADDR, &query) == 0) {
+                    char broadcast[16];
+                    snprintf(broadcast,
+                             sizeof(broadcast),
+                             "%s",
+                             inet_ntoa(((struct sockaddr_in*)&query.ifr_broadaddr)->sin_addr));
+                    fprintf(stderr, "RA95: Using broadcast address of: %s\n", broadcast);
+                    Set_Broadcast_Address(broadcast);
+                    have_broadcast = true;
+                }
+            }
+        }
+        if (!have_broadcast) {
+            char everyone[] = "255.255.255.255";
+            fprintf(stderr, "RA95: Using broadcast address of: %s\n", everyone);
+            Set_Broadcast_Address(everyone);
+        }
     }
 #else
     struct ifaddrs* if_addr = NULL;

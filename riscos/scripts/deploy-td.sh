@@ -27,7 +27,7 @@ if [ "${1:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/sdk.sh" bash -c "
         cmake -S . -B $BDIR -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake \
             -DCMAKE_BUILD_TYPE=Release -DRISCOS_EXTRA_FLAGS=$EXTRA \
-            -DBUILD_VANILLARA=OFF -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=OFF >/dev/null &&
+            -DBUILD_VANILLARA=OFF -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=ON >/dev/null &&
         cmake --build $BDIR &&
         elf2aif $BDIR/vanillatd $BDIR/vanillatd,ff8 &&
         cmake -S riscos/tools -B build/riscos-tools -G Ninja \
