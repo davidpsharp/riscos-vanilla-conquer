@@ -33,7 +33,14 @@ SettingsClass::SettingsClass()
 #else
     Video.FrameLimit = 120;
 #endif
+#ifdef __riscos__
+    // Blend horizontally, double lines: a third of mode 2's table lookups. On a real
+    // StrongARM Risc PC mode 2 couldn't keep up with detailed movies such as the GDI 1
+    // briefing (the 64 KB table is 4x the data cache); mode 1 plays them smoothly.
+    Video.InterpolationMode = 1;
+#else
     Video.InterpolationMode = 2;
+#endif
     Video.HardwareCursor = false;
     Video.DOSMode = false;
     Video.Scaler = "nearest";
