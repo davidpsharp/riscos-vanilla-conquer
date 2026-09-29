@@ -78,7 +78,7 @@ unsigned Phase_Now_Us()
 
 void Phase_Add(PhaseId id, unsigned us)
 {
-    Phase_Us[id] += us; // Only the audio thread writes PHASE_MIXER.
+    Phase_Us[id] += us;
 }
 
 void Phase_Report(unsigned elapsed_ms)
@@ -115,7 +115,7 @@ void Phase_Report(unsigned elapsed_ms)
     double scale = 1000.0 / elapsed_ms;
     fprintf(stderr,
             "time ms/s: map %.0f radar %.0f power %.0f sidebar %.0f other-draw %.0f | logic %.0f queue %.0f "
-            "callback %.0f present %.0f sleep %.0f other %.0f | audio mixing %.0f\n",
+            "callback %.0f present %.0f sleep %.0f other %.0f\n",
             tactical * scale,
             radar * scale,
             power * scale,
@@ -126,6 +126,5 @@ void Phase_Report(unsigned elapsed_ms)
             ms[PHASE_CALLBACK] * scale,
             ms[PHASE_PRESENT] * scale,
             ms[PHASE_SLEEP] * scale,
-            elapsed_ms > accounted ? (elapsed_ms - accounted) * scale : 0.0,
-            ms[PHASE_MIXER] * scale);
+            elapsed_ms > accounted ? (elapsed_ms - accounted) * scale : 0.0);
 }

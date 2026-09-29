@@ -695,12 +695,15 @@ static void Log_Frame_Rate(Uint32 render_ms)
         static MixerStats last_audio;
         Mixer_Get_Stats(audio);
         fprintf(stderr,
-                "audio: %u callbacks, %.0f frames/s mixed (%d Hz), longest gap %ums, %u dry\n",
+                "audio: %u callbacks, %.0f frames/s mixed (%d Hz), longest gap %ums, %u dry, peak level %d, up to %d "
+                "channels\n",
                 audio.Callbacks - last_audio.Callbacks,
                 (audio.FramesMixed - last_audio.FramesMixed) * 1000.0 / (now - start),
                 audio.OutputRate,
                 audio.MaxGapMs,
-                audio.DryCount - last_audio.DryCount);
+                audio.DryCount - last_audio.DryCount,
+                audio.Peak,
+                audio.MaxChannels);
         last_audio = audio;
 #endif
         Phase_Report(now - start);

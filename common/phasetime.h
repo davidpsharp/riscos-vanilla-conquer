@@ -18,7 +18,8 @@ enum PhaseId
     PHASE_CALLBACK, // Call_Back (sound, music, network)
     PHASE_PRESENT,  // Video_Render_Frame (cursor, copy to screen)
     PHASE_SLEEP,    // the frame limiter sleeping
-    PHASE_MIXER,    // the audio thread mixing (overlaps the others)
+    // Audio mixing isn't timed: it runs on its own thread, overlapping the rest
+    // (about 55 ms/s on a StrongARM Risc PC).
     PHASE_COUNT
 };
 

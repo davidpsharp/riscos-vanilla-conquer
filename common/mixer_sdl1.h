@@ -53,6 +53,8 @@ struct MixerStats
     unsigned DryCount;     // Times a channel ran out of queued data.
     int OutputRate;
     int OutputSamples;     // Callback size in frames.
+    int Peak;              // Loudest output sample since the last call (0 = silence).
+    int MaxChannels;       // Most channels playing in one callback since the last call.
 };
 void Mixer_Get_Stats(MixerStats& stats);
 // Bytes queued and played since the channel was last stopped.

@@ -1,4 +1,3 @@
-#include "phasetime.h"
 #include "mixer_sdl1.h"
 
 #include <SDL.h>
@@ -58,6 +57,8 @@ static unsigned Callbacks = 0;
 static unsigned LastCallbackMs = 0;
 static unsigned MaxGapMs = 0;
 static unsigned DryCount = 0;
+static int PeakLevel = 0;
+static int MaxPlaying = 0;
 static int OutputSamples = 0;
 static bool AudioOpen = false;
 static bool ReverseChannels = false;
@@ -123,7 +124,6 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
 
 static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 {
-    PhaseTimer phase_timer(PHASE_MIXER);
     (void)userdata;
     int frames = len / 4; // 16 bit stereo output.
     static int* mix = nullptr;
@@ -148,11 +148,16 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
     }
     LastCallbackMs = now;
 
+    int playing = 0;
     for (int c = 0; c < MAX_MIXER_CHANNELS; ++c) {
         MixerChannel* ch = Channels[c];
         if (ch != nullptr && ch->Playing && !ch->Paused) {
             Mix_Channel(ch, mix, frames);
+            ++playing;
         }
+    }
+    if (playing > MaxPlaying) {
+        MaxPlaying = playing;
     }
 
     Sint16* out = (Sint16*)stream;
@@ -166,6 +171,12 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
         }
         out[i * 2] = (Sint16)(l > 32767 ? 32767 : (l < -32768 ? -32768 : l));
         out[i * 2 + 1] = (Sint16)(r > 32767 ? 32767 : (r < -32768 ? -32768 : r));
+        int al = l < 0 ? -l : l;
+        int ar = r < 0 ? -r : r;
+        int level = al > ar ? al : ar;
+        if (level > PeakLevel) {
+            PeakLevel = level;
+        }
     }
 }
 
@@ -242,7 +253,11 @@ void Mixer_Get_Stats(MixerStats& stats)
     stats.DryCount = DryCount;
     stats.OutputRate = OutputRate;
     stats.OutputSamples = OutputSamples;
+    stats.Peak = PeakLevel > 32767 ? 32767 : PeakLevel;
+    stats.MaxChannels = MaxPlaying;
     MaxGapMs = 0;
+    PeakLevel = 0;
+    MaxPlaying = 0;
     SDL_UnlockAudio();
 }
 
