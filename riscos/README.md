@@ -153,6 +153,23 @@ The game picks `gdi` or `nod` according to the side being played (`Force_CD_Avai
 
 The movies are about 430 MB per side and can be left out on small discs.
 
+## Network play
+
+LAN play works: Multiplayer Game → Network. Vanilla Conquer emulates the original IPX networking over UDP broadcast. On RISC OS the game lists the network interfaces with `SIOCGIFCONF`, because UnixLib has no `getifaddrs`. It falls back to broadcasting to `255.255.255.255`. The machine needs a network card and the Internet module. Without them, Network just returns to the menu.
+
+**Tested on RPCEmu:** a RISC OS 5.30 and a RISC OS 3.71 machine on RPCEmu's shared virtual LAN hosted, joined and played a 2-player game in sync. They need to be on the same subnet. RO 3.71 machines come up on `1.x.x.x` and RO 5.30 machines on `10.x.x.x`, so one had to be moved with `ifconfig`.
+
+**Playing against other platforms:** GCC ignores the `ms_struct` (MSVC bitfield layout) attribute on non-x86 targets, so `SpecialClass` and the lobby packet's bitfields were smaller on RISC OS than on other builds. For example, `EventClass` was 19 bytes instead of 22. Fillers in `special.h` and `defines.h` make every network structure the same size and layout as the macOS (clang) build. This was checked by compiling a size and offset probe with both compilers. For a Mac opponent:
+
+```sh
+cmake -S . -B build/mac-net -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/sdl12-compat \
+    -DBUILD_VANILLARA=OFF -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=ON
+cmake --build build/mac-net
+riscos/scripts/run-mac.sh build/mac-net
+```
+
+Both players must be built from the same source.
+
 ## Keys
 
 SDL 1.2 numbers non-ASCII keys (modifiers, arrows, F keys, keypad) 256–322, which collided with the keyboard code's modifier bits. `SDL1_VK` folds them into 128–255.

@@ -2733,6 +2733,7 @@ typedef struct BITFIELD_STRUCT
     unsigned int IsTiberium : 1;         // 1 = tiberium is allowed
     unsigned int IsGoodies : 1;          // 1 = goodies are allowed
     unsigned int IsGhosties : 1;         // 1 = ghosts are allowed
+    unsigned int : 28;                   // Fill the unit: GCC ignores ms_struct on non-x86 targets.
     unsigned char BuildLevel;            // buildable level
     unsigned char UnitCount;             // max # units
     int Seed;                            // random number seed
@@ -2792,6 +2793,7 @@ typedef struct
         {
             int Version;             // game's version number
             unsigned int IsOpen : 1; // 1 = game is open for joining
+            unsigned int : 31;       // Fill the unit: GCC ignores ms_struct on non-x86 targets.
         } GameInfo;
         struct
         {
@@ -2807,6 +2809,7 @@ typedef struct
             unsigned int IsTiberium : 1; // 1 = tiberium is allowed
             unsigned int IsGoodies : 1;  // 1 = goodies are allowed
             unsigned int IsGhosties : 1; // 1 = ghosts are allowed
+            unsigned int : 28;           // Fill the unit: GCC ignores ms_struct on non-x86 targets.
             unsigned char BuildLevel;    // buildable level
             unsigned char UnitCount;     // max # units
             int Seed;                    // random number seed

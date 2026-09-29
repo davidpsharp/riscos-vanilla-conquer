@@ -260,6 +260,14 @@ public:
     unsigned ModernBalance : 1;
 
     /*
+    ** Fill out ModernBalance's unit. MSVC-style layout (ms_struct) gives this bitfield
+    ** a 4-byte unit of its own after the enums, but GCC ignores ms_struct on non-x86
+    ** targets (e.g. ARM RISC OS) and used 1 byte, making the class 13 bytes instead
+    ** of 16. It is sent in network events, so builds couldn't play each other.
+    */
+    unsigned : 31;
+
+    /*
     ** Some additional padding in case we need to add data to the class and maintain backwards compatibility for
     *save/load
     */
