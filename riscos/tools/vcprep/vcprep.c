@@ -4,12 +4,14 @@
 ** needed), unpacks the files held in the InstallShield archive INSTALL/SETUP.Z
 ** and checks every file it writes against a known CRC-32.
 **
-** Usage: vcprep <iso image> <app dir> [-nomovies] [-force]
+** Usage: vcprep [-nomovies] [-force] [-app <app dir>] [-search <dir>] [<iso image>...]
 **   -nomovies  leave out MOVIES.MIX (about 430 MB per disc)
 **   -force     rewrite files that are already present with the right size
+**   -app       the !VanillaTD directory; defaults to <VanillaTD$Dir>
+**   -search    with no images named, install from every C&C95 CD image here
 **
-** Run it once per disc: the shared files are identical on both, GENERAL and
-** MOVIES go into the gdi or nod directory for the disc given.
+** The shared files are identical on both discs; GENERAL and MOVIES go into
+** the gdi or nod directory for each disc.
 **
 ** Paths are native to the host: RISC OS paths on RISC OS, where the layout is
 ** MIX.<name>, gdi.MIX.GENERAL etc. as the game's short filename scheme expects.
@@ -23,6 +25,7 @@
 */
 #include "blast.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,7 +216,7 @@ static void Check(const struct Known* k, unsigned long size, unsigned long crc)
                k->crc);
         ++Problems;
     } else {
-        printf("  %-12s ok\n", k->name);
+        printf("  %-12s ok   \n", k->name); /* spaces cover the progress percentage */
     }
 }
 
@@ -495,52 +498,26 @@ static void Extract_Archive(const struct Entry* root)
     }
 }
 
-int main(int argc, char** argv)
+/* Installs from one disc image. Returns 0 if it isn't a C&C95 GDI or Nod disc. */
+static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
 {
-    const char* iso_name = NULL;
     struct Entry root, general;
     const struct Side* side = NULL;
-    int movies = 1;
-    int i;
     size_t k;
 
-    for (i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-nomovies") == 0) {
-            movies = 0;
-        } else if (strcmp(argv[i], "-force") == 0) {
-            Force = 1;
-        } else if (iso_name == NULL) {
-            iso_name = argv[i];
-        } else if (App_Dir == NULL) {
-            App_Dir = argv[i];
-        } else {
-            iso_name = NULL;
-            break;
-        }
-    }
-    if (iso_name == NULL || App_Dir == NULL) {
-        fprintf(stderr, "usage: vcprep <C&C95 CD image> <!VanillaTD dir> [-nomovies] [-force]\n");
-        return 2;
-    }
-#ifdef __riscos__
-    {
-        /* Prepare passes <VanillaConquer$Dir>; show the real path. */
-        static char canonical[1024];
-        if (_swix(OS_FSControl, _INR(0, 5), 37, App_Dir, canonical, 0, 0, sizeof(canonical)) == NULL) {
-            App_Dir = canonical;
-        }
-    }
-#endif
-
-    Crc_Init();
     Iso = fopen(iso_name, "rb");
     if (Iso == NULL) {
-        fprintf(stderr, "can't open %s: %s\n", iso_name, strerror(errno));
-        return 1;
+        printf("can't open %s: %s\n", iso_name, strerror(errno));
+        ++Problems;
+        return 0;
     }
     if (!Open_Root(&root)) {
-        fprintf(stderr, "%s is not an ISO 9660 CD image\n", iso_name);
-        return 1;
+        fclose(Iso);
+        if (!quiet_if_not_cnc) {
+            printf("%s is not an ISO 9660 CD image\n", iso_name);
+            ++Problems;
+        }
+        return 0;
     }
 
     /* Tell the discs apart by the size of GENERAL.MIX, then check it properly below. */
@@ -552,11 +529,17 @@ int main(int argc, char** argv)
         }
     }
     if (side == NULL) {
-        fprintf(stderr, "%s is not the C&C95 (C&C Gold) GDI or Nod disc this was made for\n", iso_name);
-        return 1;
+        fclose(Iso);
+        printf("%s is not the C&C95 (C&C Gold) GDI or Nod disc this was made for%s\n",
+               iso_name,
+               quiet_if_not_cnc ? ", skipped" : "");
+        if (!quiet_if_not_cnc) {
+            ++Problems;
+        }
+        return 0;
     }
     Side_Dir = side->dir;
-    printf("%s disc, installing into %s\n", strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
+    printf("%s: %s disc, installing into %s\n", iso_name, strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
 
     for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
         Copy_Plain(&root, &Disc_Files[k]);
@@ -568,8 +551,146 @@ int main(int argc, char** argv)
     } else {
         printf("  %-12s left out (-nomovies)\n", side->movies.name);
     }
-
     fclose(Iso);
+    return 1;
+}
+
+/*
+** Installs from every CD image in a directory. The images are recognised by
+** their contents, not their names: RISC OS 3.x truncates leaf names to 10
+** characters, so CNC95_GDI/iso may well have lost its extension.
+*/
+#define MIN_IMAGE_SIZE (100L * 1024 * 1024)
+
+static int Install_From_Dir(const char* dir, int movies)
+{
+    char path[1024];
+    int found = 0;
+#ifdef __riscos__
+    static unsigned char entries[4096];
+    int offset = 0;
+    while (offset != -1) {
+        int count = 0, next = -1, i;
+        const unsigned char* e = entries;
+        if (_swix(OS_GBPB, _INR(0, 6) | _OUT(3) | _OUT(4), 10, dir, entries, 64, offset, sizeof(entries), "*", &count,
+                  &next)
+            != NULL) {
+            printf("can't read the directory %s\n", dir);
+            ++Problems;
+            return found;
+        }
+        for (i = 0; i < count; ++i) {
+            /* load, exec, length, attributes, object type, then the name, word aligned */
+            unsigned long length = Get32(e + 8);
+            unsigned long type = Get32(e + 16);
+            const char* name = (const char*)e + 20;
+            if ((type == 1 || type == 3) && length >= (unsigned long)MIN_IMAGE_SIZE) {
+                snprintf(path, sizeof(path), "%s" SEP "%s", dir, name);
+                found += Install_From(path, movies, 1);
+            }
+            e += (20 + strlen(name) + 1 + 3) & ~3u;
+        }
+        offset = next;
+    }
+#else
+    DIR* d = opendir(dir);
+    struct dirent* de;
+    if (d == NULL) {
+        printf("can't read the directory %s: %s\n", dir, strerror(errno));
+        ++Problems;
+        return 0;
+    }
+    while ((de = readdir(d)) != NULL) {
+        snprintf(path, sizeof(path), "%s" SEP "%s", dir, de->d_name);
+        if (de->d_name[0] != '.' && File_Size(path) >= MIN_IMAGE_SIZE) {
+            found += Install_From(path, movies, 1);
+        }
+    }
+    closedir(d);
+#endif
+    return found;
+}
+
+#ifdef __riscos__
+/* Prepare passes <VanillaTD$Dir> and <Obey$Dir>; turn them into real paths for the messages. */
+static const char* Canonical(const char* path)
+{
+    char buf[1024];
+    char* copy;
+    if (_swix(OS_FSControl, _INR(0, 5), 37, path, buf, 0, 0, sizeof(buf)) != NULL || (copy = strdup(buf)) == NULL) {
+        return path;
+    }
+    return copy;
+}
+#else
+#define Canonical(path) (path)
+#endif
+
+static int Usage(void)
+{
+    fprintf(stderr,
+            "usage: vcprep [-nomovies] [-force] [-app <!VanillaTD dir>] [-search <dir>] [<CD image>...]\n"
+            "  Installs from the C&C95 CD images given, or else every one in the -search directory.\n"
+            "  The application directory defaults to <VanillaTD$Dir>.\n");
+    return 2;
+}
+
+int main(int argc, char** argv)
+{
+    const char* search = NULL;
+    const char* images[8];
+    int num_images = 0, installed = 0;
+    int movies = 1;
+    int i;
+
+    for (i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-nomovies") == 0) {
+            movies = 0;
+        } else if (strcmp(argv[i], "-force") == 0) {
+            Force = 1;
+        } else if (strcmp(argv[i], "-app") == 0 && i + 1 < argc) {
+            App_Dir = argv[++i];
+        } else if (strcmp(argv[i], "-search") == 0 && i + 1 < argc) {
+            search = argv[++i];
+        } else if (argv[i][0] == '-' || num_images == (int)(sizeof(images) / sizeof(images[0]))) {
+            return Usage();
+        } else {
+            images[num_images++] = argv[i];
+        }
+    }
+    if (App_Dir == NULL) {
+        App_Dir = getenv("VanillaTD$Dir");
+    }
+    if (App_Dir == NULL || *App_Dir == '\0' || (num_images == 0 && search == NULL)) {
+        return Usage();
+    }
+    App_Dir = Canonical(App_Dir);
+
+    Crc_Init();
+    if (num_images > 0) {
+        for (i = 0; i < num_images; ++i) {
+            /* A bare name that isn't in the current directory may be next to Prepare. */
+            char path[1024];
+            const char* image = images[i];
+            if (File_Size(image) < 0 && search != NULL) {
+                snprintf(path, sizeof(path), "%s" SEP "%s", Canonical(search), image);
+                if (File_Size(path) >= 0) {
+                    image = path;
+                }
+            }
+            installed += Install_From(image, movies, 0);
+        }
+    } else {
+        search = Canonical(search);
+        installed = Install_From_Dir(search, movies);
+        if (installed == 0 && Problems == 0) {
+            printf("No C&C95 CD images found in %s.\n"
+                   "Put the GDI and/or Nod disc image (.iso) there, or give its name.\n",
+                   search);
+            return 1;
+        }
+    }
+
     if (Problems) {
         printf("%d problem(s): the disc image may be a different version or damaged.\n", Problems);
         return 1;

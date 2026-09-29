@@ -115,14 +115,14 @@ Why it's this fast: on RISC OS the game skips `Resolve_File`'s case-fixing direc
 
 ## Installing the game data on RISC OS
 
-The game data isn't redistributable, so `!VanillaTD` ships without it. `!VanillaTD.Prepare` installs it from the freeware C&C95 (C&C Gold) CD images, on the RISC OS machine itself. Run it once per disc:
+The game data isn't redistributable, so `!VanillaTD` ships without it. `Prepare`, which comes in the zip next to `!VanillaTD`, installs it from the freeware C&C95 (C&C Gold) CD images, on the RISC OS machine itself. Once the Filer has seen `!VanillaTD` (`!Boot` sets `VanillaTD$Dir`), copy `Prepare` next to the ISOs and double-click it. It installs from every C&C95 image in its own directory. The ISOs therefore don't have to be on the same disc as the game. From the command line:
 
 ```
-*Obey <path>.!VanillaTD.Prepare <path>.CNC95_GDI/iso [-nomovies] [-force]
-*Obey <path>.!VanillaTD.Prepare <path>.CNC95_Nod/iso [-nomovies]
+*Obey <path>.Prepare [<CD image>...] [-nomovies] [-force]
 ```
 
-It runs `Utils.vcprep` (source in `tools/vcprep`), which:
+It runs `!VanillaTD.Utils.vcprep` (source in `tools/vcprep`), which:
+- finds the images by their contents (an ISO 9660 volume holding the C&C95 `GENERAL.MIX`), not by name, since RISC OS 3.x cuts `CNC95_GDI/iso` down to 10 characters;
 - reads the ISO image directly, with no CDFS or mounting needed;
 - unpacks the files in `INSTALL/SETUP.Z` (InstallShield 3, PKWARE implode; decompressed with Mark Adler's `blast.c`);
 - writes the short-filename layout below, with filetypes set;
@@ -130,7 +130,7 @@ It runs `Utils.vcprep` (source in `tools/vcprep`), which:
 
 **Licences:** `vcprep.c` is GPL v3, like the rest of the project. `blast.c`/`blast.h` are Mark Adler's, under the zlib licence, and are included unmodified. The `SETUP.Z` layout follows [unshieldv3](https://github.com/wfr/unshieldv3) (Apache 2.0), used only as a format reference. All of these are compatible with GPL v3.
 
-The shared files are identical on both discs, so the second run skips them, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS discs aren't supported. Other versions of the C&C95 discs would fail the checksums.
+The shared files are identical on both discs, so they're written once, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS discs aren't supported. Other versions of the C&C95 discs would fail the checksums.
 
 **Tested:**
 - Natively on macOS against both ISOs, where its output matches `prepare-td-data.sh`.
@@ -217,6 +217,10 @@ riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-
 - `Licences`: GPL-3 with EA's additional terms, blast, UnixLib and DRenderer
 
 It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype in the zip's Acorn extra field, which SparkFS, SparkPlug and Info-ZIP read.
+
+**Layout:** `Prepare` sits at the top level of the zip, next to `!VanillaTD`, so it can be copied to wherever the ISOs are. It finds the app through `VanillaTD$Dir`, which `!Boot` sets, and refuses to run if the Filer hasn't seen `!VanillaTD` yet.
+
+**Tested on RO 3.71:** Prepare double-clicked in a directory holding the GDI ISO, the Nod ISO under a truncated name (`CNC95_Nod_`) and a DOS ISO. It installed both discs including the movies, skipped the DOS disc, and the intro then played. Before the Filer had seen `!VanillaTD`, it gave its error instead. From the command line, `-nomovies` and a bare image name both work.
 
 **Tested:** SparkFS on RISC OS 5.30 unpacked the release zip with every filetype intact. On RISC OS 3.71 the app was copied to ADFS, `Prepare` installed the GDI ISO (`-nomovies`), and the game started. On first run the game plays the intro and goes straight to side selection, because the CD's `CONQUER.INI` has `PlayIntro=Yes`. That's the original game's behaviour, and it then sets it to `no`.
 

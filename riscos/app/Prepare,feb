@@ -1,0 +1,13 @@
+| Prepare for Vanilla Conquer: Tiberian Dawn
+| Installs the game data into !VanillaTD from the freeware C&C95 (C&C Gold)
+| CD images in the same directory as this file. Copy it next to the .iso
+| files and double-click it, or from the command line:
+|   *Obey <path>.Prepare [<CD image>...] [-nomovies] [-force]
+| -nomovies leaves out the movies (about 430 MB per disc).
+| -force rewrites files that are already present.
+If "<VanillaTD$Dir>"="" Then Error Prepare doesn't know where !VanillaTD is yet. Open the directory containing !VanillaTD, then run Prepare again.
+RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaTD$Dir>.Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 Error Prepare needs SharedUnixLibrary 1.16 or later
+WimpSlot -min 1024K -max 1024K
+Run <VanillaTD$Dir>.Utils.vcprep -app <VanillaTD$Dir> -search <Obey$Dir> %*0

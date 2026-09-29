@@ -127,7 +127,7 @@ namespace
 ** On RISC OS the application directory is found through the <App$Dir> system
 ** variable that !Run sets. UnixLib maps "/<Var$Dir>/file" to "<Var$Dir>.file".
 */
-#define RISCOS_APP_DIR "/<VanillaConquer$Dir>"
+#define RISCOS_APP_DIR "/<VanillaTD$Dir>"
 #endif
 
 const char* PathsClass::Program_Path()

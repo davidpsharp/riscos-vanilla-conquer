@@ -5,8 +5,8 @@ Files named NAME,xxx (the HostFS/NFS convention) are stored as NAME with the
 filetype in an Acorn "ARC0" extra field (tag 0x4341), which SparkFS,
 SparkPlug and Info-ZIP on RISC OS all read. Other files are stored as Text.
 
-Usage: riscos-zip.py <out.zip> <directory>...
-  Each directory is added under its own leaf name.
+Usage: riscos-zip.py <out.zip> <file or directory>...
+  Each is added at the top level under its own leaf name.
 """
 import os
 import re
@@ -52,6 +52,9 @@ def main():
     with zipfile.ZipFile(out, "w") as z:
         for top in dirs:
             base = os.path.dirname(os.path.abspath(top))
+            if not os.path.isdir(top):
+                add(z, top, os.path.basename(top))
+                continue
             for root, subdirs, files in os.walk(top):
                 subdirs.sort()
                 rel = os.path.relpath(root, base)

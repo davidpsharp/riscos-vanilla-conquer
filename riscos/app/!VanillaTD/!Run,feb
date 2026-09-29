@@ -1,12 +1,12 @@
 | !Run for Vanilla Conquer: Tiberian Dawn
-Set VanillaConquer$Dir <Obey$Dir>
-IconSprites <VanillaConquer$Dir>.!Sprites
+Set VanillaTD$Dir <Obey$Dir>
+IconSprites <VanillaTD$Dir>.!Sprites
 | SharedUnixLibrary is normally in !System; fall back to the copy shipped here.
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
-RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaConquer$Dir>.Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaTD$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
-RMEnsure DigitalRenderer 0.56 RMLoad <VanillaConquer$Dir>.Modules.DRenderer
+RMEnsure DigitalRenderer 0.56 RMLoad <VanillaTD$Dir>.Modules.DRenderer
 WimpSlot -min 20000K -max 20000K
-Run <VanillaConquer$Dir>.!RunImage %*0 >/<VanillaConquer$Dir>/stdout 2>/<VanillaConquer$Dir>/stderr
+Run <VanillaTD$Dir>.!RunImage %*0 >/<VanillaTD$Dir>/stdout 2>/<VanillaTD$Dir>/stderr

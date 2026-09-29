@@ -38,6 +38,9 @@ fi
 [ -d "$WORK/hostfs/modules" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
 mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaTD/* "$APP/"
+# Prepare sits next to !VanillaTD, as in the release zip.
+rm -f "$APP/Prepare,feb"
+cp "$ROOT/riscos/app/Prepare,feb" "$APP/../"
 cp "$ROOT/$BDIR/vanillatd,ff8" "$APP/!RunImage,ff8"
 mkdir -p "$APP/Utils"
 cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"

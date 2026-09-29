@@ -42,16 +42,28 @@ CD images that Electronic Arts released in 2007: the GDI disc and,
 optionally, the Nod disc (as .iso files). The DOS discs are not
 supported.
 
-Copy the ISO files to your RISC OS machine, then install from each one
-in turn with the Prepare script in the application (Shift-double-click
-!VanillaTD to open it). For example:
+The Prepare file that comes next to !VanillaTD installs the data from
+the ISO files:
 
-  *Obey ADFS::HardDisc4.$.Games.!VanillaTD.Prepare ADFS::HardDisc4.$.GDI/iso
-  *Obey ADFS::HardDisc4.$.Games.!VanillaTD.Prepare ADFS::HardDisc4.$.Nod/iso
+  1. Put !VanillaTD where you want to keep the game, and open the
+     directory containing it, so the Filer has seen it.
+  2. Copy Prepare into the directory holding the ISO file(s). They
+     don't need to be on the same disc as !VanillaTD, which helps if
+     there isn't room for both the ISOs and the game on one disc.
+  3. Double-click Prepare.
 
-Prepare reads the ISO directly (no CD drive or CDFS needed), unpacks the
-game files into !VanillaTD and checks each one against a known checksum.
-The files both discs share are only written once.
+Prepare installs from every C&C95 disc image it finds in its own
+directory: GDI, Nod or both. It reads the ISO files directly (no CD
+drive or CDFS needed), unpacks the game files into !VanillaTD and checks
+each one against a known checksum. It recognises the images by their
+contents, so it doesn't matter if RISC OS has shortened their names.
+The files both discs share are only written once, and files already
+installed are skipped, so it's safe to run it again.
+
+From the command line you can also name the images and give options:
+
+  *Obey ADFS::HardDisc4.$.ISOs.Prepare -nomovies
+  *Obey ADFS::HardDisc4.$.Prepare SCSI::Big.$.CNC95_GDI/iso
 
   -nomovies  leaves out the movies (about 430 MB per disc)
   -force     rewrites files that are already there
