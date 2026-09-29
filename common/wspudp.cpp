@@ -185,6 +185,22 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
     Set_Broadcast_Address((void*)"255.255.255.255");
 
     /*
+    ** VC_NETPEER: extra addresses to send "broadcasts" to directly, comma or space
+    ** separated, for networks that don't pass broadcasts between machines (e.g. some
+    ** routers between wired and Wi-Fi). On RISC OS: *Set VC_NETPEER 192.168.1.187
+    */
+    if (const char* peers = getenv("VC_NETPEER")) {
+        char list[256];
+        snprintf(list, sizeof(list), "%s", peers);
+        for (char* peer = strtok(list, ", "); peer != nullptr; peer = strtok(nullptr, ", ")) {
+            if (strlen(peer) <= strlen("xxx.xxx.xxx.xxx")) {
+                fprintf(stderr, "RA95: Also sending broadcasts to %s (VC_NETPEER)\n", peer);
+                Set_Broadcast_Address(peer);
+            }
+        }
+    }
+
+    /*
     ** Sets the socket as nonblocking.
     */
 #ifdef _WIN32
