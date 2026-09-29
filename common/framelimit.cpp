@@ -18,7 +18,7 @@ unsigned Logic_Frame_Count = 0;
 void Video_Render_Frame();
 #endif
 
-void Frame_Limiter(FrameLimitFlags flags)
+void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
 {
     static auto frame_start = std::chrono::steady_clock::now();
 #ifdef NEW_VIDEO_BUILD
@@ -33,7 +33,8 @@ void Frame_Limiter(FrameLimitFlags flags)
         }
         PhaseTimer phase_timer(PHASE_SLEEP);
         if (!(flags & FrameLimitFlags::FL_NO_BLOCK)) {
-            ms_sleep(unsigned(render_remaining));
+            // Oversleeping the game's next frame makes each one take a whole extra present slot.
+            ms_sleep(unsigned(max_sleep_ms >= 0 && max_sleep_ms < render_remaining ? max_sleep_ms : render_remaining));
         } else {
             ms_sleep(1); // Unconditionally yield for minimum time.
         }
@@ -64,7 +65,11 @@ void Frame_Limiter(FrameLimitFlags flags)
             frame_start += std::chrono::microseconds{min_frame_time};
             if (!(flags & FrameLimitFlags::FL_NO_SLEEP)) {
                 PhaseTimer phase_timer(PHASE_SLEEP);
-                us_sleep(min_frame_time - cur_frame_time);
+                unsigned wait = unsigned(min_frame_time - cur_frame_time);
+                if (max_sleep_ms >= 0 && unsigned(max_sleep_ms) * 1000 < wait) {
+                    wait = unsigned(max_sleep_ms) * 1000;
+                }
+                us_sleep(wait);
             }
         } else {
             frame_start = frame_end;

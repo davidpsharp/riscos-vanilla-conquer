@@ -1537,7 +1537,8 @@ static void Sync_Delay(void)
             Map.Render();
         }
 
-        Frame_Limiter(FL_NONE);
+        // Wake in time for the next game frame rather than the next present slot.
+        Frame_Limiter(FL_NONE, int(FrameTimer.Time()) * 1000 / TIMER_SECOND);
     }
     Color_Cycle();
     Call_Back();
