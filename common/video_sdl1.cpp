@@ -59,6 +59,7 @@
 extern WWKeyboardClass* Keyboard;
 static SDL_Surface* window;
 static SDL_Color logpal[256], physpal[256];
+void Video_Settle_Front();
 
 static struct
 {
@@ -133,6 +134,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         win_flags |= SDL_FULLSCREEN;
     }
 
+    Video_Settle_Front();
     window = SDL_SetVideoMode(w, h, 8, win_flags);
     if (window == nullptr) {
         DBG_ERROR("SDL_SetVideoMode failed: %s", SDL_GetError());
@@ -198,6 +200,7 @@ void Toggle_Video_Fullscreen()
             win_flags |= SDL_FULLSCREEN;
         }
 
+        Video_Settle_Front();
         new_window = SDL_SetVideoMode(window->w, window->h, 8, win_flags);
         if (new_window) {
             window = new_window;
@@ -446,6 +449,35 @@ SurfaceMonitorClass::SurfaceMonitorClass()
 class VideoSurfaceSDL1;
 static VideoSurfaceSDL1* frontSurface = nullptr;
 
+// Copies the overlapping part of two 8 bit surfaces byte for byte (SDL would remap
+// colours between 8 bit palettes).
+static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
+{
+    int w = from->w < to->w ? from->w : to->w;
+    int h = from->h < to->h ? from->h : to->h;
+    SDL_LockSurface(from);
+    SDL_LockSurface(to);
+    for (int row = 0; row < h; ++row) {
+        memcpy(static_cast<Uint8*>(to->pixels) + row * to->pitch,
+               static_cast<const Uint8*>(from->pixels) + row * from->pitch,
+               w);
+    }
+    SDL_UnlockSurface(to);
+    SDL_UnlockSurface(from);
+}
+
+/*
+** The visible surface (SeenBuff) normally gets each frame by a full copy from the
+** hidden one (HidPage) in Blit_Display, and then presenting copies it again to the
+** screen. On a Risc PC each of those copies costs 15-20 ms. So instead Blit_Display
+** can call Show_Hidden: the visible surface then "mirrors" the hidden one, and the
+** next present copies the hidden surface straight to the screen. After that the
+** frame lives on the screen, and the game can draw its next frame on the hidden
+** surface. Whenever anything touches the visible surface (a dialog drawing on it,
+** say), Settle first fills it in with what it would have held: the hidden surface
+** if the frame hasn't been presented yet, else the screen. Touching the hidden
+** surface before its frame is presented settles too. VC_NODEFERBLIT turns it off.
+*/
 class VideoSurfaceSDL1 : public VideoSurface
 {
 public:
@@ -462,7 +494,11 @@ public:
 
     virtual ~VideoSurfaceSDL1()
     {
+        if (frontSurface != nullptr && frontSurface->mirror == this) {
+            frontSurface->Settle();
+        }
         if (frontSurface == this) {
+            mirror = nullptr;
             frontSurface = nullptr;
         }
 
@@ -493,6 +529,7 @@ public:
 
     virtual bool LockWait()
     {
+        Touch();
         changed = true; // Anything that draws on the surface locks it first.
         return (SDL_LockSurface(surface) == 0);
     }
@@ -507,6 +544,8 @@ public:
     {
         SDL_Rect srcRectSDL = Make_SDL_Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height);
         SDL_Rect destRectSDL = Make_SDL_Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height);
+        ((VideoSurfaceSDL1*)src)->Touch();
+        Touch();
         changed = true;
         SDL_BlitSurface(((VideoSurfaceSDL1*)src)->surface, &srcRectSDL, surface, &destRectSDL);
     }
@@ -514,17 +553,47 @@ public:
     virtual void FillRect(const Rect& rect, unsigned char color)
     {
         SDL_Rect rectSDL = Make_SDL_Rect(rect.X, rect.Y, rect.Width + 1, rect.Height + 1);
+        Touch();
         changed = true;
         SDL_FillRect(surface, &rectSDL, color);
     }
 
+    // Blit_Display: make this (the visible surface) show "hidden" without copying it.
+    bool Show_Hidden(VideoSurfaceSDL1* hidden)
+    {
+        if (hidden == this || hidden->surface->w != surface->w || hidden->surface->h != surface->h) {
+            return false;
+        }
+        if (mirror != nullptr && mirror != hidden) {
+            Settle();
+        }
+        mirror = hidden;
+        mirror_shown = false;
+        changed = true;
+        return true;
+    }
+
+    // Fill in the surface with the frame it stands for, before anything uses it.
+    void Settle()
+    {
+        VideoSurfaceSDL1* from = mirror;
+        mirror = nullptr;
+        if (from == nullptr) {
+            return;
+        }
+        if (!mirror_shown) {
+            Raw_Copy(from->surface, surface);
+        } else if (window != nullptr) {
+            // The frame is on the screen, with the cursor drawn over it.
+            Raw_Copy(window, surface);
+            if (last_cursor) {
+                Put_Under(surface, last_drawn);
+            }
+        }
+    }
+
     void RenderSurface()
     {
-        /*
-        ** Draw the software cursor into the frame before copying it to the screen, then
-        ** put back what was under it. Drawing it on the screen after the copy leaves it
-        ** missing for part of every frame, which flickers badly on real hardware.
-        */
         SDL_Rect area = {0, 0, 0, 0};
         bool cursor = !Get_Mouse_State() && hwcursor.Surface != nullptr;
 
@@ -550,28 +619,57 @@ public:
         }
         ++Phase_Counts[full ? COUNT_PRESENT_FULL : COUNT_PRESENT_PARTIAL];
 
+        // The frame to show: the hidden surface if this one mirrors it.
+        SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
         SDL_Rect drawn = area;
-        if (cursor) {
-            cursor = Save_Area(drawn); // clips "drawn" to the surface
-            if (cursor) {
-                SDL_Rect dst = area;
-                SDL_BlitSurface(hwcursor.Surface, nullptr, surface, &dst);
-            }
-        }
-
         SDL_Rect dirty = {0, 0, 0, 0};
-        if (full) {
-            SDL_BlitSurface(surface, NULL, window, NULL);
-        } else {
-            dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
-            if (dirty.w > 0 && dirty.h > 0) {
-                SDL_Rect src = dirty, dst = dirty;
-                SDL_BlitSurface(surface, &src, window, &dst);
-            }
-        }
 
-        if (cursor) {
-            Restore_Area(drawn);
+        if (!full && mirror != nullptr && mirror_shown) {
+            /*
+            ** The frame is only on the screen now (the hidden surface may already hold
+            ** part of the next one), so move the cursor on the screen itself: put back
+            ** what was under it, then save what's under the new place and draw it there.
+            */
+            if (last_cursor) {
+                Put_Under(window, last_drawn);
+            }
+            if (cursor) {
+                cursor = Save_Area(window, drawn);
+                if (cursor) {
+                    Draw_Cursor(window, area);
+                }
+            }
+            dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
+        } else {
+            /*
+            ** Draw the software cursor into the frame before copying it to the screen,
+            ** then put back what was under it. Drawing it on the screen after the copy
+            ** leaves it missing for part of every frame, which flickers badly on real
+            ** hardware.
+            */
+            if (cursor) {
+                cursor = Save_Area(frame, drawn); // clips "drawn" to the surface
+                if (cursor) {
+                    Draw_Cursor(frame, area);
+                }
+            }
+
+            if (full) {
+                Raw_Copy(frame, window);
+            } else {
+                dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
+                if (dirty.w > 0 && dirty.h > 0) {
+                    SDL_Rect src = dirty, dst = dirty;
+                    SDL_BlitSurface(frame, &src, window, &dst);
+                }
+            }
+
+            if (cursor) {
+                Put_Under(frame, drawn);
+            }
+            if (mirror != nullptr) {
+                mirror_shown = true;
+            }
         }
 
         if (full) {
@@ -589,6 +687,19 @@ public:
     }
 
 private:
+    // About to be read or written: make sure it holds what it should.
+    void Touch()
+    {
+        if (frontSurface == nullptr) {
+            return;
+        }
+        if (this == frontSurface) {
+            Settle();
+        } else if (frontSurface->mirror == this && !frontSurface->mirror_shown) {
+            frontSurface->Settle();
+        }
+    }
+
     static SDL_Rect Union(const SDL_Rect& a, const SDL_Rect& b)
     {
         if (a.w <= 0 || a.h <= 0) {
@@ -604,6 +715,71 @@ private:
         return Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
     }
 
+    /*
+    ** Copies the part of "area" inside the surface to a side buffer, clipping "area" to
+    ** match. Raw copies, as SDL would remap colours between 8 bit palettes.
+    */
+    bool Save_Area(SDL_Surface* on, SDL_Rect& area)
+    {
+        int x0 = area.x < 0 ? 0 : area.x;
+        int y0 = area.y < 0 ? 0 : area.y;
+        int x1 = area.x + area.w > on->w ? on->w : area.x + area.w;
+        int y1 = area.y + area.h > on->h ? on->h : area.y + area.h;
+
+        if (x1 <= x0 || y1 <= y0) {
+            return false;
+        }
+        area = Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
+        under.resize(size_t(area.w) * area.h);
+
+        SDL_LockSurface(on);
+        for (int row = 0; row < area.h; ++row) {
+            memcpy(&under[size_t(row) * area.w],
+                   static_cast<Uint8*>(on->pixels) + (area.y + row) * on->pitch + area.x,
+                   area.w);
+        }
+        SDL_UnlockSurface(on);
+        return true;
+    }
+
+    // Puts back what Save_Area saved.
+    void Put_Under(SDL_Surface* on, const SDL_Rect& area)
+    {
+        if (under.size() < size_t(area.w) * area.h) {
+            return;
+        }
+        SDL_LockSurface(on);
+        for (int row = 0; row < area.h; ++row) {
+            memcpy(static_cast<Uint8*>(on->pixels) + (area.y + row) * on->pitch + area.x,
+                   &under[size_t(row) * area.w],
+                   area.w);
+        }
+        SDL_UnlockSurface(on);
+    }
+
+    // Draws the cursor with its top left at "at", colour 0 transparent, clipped.
+    void Draw_Cursor(SDL_Surface* on, const SDL_Rect& at)
+    {
+        const Uint8* shape = static_cast<const Uint8*>(hwcursor.Surface->pixels);
+        int pitch = hwcursor.Surface->pitch;
+        SDL_LockSurface(on);
+        for (int row = 0; row < at.h; ++row) {
+            int y = at.y + row;
+            if (y < 0 || y >= on->h) {
+                continue;
+            }
+            Uint8* dst = static_cast<Uint8*>(on->pixels) + y * on->pitch;
+            const Uint8* src = shape + row * pitch;
+            for (int col = 0; col < at.w; ++col) {
+                int x = at.x + col;
+                if (src[col] != 0 && x >= 0 && x < on->w) {
+                    dst[x] = src[col];
+                }
+            }
+        }
+        SDL_UnlockSurface(on);
+    }
+
     // What was presented last, so an unchanged frame needn't be copied again.
     bool changed = true;
     bool presented = false;
@@ -612,48 +788,39 @@ private:
     SDL_Rect last_drawn = {0, 0, 0, 0};
     unsigned last_generation = 0;
 
-    /*
-    ** Copies the part of "area" inside the surface to a side buffer, clipping "area" to
-    ** match. Raw copies, as SDL would remap colours between 8 bit palettes.
-    */
-    bool Save_Area(SDL_Rect& area)
-    {
-        int x0 = area.x < 0 ? 0 : area.x;
-        int y0 = area.y < 0 ? 0 : area.y;
-        int x1 = area.x + area.w > surface->w ? surface->w : area.x + area.w;
-        int y1 = area.y + area.h > surface->h ? surface->h : area.y + area.h;
-
-        if (x1 <= x0 || y1 <= y0) {
-            return false;
-        }
-        area = Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
-        under.resize(size_t(area.w) * area.h);
-
-        SDL_LockSurface(surface);
-        for (int row = 0; row < area.h; ++row) {
-            memcpy(&under[size_t(row) * area.w],
-                   static_cast<Uint8*>(surface->pixels) + (area.y + row) * surface->pitch + area.x,
-                   area.w);
-        }
-        SDL_UnlockSurface(surface);
-        return true;
-    }
-
-    void Restore_Area(const SDL_Rect& area)
-    {
-        SDL_LockSurface(surface);
-        for (int row = 0; row < area.h; ++row) {
-            memcpy(static_cast<Uint8*>(surface->pixels) + (area.y + row) * surface->pitch + area.x,
-                   &under[size_t(row) * area.w],
-                   area.w);
-        }
-        SDL_UnlockSurface(surface);
-    }
+    // The hidden surface this one stands for, and whether that frame is on the screen yet.
+    VideoSurfaceSDL1* mirror = nullptr;
+    bool mirror_shown = false;
 
     SDL_Surface* surface;
     GBC_Enum flags;
     std::vector<Uint8> under; // What the software cursor covers while it is drawn.
+
+    friend bool Video_Show_Hidden(VideoSurface* hidden);
+    friend void Video_Settle_Front();
 };
+
+/*
+** Blit_Display calls this instead of copying the hidden page to the visible one;
+** false means copy as usual.
+*/
+bool Video_Show_Hidden(VideoSurface* hidden)
+{
+    static const bool off = getenv("VC_NODEFERBLIT") != nullptr;
+    if (off || frontSurface == nullptr || hidden == nullptr) {
+        return false;
+    }
+    return frontSurface->Show_Hidden(static_cast<VideoSurfaceSDL1*>(hidden));
+}
+
+// Before the screen changes under the visible surface (a new video mode).
+void Video_Settle_Front()
+{
+    if (frontSurface != nullptr) {
+        frontSurface->Settle();
+        frontSurface->presented = false;
+    }
+}
 
 // Mouse button events seen by the SDL1 keyboard code, for the VC_FPSLOG report.
 extern unsigned SDL1_Mouse_Button_Events;

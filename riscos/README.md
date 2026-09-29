@@ -68,6 +68,11 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 
 The frame limiter's sleep ends on a centisecond tick, so the centisecond clock would count most short work as zero. On RISC OS 3.5–4.x the timer instead reads IOMD timer 0 (2 MHz) in SVC mode. Elsewhere it uses `steady_clock`, which is coarse on RISC OS 5. RPCEmu is much faster than a real StrongARM, so only real-hardware numbers show what to optimise.
 
+**What the timings led to** (StrongARM Risc PC, in play). At first, whole-screen copies took about 60% of every second: ~250 ms/s in `Blit_Display` (hidden page to visible page) and ~370 ms/s presenting (visible page to screen). The game logic ran at 12.4 of its 15 frames a second.
+- **Unchanged frames aren't copied:** the game presents about twice per frame it draws, so presents copy only the cursor's old and new areas, or nothing, when nothing has drawn on the visible page. `VC_FULLPRESENT` turns this off.
+- **The hidden page is presented directly:** `Blit_Display` makes the visible surface mirror the hidden one, instead of copying it (`video_sdl1.cpp`). The visible surface is filled in only when something actually uses it, such as a dialog. `VC_NODEFERBLIT` turns this off.
+- **Pacing:** waiting for the next game frame no longer oversleeps it. The old sleeps ran to the next present slot, so each frame took three slots instead of two, which is why the game ran at 12.4 fps. `VC_SIMLOAD=<ms>` adds that much work per game frame, to reproduce a slow machine on RPCEmu. At 55 ms it gave 12.3–12.5 fps before the fix and 15.2–15.6 after.
+
 ## Playtest status (RISC OS 3.71, StrongARM, RPCEmu)
 
 Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM, 64 MB RAM).

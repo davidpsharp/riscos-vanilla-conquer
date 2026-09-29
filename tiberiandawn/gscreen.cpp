@@ -457,9 +457,24 @@ extern bool CanVblankSync;
  *   02/14/1994 JLB : Created.                                                                 *
  *   05/01/1994 JLB : Converted to member function.                                            *
  *=============================================================================================*/
+#ifdef SDL1_BUILD
+bool Video_Show_Hidden(VideoSurface* hidden);
+#endif
+
 void GScreenClass::Blit_Display(void)
 {
     ++Phase_Counts[COUNT_BLIT_DISPLAY];
+#ifdef SDL1_BUILD
+    /*
+    ** Rather than copy the whole hidden page to the visible one, let the video code
+    ** present the hidden page directly (see video_sdl1.cpp).
+    */
+    if (HidPage.Get_XPos() == 0 && HidPage.Get_YPos() == 0 && HidPage.Get_Width() == SeenBuff.Get_Width()
+        && HidPage.Get_Height() == SeenBuff.Get_Height()
+        && Video_Show_Hidden(HidPage.Get_Graphic_Buffer()->Get_DD_Surface())) {
+        return;
+    }
+#endif
 #if (0)
     if (HidPage.Get_IsDirectDraw() && (Options.GameSpeed > 1 || Options.ScrollRate == 6 && CanVblankSync)) {
         WWMouse->Draw_Mouse(&HidPage);
