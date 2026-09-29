@@ -39,8 +39,27 @@ Installing the game data
 
 The game data isn't included. You need the freeware C&C95 (C&C Gold)
 CD images that Electronic Arts released in 2007: the GDI disc and,
-optionally, the Nod disc (as .iso files). The DOS discs are not
-supported.
+optionally, the Nod disc. Make sure you get the Windows 95 versions:
+the MS-DOS and Mac discs won't work.
+
+As of September 2026 they can be downloaded from:
+
+  cnc-comm.com: choose "GDI CD Windows 95" and "Nod CD Windows 95" on
+    https://cnc-comm.com/command-and-conquer/downloads/the-game
+
+  CNCNZ.com: "Tiberian Dawn - GDI Disc" and "Nod Disc" (GDI95.zip and
+  NOD95.zip) on
+    https://cncnz.com/features/freeware-classic-command-conquer-games/
+
+  ModDB:
+    https://www.moddb.com/games/cc-gold/downloads/command-conquer-gold-free-game-gdi-iso
+    https://www.moddb.com/games/cc-gold/downloads/command-conquer-gold-free-game-nod-iso
+
+The downloads are zip files, each holding one .iso file (about 600 MB).
+Unzip them first; that's easiest on a modern computer, as the zip and
+the ISO together need over 1 GB for each disc. The images from
+cnc-comm.com and CNCNZ.com have been checked with Prepare, and every
+file matched.
 
 The Prepare file that comes next to !VanillaTD installs the data from
 the ISO files:

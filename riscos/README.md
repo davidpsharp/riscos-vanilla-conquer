@@ -130,7 +130,7 @@ It runs `!VanillaTD.Utils.vcprep` (source in `tools/vcprep`), which:
 
 **Licences:** `vcprep.c` is GPL v3, like the rest of the project. `blast.c`/`blast.h` are Mark Adler's, under the zlib licence, and are included unmodified. The `SETUP.Z` layout follows [unshieldv3](https://github.com/wfr/unshieldv3) (Apache 2.0), used only as a format reference. All of these are compatible with GPL v3.
 
-The shared files are identical on both discs, so they're written once, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS discs aren't supported. Other versions of the C&C95 discs would fail the checksums.
+The shared files are identical on both discs, so they're written once, and it keeps an existing `INI.CONQUER`. `-nomovies` leaves out `MOVIES` (about 430 MB per disc). The DOS and Mac discs aren't supported: the game needs the Windows 95 data, and Prepare rejects the others. `!Help` lists download sites as of September 2026. Checked on 2026-09-29: the Windows 95 GDI and Nod images from cnc-comm.com (`CNC95_GDI.zip`, `CNC95_Nod.zip`) and CNCNZ.com (`GDI95.zip`, `NOD95.zip`, a different mastering) all pass every checksum, movies included. ModDB refuses automated downloads, so its copies are unchecked.
 
 **Tested:**
 - Natively on macOS against both ISOs, where its output matches `prepare-td-data.sh`.

@@ -685,7 +685,9 @@ int main(int argc, char** argv)
         installed = Install_From_Dir(search, movies);
         if (installed == 0 && Problems == 0) {
             printf("No C&C95 CD images found in %s.\n"
-                   "Put the GDI and/or Nod disc image (.iso) there, or give its name.\n",
+                   "Put the Windows 95 (C&C Gold) GDI and/or Nod disc image (.iso) there, or\n"
+                   "give its name. The MS-DOS and Mac discs won't work. !VanillaTD.!Help says\n"
+                   "where to download them.\n",
                    search);
             return 1;
         }
