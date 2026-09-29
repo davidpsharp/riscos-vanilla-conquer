@@ -255,7 +255,7 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
     ** 255.255.255.255 if no interface reports a broadcast address.
     */
     {
-        char buffer[16 * sizeof(struct ifreq)];
+        char buffer[2048];
         struct ifconf ifc;
         bool have_broadcast = false;
 
@@ -265,28 +265,49 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
             fprintf(stderr, "RA95: Can't list network interfaces: %s\n", strerror(errno));
             ifc.ifc_len = 0;
         }
-        for (int offset = 0; offset + (int)sizeof(struct ifreq) <= ifc.ifc_len; offset += sizeof(struct ifreq)) {
-            struct ifreq* ifr = (struct ifreq*)(buffer + offset);
-            if (ifr->ifr_addr.sa_family != AF_INET) {
+
+        /*
+        ** The RISC OS Internet module is 4.4BSD derived: entries are the interface name
+        ** followed by a sockaddr of sa_len bytes (link level ones are longer than 16), so
+        ** they vary in length and may be unaligned. Copy each out before reading it.
+        */
+        for (int offset = 0; offset + IFNAMSIZ + 2 <= ifc.ifc_len;) {
+            const unsigned char* entry = (const unsigned char*)buffer + offset;
+            int addr_len = entry[IFNAMSIZ]; // sa_len
+            if (addr_len < (int)sizeof(struct sockaddr)) {
+                addr_len = sizeof(struct sockaddr);
+            }
+            int entry_len = IFNAMSIZ + addr_len;
+            if (offset + entry_len > ifc.ifc_len) {
+                break;
+            }
+            offset += entry_len;
+
+            struct ifreq ifr;
+            memset(&ifr, 0, sizeof(ifr));
+            memcpy(&ifr, entry, entry_len < (int)sizeof(ifr) ? entry_len : sizeof(ifr));
+            ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+            if (ifr.ifr_addr.sa_family != AF_INET) {
                 continue;
             }
-            struct in_addr address = ((struct sockaddr_in*)&ifr->ifr_addr)->sin_addr;
-            fprintf(stderr, "RA95: Found local address: %s on %s\n", inet_ntoa(address), ifr->ifr_name);
+
+            struct sockaddr_in sin;
+            memcpy(&sin, &ifr.ifr_addr, sizeof(sin));
+            fprintf(stderr, "RA95: Found local address: %s on %s\n", inet_ntoa(sin.sin_addr), ifr.ifr_name);
 
             unsigned char* a = new unsigned char[4];
-            memcpy(a, &address.s_addr, 4);
+            memcpy(a, &sin.sin_addr.s_addr, 4);
             LocalAddresses.Add(a);
 
-            struct ifreq query = *ifr;
+            struct ifreq query = ifr;
             if (ioctl(Socket, SIOCGIFFLAGS, &query) == 0 && (query.ifr_flags & IFF_BROADCAST)
                 && !(query.ifr_flags & IFF_LOOPBACK)) {
-                query = *ifr;
+                query = ifr;
                 if (ioctl(Socket, SIOCGIFBRDADDR, &query) == 0) {
+                    struct sockaddr_in bin;
+                    memcpy(&bin, &query.ifr_broadaddr, sizeof(bin));
                     char broadcast[16];
-                    snprintf(broadcast,
-                             sizeof(broadcast),
-                             "%s",
-                             inet_ntoa(((struct sockaddr_in*)&query.ifr_broadaddr)->sin_addr));
+                    snprintf(broadcast, sizeof(broadcast), "%s", inet_ntoa(bin.sin_addr));
                     fprintf(stderr, "RA95: Using broadcast address of: %s\n", broadcast);
                     Set_Broadcast_Address(broadcast);
                     have_broadcast = true;
