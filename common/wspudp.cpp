@@ -51,6 +51,8 @@ extern WWKeyboardClass* Keyboard;
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <assert.h>
 
 #if defined(__riscos__)
@@ -176,7 +178,7 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
     */
     int yes = 1;
     if (setsockopt(Socket, SOL_SOCKET, SO_BROADCAST, (char*)&yes, sizeof(yes)) < 0) {
-        DBG_LOG("setsockopt failed: %s", strerror(errno));
+        fprintf(stderr, "RA95: Can't enable broadcasts: %s\n", strerror(errno));
         Close_Socket();
         return (false);
     }
@@ -251,8 +253,8 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
     }
 #elif defined(__riscos__)
     /*
-    ** UnixLib has no getifaddrs, so list the interfaces with SIOCGIFCONF. Broadcast to
-    ** 255.255.255.255 if no interface reports a broadcast address.
+    ** UnixLib has no getifaddrs, so list the interfaces with SIOCGIFCONF, adding each
+    ** interface's broadcast address to the 255.255.255.255 set up above.
     */
     {
         char buffer[2048];
@@ -315,9 +317,7 @@ bool UDPInterfaceClass::Open_Socket(SOCKET)
             }
         }
         if (!have_broadcast) {
-            char everyone[] = "255.255.255.255";
-            fprintf(stderr, "RA95: Using broadcast address of: %s\n", everyone);
-            Set_Broadcast_Address(everyone);
+            fprintf(stderr, "RA95: No interface broadcast address; only using 255.255.255.255\n");
         }
     }
 #else
@@ -568,8 +568,39 @@ int UDPInterfaceClass::Message_Handler(HWND, UINT message, UINT, LONG lParam)
     return (0);
 }
 #else
+/*
+** With VC_FPSLOG set, report UDP packets sent and received every 5 seconds.
+*/
+static unsigned PacketsSent = 0;
+static unsigned PacketsReceived = 0;
+
+static void Log_Packet_Counts()
+{
+    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    static time_t last = 0;
+    static unsigned last_sent = 0, last_received = 0;
+    if (!enabled) {
+        return;
+    }
+    time_t now = time(nullptr);
+    if (last == 0) {
+        last = now;
+    }
+    if (now - last >= 5) {
+        fprintf(stderr,
+                "RA95: %u packets sent, %u received in %ds\n",
+                PacketsSent - last_sent,
+                PacketsReceived - last_received,
+                int(now - last));
+        last_sent = PacketsSent;
+        last_received = PacketsReceived;
+        last = now;
+    }
+}
+
 int UDPInterfaceClass::Message_Handler()
 {
+    Log_Packet_Counts();
     struct sockaddr_in addr;
     int rc;
     socklen_t addr_len;
@@ -614,6 +645,8 @@ int UDPInterfaceClass::Message_Handler()
                         }
                     }
 
+                    ++PacketsReceived;
+
                     if (remote) {
                         /*
                         ** Create a new buffer and store this packet in it.
@@ -656,19 +689,30 @@ int UDPInterfaceClass::Message_Handler()
                 */
                 rc = sendto(Socket, (const char*)packet->Buffer, packet->BufferLen, 0, (sockaddr*)&addr, sizeof(addr));
 
-                if (rc == SOCKET_ERROR) {
-                    if (LastSocketError != WSAEWOULDBLOCK) {
-                        Clear_Socket_Error(Socket);
-                    }
-
-                    break;
-                } else {
-                    /*
-                    ** Delete the sent packet.
-                    */
-                    OutBuffers.Delete(packetnum);
-                    delete packet;
+                if (rc == SOCKET_ERROR && LastSocketError == WSAEWOULDBLOCK) {
+                    break; // Try again when the socket is writable.
                 }
+                if (rc == SOCKET_ERROR) {
+                    /*
+                    ** Drop a packet that can't be sent rather than retrying it forever: it
+                    ** blocked everything queued behind it. On RISC OS without a default
+                    ** route, the 255.255.255.255 copy of every broadcast failed this way, so
+                    ** the subnet broadcast queued after it never went out.
+                    */
+                    static int reported = 0;
+                    if (reported < 10) {
+                        ++reported;
+                        fprintf(stderr,
+                                "RA95: Can't send to %s: %s\n",
+                                inet_ntoa(addr.sin_addr),
+                                strerror(LastSocketError));
+                    }
+                    Clear_Socket_Error(Socket);
+                } else {
+                    ++PacketsSent;
+                }
+                OutBuffers.Delete(packetnum);
+                delete packet;
             }
         }
     } else {
