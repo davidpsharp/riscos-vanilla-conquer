@@ -42,6 +42,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include <stdio.h>
+#include <string.h>
 
 // ST = 12/17/2018 5:44PM
 #ifndef WinTickCount
@@ -50,6 +52,34 @@ extern TimerClass WinTickCount;
 
 char MessageListClass::MessageBuffers[MAX_NUM_MESSAGES][MAX_MESSAGE_LENGTH + 30];
 char MessageListClass::BufferAvail[MAX_NUM_MESSAGES];
+
+/*
+** The text of each segment of a multi-packet message, per message buffer. A long
+** message is sent in pieces of up to COMPAT_MESSAGE_LENGTH - 5 characters, split at a
+** space where possible; each line is rebuilt as its "name:" prefix followed by the
+** pieces in order. (Patching the pieces into the line at fixed offsets cut messages
+** off whenever a piece was shorter than the maximum, which word splitting made usual.)
+*/
+static char SegmentText[MAX_NUM_MESSAGES][MAX_MESSAGE_SEGMENTS][COMPAT_MESSAGE_LENGTH - 4];
+
+static void Rebuild_Message(char* buffer, size_t buffer_size, size_t prefix_len, int index)
+{
+    if (prefix_len >= buffer_size) {
+        return;
+    }
+    buffer[prefix_len] = '\0';
+    for (int seg = 0; seg < MAX_MESSAGE_SEGMENTS; ++seg) {
+        size_t len = strlen(buffer);
+        snprintf(buffer + len, buffer_size - len, "%s", SegmentText[index][seg]);
+    }
+}
+
+static void Store_Segment(int index, int position, const char* text)
+{
+    if (position >= 0 && position < MAX_MESSAGE_SEGMENTS) {
+        snprintf(SegmentText[index][position], sizeof(SegmentText[index][position]), "%s", text);
+    }
+}
 
 /***************************************************************************
  * MessageListClass::MessageListClass -- constructor                       *
@@ -276,9 +306,15 @@ TextLabelClass* MessageListClass::Add_Message(char* txt,
                         raw_string = s2;
                         current_string = s1;
                         if (raw_string++ && current_string++) {
-                            memcpy(current_string + (position * (COMPAT_MESSAGE_LENGTH - 5)) /*+from_adjust*/,
-                                   raw_string,
-                                   COMPAT_MESSAGE_LENGTH - 4);
+                            for (int index = 0; index < MAX_NUM_MESSAGES; ++index) {
+                                if (txtlabel->Text == MessageBuffers[index]) {
+                                    Store_Segment(index, position, raw_string);
+                                    Rebuild_Message(MessageBuffers[index],
+                                                    sizeof(MessageBuffers[index]),
+                                                    current_string - txtlabel->Text,
+                                                    index);
+                                }
+                            }
                             /*
                             ** Flag this string segment as complete
                             */
@@ -398,19 +434,14 @@ TextLabelClass* MessageListClass::Add_Message(char* txt,
                     dest_str = MessageBuffers[i];
                 }
 
-                if (raw_string++) {
-                    for (j = 0; j < 3; j++) {
-                        if (!((magic_number - j) == MESSAGE_HEAD_MAGIC_NUMBER)) {
-                            memset(dest_str + j * (COMPAT_MESSAGE_LENGTH - 4) /*+from_adjust*/,
-                                   32,
-                                   COMPAT_MESSAGE_LENGTH - 4);
-                        } else {
-                            strcpy(dest_str + j * (COMPAT_MESSAGE_LENGTH - 4) /*+from_adjust*/, raw_string);
-                        }
-                    }
-                    *(dest_str + ((COMPAT_MESSAGE_LENGTH - 4) * MAX_MESSAGE_SEGMENTS - 1)) = 0;
-                }
                 position = magic_number - MESSAGE_HEAD_MAGIC_NUMBER;
+                if (raw_string++) {
+                    for (j = 0; j < MAX_MESSAGE_SEGMENTS; j++) {
+                        SegmentText[i][j][0] = '\0';
+                    }
+                    Store_Segment(i, position, raw_string);
+                    Rebuild_Message(MessageBuffers[i], sizeof(MessageBuffers[i]), dest_str - MessageBuffers[i], i);
+                }
                 txtlabel->Segments = 1 << position;
             }
 
@@ -694,7 +725,9 @@ int MessageListClass::Input(KeyNumType& input)
                     Fancy_Text_Print(TXT_NONE, 0, 0, EditLabel->Color, TBLACK, EditLabel->Style);
                     int width = String_Pixel_Width(EditBuf);
                     if (width >= Width) {
-                        EditBuf[EditCurPos--] = 0;
+                        // Take the character back off: the line is full. (This cleared the
+                        // byte after it instead, so each further key replaced the last one.)
+                        EditBuf[--EditCurPos] = 0;
                         retcode = 0;
                     }
                 }
