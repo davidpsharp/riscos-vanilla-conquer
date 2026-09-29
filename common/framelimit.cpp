@@ -31,6 +31,9 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
         if (flags & FrameLimitFlags::FL_NO_SLEEP) {
             return;
         }
+        if (max_sleep_ms == 0) {
+            return; // The game's next frame is due any moment: don't sleep.
+        }
         PhaseTimer phase_timer(PHASE_SLEEP);
         if (!(flags & FrameLimitFlags::FL_NO_BLOCK)) {
             // Oversleeping the game's next frame makes each one take a whole extra present slot.
@@ -63,7 +66,7 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
         auto cur_frame_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
         if (cur_frame_time < min_frame_time) {
             frame_start += std::chrono::microseconds{min_frame_time};
-            if (!(flags & FrameLimitFlags::FL_NO_SLEEP)) {
+            if (!(flags & FrameLimitFlags::FL_NO_SLEEP) && max_sleep_ms != 0) {
                 PhaseTimer phase_timer(PHASE_SLEEP);
                 unsigned wait = unsigned(min_frame_time - cur_frame_time);
                 if (max_sleep_ms >= 0 && unsigned(max_sleep_ms) * 1000 < wait) {

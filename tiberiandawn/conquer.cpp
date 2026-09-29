@@ -1508,13 +1508,25 @@ FacingType KN_To_Facing(int input)
  *   01/04/1995 JLB : Created.                                                                 *
  *   03/06/1995 JLB : Fixed.                                                                   *
  *=============================================================================================*/
+/*
+** How long the frame limiter may sleep before the next game frame is due. FrameTimer
+** counts in 1/60 s ticks, so "one tick left" could be anything up to 17 ms: don't
+** sleep at all then, or a slow machine oversleeps a little on nearly every frame.
+*/
+static int Ms_Before_Next_Frame()
+{
+    int ticks = int(FrameTimer.Time());
+    return ticks <= 1 ? 0 : (ticks - 1) * 1000 / TIMER_SECOND;
+}
+
 static void Sync_Delay(void)
 {
     /*
     ** Slow down with frame limiter first; but if the next game frame is already
     ** due, the game is running behind, so present without waiting.
     */
-    Frame_Limiter(FrameTimer.Time() ? FL_FORCE_RENDER : FrameLimitFlags(FL_FORCE_RENDER | FL_NO_SLEEP));
+    Frame_Limiter(FrameTimer.Time() ? FL_FORCE_RENDER : FrameLimitFlags(FL_FORCE_RENDER | FL_NO_SLEEP),
+                  Ms_Before_Next_Frame());
 
     /*
     **	Delay one tick and keep a record that one tick was "wasted" here.
@@ -1538,7 +1550,7 @@ static void Sync_Delay(void)
         }
 
         // Wake in time for the next game frame rather than the next present slot.
-        Frame_Limiter(FL_NONE, int(FrameTimer.Time()) * 1000 / TIMER_SECOND);
+        Frame_Limiter(FL_NONE, Ms_Before_Next_Frame());
     }
     Color_Cycle();
     Call_Back();
@@ -1672,6 +1684,17 @@ bool Main_Loop()
     {
         PhaseTimer phase_timer(PHASE_LOGIC);
         Logic.AI();
+
+        /*
+        ** VC_SIMLOAD=<ms> busy-waits that long every game frame, to make a fast
+        ** machine (or emulator) behave like a slow one when testing frame pacing.
+        */
+        static const int sim_load_ms = getenv("VC_SIMLOAD") ? atoi(getenv("VC_SIMLOAD")) : 0;
+        if (sim_load_ms > 0) {
+            unsigned until = Phase_Now_Us() + unsigned(sim_load_ms) * 1000;
+            while (int(until - Phase_Now_Us()) > 0) {
+            }
+        }
     }
 
     //	Heap_Dump_Check( "After Logic.AI" );
