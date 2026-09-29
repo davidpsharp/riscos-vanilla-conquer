@@ -61,6 +61,13 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 
 **Movies:** they play smoothly with sound in `InterpolationMode=1`, the RISC OS default. That mode blends horizontally and doubles lines. In mode 2 (vertical blending too, the desktop default), the GDI 1 briefing took 33–37 ms to scale plus 15 ms to copy to the screen, against a 67 ms frame budget, so it lagged with sound on. Mode 3 doubles pixels with no blending. `VC_FPSLOG` prints `movie:` lines with the per-frame scale and present times. The VQA audio buffer was also raised from 1.5 s to 3 s, because the briefing stores its audio further ahead of the video than that.
 
+**Where the time goes:** with `VC_FPSLOG` set, the game also prints a `time ms/s:` line every 5 seconds, from `common/phasetime.*`. It gives milliseconds per second of wall time for:
+- map, radar, power bar, sidebar and other drawing;
+- game logic, event queue, `Call_Back`, presenting and sleeping;
+- audio mixing, which runs on its own thread and overlaps the rest.
+
+The frame limiter's sleep ends on a centisecond tick, so the centisecond clock would count most short work as zero. On RISC OS 3.5–4.x the timer instead reads IOMD timer 0 (2 MHz) in SVC mode. Elsewhere it uses `steady_clock`, which is coarse on RISC OS 5. RPCEmu is much faster than a real StrongARM, so only real-hardware numbers show what to optimise.
+
 ## Playtest status (RISC OS 3.71, StrongARM, RPCEmu)
 
 Tested on `VC SA RO371` (2 MB VRAM, 128 MB RAM) and `VC SA RO371 1MB` (1 MB VRAM, 64 MB RAM).

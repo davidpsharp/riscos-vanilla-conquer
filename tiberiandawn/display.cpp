@@ -75,6 +75,7 @@
  *   DisplayClass::Center_Map -- Centers the map about the currently selected objects          *
  *   DisplayClass::Prev_Object -- Searches for the previous object on the map.                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+#include "common/phasetime.h"
 #include "function.h"
 #include "common/fading.h"
 #include "ccini.h"
@@ -2088,6 +2089,7 @@ ObjectClass* DisplayClass::Cell_Object(CELL cell, int x, int y)
  *=============================================================================================*/
 void DisplayClass::Draw_It(bool forced)
 {
+    PhaseTimer phase_timer(PHASE_TACTICAL);
     int x, y; // Working cell index values.
 
     MapClass::Draw_It(forced);

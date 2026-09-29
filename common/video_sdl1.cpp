@@ -37,6 +37,7 @@
 
 /*= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =*/
 
+#include "phasetime.h"
 #include "framelimit.h"
 #ifdef SDL1AUDIO_BUILD
 #include "mixer_sdl1.h"
@@ -633,6 +634,7 @@ static void Log_Frame_Rate(Uint32 render_ms)
                 audio.DryCount - last_audio.DryCount);
         last_audio = audio;
 #endif
+        Phase_Report(now - start);
         last_buttons = SDL1_Mouse_Button_Events;
         last_logic = Logic_Frame_Count;
         start = now;

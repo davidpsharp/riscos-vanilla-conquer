@@ -64,6 +64,7 @@
  *   RadarClass::Coord_To_Radar_Pixel -- Converts a coordinate to a radar pixel position       *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include <stdlib.h>
 
@@ -326,6 +327,7 @@ bool RadarClass::Radar_Activate(int control)
  *=============================================================================================*/
 void RadarClass::Draw_It(bool forced)
 {
+    PhaseTimer phase_timer(PHASE_RADAR);
     DisplayClass::Draw_It(forced);
     //	if (!In_Debugger)	while (!HidPage.Lock()) {}
 

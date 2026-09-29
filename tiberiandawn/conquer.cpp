@@ -58,6 +58,7 @@
  *   Validate_Error -- prints an error message when an object fails validation                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "common/irandom.h"
 #include <chrono>
@@ -1223,6 +1224,7 @@ bool Color_Cycle(void)
  *=============================================================================================*/
 void Call_Back(void)
 {
+    PhaseTimer phase_timer(PHASE_CALLBACK);
 #ifndef DEMO
     int i;
     int id;
@@ -1665,7 +1667,10 @@ bool Main_Loop()
     /*
     **	AI logic operations are performed here.
     */
-    Logic.AI();
+    {
+        PhaseTimer phase_timer(PHASE_LOGIC);
+        Logic.AI();
+    }
 
     //	Heap_Dump_Check( "After Logic.AI" );
 
@@ -1689,7 +1694,10 @@ bool Main_Loop()
     /*
     **	Process all commands that are ready to be processed.
     */
-    Queue_AI();
+    {
+        PhaseTimer phase_timer(PHASE_QUEUE);
+        Queue_AI();
+    }
 
     // Heap_Dump_Check( "After Queue_AI" );
 

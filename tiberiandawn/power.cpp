@@ -40,6 +40,7 @@
  *   Power_Height -- Given a value figure where it falls on bar                                *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 
 /*
@@ -167,6 +168,7 @@ void PowerClass::One_Time(void)
  *=============================================================================================*/
 void PowerClass::Draw_It(bool complete)
 {
+    PhaseTimer phase_timer(PHASE_POWER);
     static int _modtable[] = {0, -1, 0, 1, 0, -1, -2, -1, 0, 1, 2, 1, 0};
     int power_color;
     int factor = Get_Resolution_Factor();

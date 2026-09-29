@@ -117,6 +117,7 @@ endif()
 
 set(COMMONR_SRC
     framelimit.cpp
+    phasetime.cpp
     gbuffer.cpp
     interpal.cpp
     soundio_null.cpp
@@ -128,6 +129,7 @@ set(COMMONR_SRC
 
 set(COMMONV_SRC
     framelimit.cpp
+    phasetime.cpp
     gbuffer.cpp
     interpal.cpp
     unvqbuff.cpp

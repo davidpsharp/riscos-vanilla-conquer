@@ -1,3 +1,4 @@
+#include "phasetime.h"
 #include "mixer_sdl1.h"
 
 #include <SDL.h>
@@ -122,6 +123,7 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
 
 static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 {
+    PhaseTimer phase_timer(PHASE_MIXER);
     (void)userdata;
     int frames = len / 4; // 16 bit stereo output.
     static int* mix = nullptr;

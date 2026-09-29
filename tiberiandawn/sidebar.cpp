@@ -74,6 +74,7 @@
  *   sortfunc -- Utility routine that handles 'qsort' the strip buttons.                       *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "settings.h"
 
@@ -761,6 +762,7 @@ bool SidebarClass::Scroll(bool up, int column)
  *=============================================================================================*/
 void SidebarClass::Draw_It(bool complete)
 {
+    PhaseTimer phase_timer(PHASE_SIDEBAR);
     PowerClass::Draw_It(complete);
 
     if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map) {

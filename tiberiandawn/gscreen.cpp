@@ -44,6 +44,7 @@
  *   GScreenClass::Remove_A_Button -- Removes a gadget from the game input system.             *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 
 #include "common/filepcx.h"
@@ -359,6 +360,7 @@ void GScreenClass::Remove_A_Button(GadgetClass& gadget)
  *=============================================================================================*/
 void GScreenClass::Render(void)
 {
+    PhaseTimer phase_timer(PHASE_RENDER);
     // if (Buttons && Buttons->Is_List_To_Redraw()) {
     //	IsToRedraw = true;
     //}

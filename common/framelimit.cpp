@@ -8,6 +8,7 @@
 #endif
 
 #include "mssleep.h"
+#include "phasetime.h"
 
 extern WWMouseClass* WWMouse;
 
@@ -27,6 +28,7 @@ void Frame_Limiter(FrameLimitFlags flags)
     auto render_remaining = std::chrono::duration_cast<std::chrono::milliseconds>(frame_start - render_start).count();
 
     if (!(flags & FrameLimitFlags::FL_FORCE_RENDER) && render_remaining > render_avg) {
+        PhaseTimer phase_timer(PHASE_SLEEP);
         if (!(flags & FrameLimitFlags::FL_NO_BLOCK)) {
             ms_sleep(unsigned(render_remaining));
         } else {
@@ -35,7 +37,10 @@ void Frame_Limiter(FrameLimitFlags flags)
         return;
     }
 
-    Video_Render_Frame();
+    {
+        PhaseTimer phase_timer(PHASE_PRESENT);
+        Video_Render_Frame();
+    }
 
     auto render_end = std::chrono::steady_clock::now();
     auto render_time = std::chrono::duration_cast<std::chrono::milliseconds>(render_end - render_start).count();
@@ -54,6 +59,7 @@ void Frame_Limiter(FrameLimitFlags flags)
         auto cur_frame_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
         if (cur_frame_time < min_frame_time) {
             frame_start += std::chrono::microseconds{min_frame_time};
+            PhaseTimer phase_timer(PHASE_SLEEP);
             us_sleep(min_frame_time - cur_frame_time);
         } else {
             frame_start = frame_end;
