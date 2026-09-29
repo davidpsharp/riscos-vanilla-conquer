@@ -1,2 +1,3 @@
 | !Boot for Vanilla Conquer: Tiberian Dawn
 Set VanillaConquer$Dir <Obey$Dir>
+IconSprites <Obey$Dir>.!Sprites

@@ -2,6 +2,8 @@
 # Fetch the RISC OS runtime modules our binaries need into ~/vcport-work/hostfs/modules:
 #   SharedULib - SharedUnixLibrary, required by every GCCSDK program
 #   DRenderer  - digital sound renderer, used by SDL audio
+# along with each package's copyright notice (<module>-Copyright), which the
+# release zip includes.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 OUT="${VC_WORK:-$HOME/vcport-work}/hostfs/modules"
@@ -14,5 +16,6 @@ for pkg in SharedUnixLibrary_1.16-1:SharedULib DRenderer_0.56-r-1b:DRenderer; do
     curl -fsSL -o "$tmp/$zip.zip" "$BASE/$zip.zip"
     unzip -q -o -j "$tmp/$zip.zip" "System/310/Modules/$mod" -d "$tmp"
     cp "$tmp/$mod" "$OUT/$mod,ffa"
+    unzip -q -o -p "$tmp/$zip.zip" RiscPkg/Copyright > "$OUT/$mod-Copyright"
     echo "$OUT/$mod,ffa"
 done

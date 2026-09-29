@@ -1,0 +1,150 @@
+Vanilla Conquer: Tiberian Dawn for RISC OS
+==========================================
+
+Version 0.1 (first release)
+
+Command & Conquer (1995) for the Risc PC, built from the Vanilla Conquer
+source code, which is based on the game's source code as released by
+Electronic Arts under the GNU GPL.
+
+Source code, updates and bug reports:
+  https://github.com/davidpsharp/riscos-vanilla-conquer
+
+The title screen shows the version and when it was built.
+
+
+Requirements
+------------
+
+  * A StrongARM Risc PC (or RPCEmu set up as one). ARM610, ARM710 and
+    ARM7500 machines (including the A7000) are not supported: the game
+    will not run on them.
+  * RISC OS 3.7 or later. Tested on RISC OS 3.71 and 5.30 in RPCEmu and
+    on RISC OS 3.7 on a real StrongARM Risc PC.
+  * 1 MB or 2 MB of VRAM. The game uses a 640x400 (or 640x480) 256-colour
+    screen mode.
+  * About 24 MB of free memory.
+  * About 65 MB of disc space for the game data, plus about 430 MB for
+    each disc's movies if you want them.
+  * For sound, the DigitalRenderer module (included). Without it the
+    game runs silently.
+  * For network play, a network card and the Internet module.
+
+SharedUnixLibrary and DigitalRenderer are included in !VanillaTD.Modules.
+!Run uses newer copies from !System if you have them.
+
+
+Installing the game data
+------------------------
+
+The game data isn't included. You need the freeware C&C95 (C&C Gold)
+CD images that Electronic Arts released in 2007: the GDI disc and,
+optionally, the Nod disc (as .iso files). The DOS discs are not
+supported.
+
+Copy the ISO files to your RISC OS machine, then install from each one
+in turn with the Prepare script in the application (Shift-double-click
+!VanillaTD to open it). For example:
+
+  *Obey ADFS::HardDisc4.$.Games.!VanillaTD.Prepare ADFS::HardDisc4.$.GDI/iso
+  *Obey ADFS::HardDisc4.$.Games.!VanillaTD.Prepare ADFS::HardDisc4.$.Nod/iso
+
+Prepare reads the ISO directly (no CD drive or CDFS needed), unpacks the
+game files into !VanillaTD and checks each one against a known checksum.
+The files both discs share are only written once.
+
+  -nomovies  leaves out the movies (about 430 MB per disc)
+  -force     rewrites files that are already there
+
+Without the Nod disc you can still play GDI missions and multiplayer.
+Without movies the game simply skips them.
+
+
+Playing
+-------
+
+Double-click !VanillaTD. The first time, like the original game, it
+plays the intro and goes straight to choosing a side; after that it
+starts at the main menu. Esc skips movies. The keys are the same as in
+the original game; F9 to F12 are map bookmarks (Ctrl+F9 to set one).
+
+Settings are in !VanillaTD.INI.CONQUER, which the game creates the first
+time it runs. Settings that may be useful on RISC OS:
+
+  [Video]
+  FrameLimit=30          Frames drawn per second (the game logic itself
+                         runs at the speed set in the game's options).
+  InterpolationMode=1    How movies are scaled up to full screen:
+                           0 or 2  smoothest, too slow for a StrongARM
+                           1       smooth horizontally, lines doubled
+                                   (the default on RISC OS)
+                           3       pixels doubled, the fastest
+
+  [Intro]
+  PlayLogo=No            Skip the Westwood logo at start-up.
+
+Saved games are stored in !VanillaTD (for example !VanillaTD.000.SAVEGAME
+for slot 0). They can be moved between RISC OS machines but can't be
+loaded by Vanilla Conquer on other platforms, or by the original game.
+
+
+Network play
+------------
+
+Choose Multiplayer Game, then Network. Players on the same local network
+see each other's games. Other players can use RISC OS or the official
+Vanilla Conquer builds for Windows, macOS or Linux, as long as they are
+the same version.
+
+  * All the machines must be on the same subnet.
+  * Wired Ethernet is recommended: some wireless networks drop the
+    broadcast messages that the game uses to find other players.
+  * If the machines still can't see each other, set VC_NETPEER to the
+    other players' IP addresses before starting the game, e.g.
+      *Set VC_NETPEER 192.168.1.20,192.168.1.21
+
+Chat messages that RISC OS sends to the official builds are cut to about
+22 characters when they arrive there, because of a bug in those builds.
+
+
+Known issues
+------------
+
+  * Typing your name on the high-score table and the colouring-in of the
+    campaign map are slow on a real Risc PC.
+  * The TV-static effect on the GDI/Nod selection screen is a bit jerky.
+  * Only Tiberian Dawn for now. Red Alert is planned.
+
+
+Problems
+--------
+
+Messages from the game go to !VanillaTD.stderr. If something goes wrong,
+please include that file in a bug report. To also log frame rates and
+timings there:
+
+  *Set VC_FPSLOG 1
+
+
+Licences
+--------
+
+Vanilla Conquer is free software under the GNU General Public License
+version 3, with additional terms from Electronic Arts. See
+!VanillaTD.Licences for the licence texts, including those of the parts
+from other people:
+
+  GPL-3          Vanilla Conquer and this port, including Utils.vcprep
+  Blast          blast.c in Utils.vcprep (Mark Adler, zlib licence)
+  UnixLib        SharedUnixLibrary and the C library in !RunImage
+                 (BSD/LGPL)
+  DRenderer      the DigitalRenderer module (GPL-2)
+
+The GPL means you can have the source code: it's at the GitHub address
+above. The sources of SharedUnixLibrary, DigitalRenderer and SDL 1.2
+(LGPL-2.1, built into !RunImage) are from the GCCSDK project at
+https://www.riscos.info/.
+
+Command & Conquer is a trademark of Electronic Arts. This project is not
+affiliated with or endorsed by Electronic Arts. The game data remains
+the property of Electronic Arts.

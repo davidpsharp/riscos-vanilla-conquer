@@ -202,6 +202,24 @@ This was verified by copying the app (without `MIX.MOVIES`, since the 256 MB Har
 
 Without `MIX.MOVIES` the game just skips the movies, so it can be left out on small discs. SCORES (37 MB) holds the music, which isn't used until sound is implemented.
 
+## Making a release
+
+```sh
+git tag v0.1-riscos                         # the title screen shows tags starting with v
+riscos/scripts/make-release.sh 0.1          # -> build/release/VanillaTD-riscos-0.1.zip
+```
+
+`make-release.sh` builds the game, then assembles `!VanillaTD` in `build/release`, with:
+- `!RunImage`, `Prepare` and `Utils.vcprep`
+- `!Help`: the user documentation (requirements, installing the data, settings, network play, known issues)
+- `!Sprites`/`!Sprites22`: made from `resources/vanillatd_icon.svg` by `tools/make-sprites.py`
+- `Modules`: SharedUnixLibrary and DigitalRenderer
+- `Licences`: GPL-3 with EA's additional terms, blast, UnixLib and DRenderer
+
+It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype in the zip's Acorn extra field, which SparkFS, SparkPlug and Info-ZIP read.
+
+**Tested:** SparkFS on RISC OS 5.30 unpacked the 0.1 zip with every filetype intact. On RISC OS 3.71 the app was copied to ADFS, `Prepare` installed the GDI ISO (`-nomovies`), and the game started. On first run the game plays the intro and goes straight to side selection, because the CD's `CONQUER.INI` has `PlayIntro=Yes`. That's the original game's behaviour, and it then sets it to `no`.
+
 ## Day-to-day loop
 
 ```sh

@@ -522,6 +522,15 @@ int main(int argc, char** argv)
         fprintf(stderr, "usage: vcprep <C&C95 CD image> <!VanillaTD dir> [-nomovies] [-force]\n");
         return 2;
     }
+#ifdef __riscos__
+    {
+        /* Prepare passes <VanillaConquer$Dir>; show the real path. */
+        static char canonical[1024];
+        if (_swix(OS_FSControl, _INR(0, 5), 37, App_Dir, canonical, 0, 0, sizeof(canonical)) == NULL) {
+            App_Dir = canonical;
+        }
+    }
+#endif
 
     Crc_Init();
     Iso = fopen(iso_name, "rb");

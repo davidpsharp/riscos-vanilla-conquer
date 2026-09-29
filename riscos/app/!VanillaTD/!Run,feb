@@ -1,5 +1,6 @@
 | !Run for Vanilla Conquer: Tiberian Dawn
 Set VanillaConquer$Dir <Obey$Dir>
+IconSprites <VanillaConquer$Dir>.!Sprites
 | SharedUnixLibrary is normally in !System; fall back to the copy shipped here.
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaConquer$Dir>.Modules.SharedULib
