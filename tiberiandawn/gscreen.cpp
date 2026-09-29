@@ -459,6 +459,7 @@ extern bool CanVblankSync;
  *=============================================================================================*/
 void GScreenClass::Blit_Display(void)
 {
+    ++Phase_Counts[COUNT_BLIT_DISPLAY];
 #if (0)
     if (HidPage.Get_IsDirectDraw() && (Options.GameSpeed > 1 || Options.ScrollRate == 6 && CanVblankSync)) {
         WWMouse->Draw_Mouse(&HidPage);

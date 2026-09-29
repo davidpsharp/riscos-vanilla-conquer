@@ -22,7 +22,18 @@ enum PhaseId
     PHASE_COUNT
 };
 
+// Counts for the report: full-screen Blit_Displays, and presents by kind.
+enum PhaseCountId
+{
+    COUNT_BLIT_DISPLAY,
+    COUNT_PRESENT_FULL,
+    COUNT_PRESENT_PARTIAL,
+    COUNT_PRESENT_SKIPPED,
+    COUNT_MAX
+};
+
 extern bool Phase_Timing;
+extern unsigned Phase_Counts[COUNT_MAX];
 unsigned Phase_Now_Us();
 void Phase_Add(PhaseId id, unsigned us);
 void Phase_Report(unsigned elapsed_ms);

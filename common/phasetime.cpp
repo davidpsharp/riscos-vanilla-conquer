@@ -7,6 +7,7 @@
 bool Phase_Timing = getenv("VC_FPSLOG") != nullptr;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
+unsigned Phase_Counts[COUNT_MAX];
 
 #ifdef __riscos__
 /*
@@ -84,6 +85,15 @@ void Phase_Report(unsigned elapsed_ms)
 {
     if (!Phase_Timing || elapsed_ms == 0) {
         return;
+    }
+    fprintf(stderr,
+            "frames/s: game drew %.1f, presents full %.1f partial %.1f skipped %.1f\n",
+            Phase_Counts[COUNT_BLIT_DISPLAY] * 1000.0 / elapsed_ms,
+            Phase_Counts[COUNT_PRESENT_FULL] * 1000.0 / elapsed_ms,
+            Phase_Counts[COUNT_PRESENT_PARTIAL] * 1000.0 / elapsed_ms,
+            Phase_Counts[COUNT_PRESENT_SKIPPED] * 1000.0 / elapsed_ms);
+    for (int i = 0; i < COUNT_MAX; ++i) {
+        Phase_Counts[i] = 0;
     }
     unsigned ms[PHASE_COUNT];
     for (int i = 0; i < PHASE_COUNT; ++i) {

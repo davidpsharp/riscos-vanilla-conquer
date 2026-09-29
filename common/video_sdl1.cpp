@@ -303,8 +303,12 @@ static void Update_HWCursor()
     }
 }
 
+// Bumped whenever the cursor shape may have changed, so a frame is presented.
+static unsigned Cursor_Generation = 0;
+
 void Set_Video_Cursor(void* cursor, int w, int h, int hotx, int hoty)
 {
+    ++Cursor_Generation;
     hwcursor.Raw = cursor;
     hwcursor.W = w;
     hwcursor.H = h;
@@ -489,6 +493,7 @@ public:
 
     virtual bool LockWait()
     {
+        changed = true; // Anything that draws on the surface locks it first.
         return (SDL_LockSurface(surface) == 0);
     }
 
@@ -502,12 +507,14 @@ public:
     {
         SDL_Rect srcRectSDL = Make_SDL_Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height);
         SDL_Rect destRectSDL = Make_SDL_Rect(destRect.X, destRect.Y, destRect.Width, destRect.Height);
+        changed = true;
         SDL_BlitSurface(((VideoSurfaceSDL1*)src)->surface, &srcRectSDL, surface, &destRectSDL);
     }
 
     virtual void FillRect(const Rect& rect, unsigned char color)
     {
         SDL_Rect rectSDL = Make_SDL_Rect(rect.X, rect.Y, rect.Width + 1, rect.Height + 1);
+        changed = true;
         SDL_FillRect(surface, &rectSDL, color);
     }
 
@@ -524,25 +531,87 @@ public:
         if (cursor) {
             int x, y;
             Get_Video_Mouse(x, y);
-            SDL_Rect dst =
-                Make_SDL_Rect(x - hwcursor.HotX, y - hwcursor.HotY, hwcursor.Surface->w, hwcursor.Surface->h);
-            area = dst;
-            cursor = Save_Area(area);
+            area = Make_SDL_Rect(x - hwcursor.HotX, y - hwcursor.HotY, hwcursor.Surface->w, hwcursor.Surface->h);
+        }
+
+        /*
+        ** The game presents about twice for every frame it draws, and a full copy to
+        ** the screen is the most expensive thing a Risc PC does all frame. If nothing
+        ** has drawn on the surface since the last present, copy only where the cursor
+        ** was and now is, or nothing at all if it hasn't changed. VC_FULLPRESENT turns
+        ** this off, for comparison.
+        */
+        static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
+        bool full = changed || always_full || !presented;
+        if (!full && cursor == last_cursor && Cursor_Generation == last_generation
+            && (!cursor || (area.x == last_area.x && area.y == last_area.y))) {
+            ++Phase_Counts[COUNT_PRESENT_SKIPPED];
+            return;
+        }
+        ++Phase_Counts[full ? COUNT_PRESENT_FULL : COUNT_PRESENT_PARTIAL];
+
+        SDL_Rect drawn = area;
+        if (cursor) {
+            cursor = Save_Area(drawn); // clips "drawn" to the surface
             if (cursor) {
+                SDL_Rect dst = area;
                 SDL_BlitSurface(hwcursor.Surface, nullptr, surface, &dst);
             }
         }
 
-        SDL_BlitSurface(surface, NULL, window, NULL);
-
-        if (cursor) {
-            Restore_Area(area);
+        SDL_Rect dirty = {0, 0, 0, 0};
+        if (full) {
+            SDL_BlitSurface(surface, NULL, window, NULL);
+        } else {
+            dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
+            if (dirty.w > 0 && dirty.h > 0) {
+                SDL_Rect src = dirty, dst = dirty;
+                SDL_BlitSurface(surface, &src, window, &dst);
+            }
         }
 
-        SDL_Flip(window);
+        if (cursor) {
+            Restore_Area(drawn);
+        }
+
+        if (full) {
+            SDL_Flip(window);
+        } else if (dirty.w > 0 && dirty.h > 0) {
+            SDL_UpdateRects(window, 1, &dirty);
+        }
+
+        changed = false;
+        presented = true;
+        last_cursor = cursor;
+        last_area = area;
+        last_drawn = drawn;
+        last_generation = Cursor_Generation;
     }
 
 private:
+    static SDL_Rect Union(const SDL_Rect& a, const SDL_Rect& b)
+    {
+        if (a.w <= 0 || a.h <= 0) {
+            return b;
+        }
+        if (b.w <= 0 || b.h <= 0) {
+            return a;
+        }
+        int x0 = a.x < b.x ? a.x : b.x;
+        int y0 = a.y < b.y ? a.y : b.y;
+        int x1 = a.x + a.w > b.x + b.w ? a.x + a.w : b.x + b.w;
+        int y1 = a.y + a.h > b.y + b.h ? a.y + a.h : b.y + b.h;
+        return Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
+    }
+
+    // What was presented last, so an unchanged frame needn't be copied again.
+    bool changed = true;
+    bool presented = false;
+    bool last_cursor = false;
+    SDL_Rect last_area = {0, 0, 0, 0};
+    SDL_Rect last_drawn = {0, 0, 0, 0};
+    unsigned last_generation = 0;
+
     /*
     ** Copies the part of "area" inside the surface to a side buffer, clipping "area" to
     ** match. Raw copies, as SDL would remap colours between 8 bit palettes.

@@ -1511,9 +1511,10 @@ FacingType KN_To_Facing(int input)
 static void Sync_Delay(void)
 {
     /*
-    ** Slow down with frame limiter first.
+    ** Slow down with frame limiter first; but if the next game frame is already
+    ** due, the game is running behind, so present without waiting.
     */
-    Frame_Limiter();
+    Frame_Limiter(FrameTimer.Time() ? FL_FORCE_RENDER : FrameLimitFlags(FL_FORCE_RENDER | FL_NO_SLEEP));
 
     /*
     **	Delay one tick and keep a record that one tick was "wasted" here.
