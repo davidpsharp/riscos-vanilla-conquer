@@ -205,8 +205,8 @@ Without `MIX.MOVIES` the game just skips the movies, so it can be left out on sm
 ## Making a release
 
 ```sh
-git tag v0.1-riscos                         # the title screen shows tags starting with v
-riscos/scripts/make-release.sh 0.1          # -> build/release/VanillaTD-riscos-0.1.zip
+git tag v<version>-riscos                   # the title screen shows tags starting with v
+riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-<version>.zip
 ```
 
 `make-release.sh` builds the game, then assembles `!VanillaTD` in `build/release`, with:
@@ -218,7 +218,7 @@ riscos/scripts/make-release.sh 0.1          # -> build/release/VanillaTD-riscos-
 
 It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype in the zip's Acorn extra field, which SparkFS, SparkPlug and Info-ZIP read.
 
-**Tested:** SparkFS on RISC OS 5.30 unpacked the 0.1 zip with every filetype intact. On RISC OS 3.71 the app was copied to ADFS, `Prepare` installed the GDI ISO (`-nomovies`), and the game started. On first run the game plays the intro and goes straight to side selection, because the CD's `CONQUER.INI` has `PlayIntro=Yes`. That's the original game's behaviour, and it then sets it to `no`.
+**Tested:** SparkFS on RISC OS 5.30 unpacked the release zip with every filetype intact. On RISC OS 3.71 the app was copied to ADFS, `Prepare` installed the GDI ISO (`-nomovies`), and the game started. On first run the game plays the intro and goes straight to side selection, because the CD's `CONQUER.INI` has `PlayIntro=Yes`. That's the original game's behaviour, and it then sets it to `no`.
 
 ## Day-to-day loop
 

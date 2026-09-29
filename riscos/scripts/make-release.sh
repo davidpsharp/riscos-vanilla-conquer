@@ -2,7 +2,7 @@
 # Build the release zip: !VanillaTD with the game, Prepare, the runtime modules
 # and licences, but no game data. Filetypes are kept (see tools/riscos-zip.py).
 # Usage: make-release.sh <version> [--no-build]
-#   e.g. make-release.sh 0.1  ->  build/release/VanillaTD-riscos-0.1.zip
+#   e.g. make-release.sh preview  ->  build/release/VanillaTD-riscos-preview.zip
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${VC_WORK:-$HOME/vcport-work}
