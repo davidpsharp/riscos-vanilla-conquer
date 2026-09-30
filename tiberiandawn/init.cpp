@@ -541,6 +541,14 @@ bool Init_Game(int, char*[])
         MFCD::Cache("CONQUER.MIX");
         if (SampleType != 0 && !Debug_Quiet) {
             MFCD::Cache("SOUNDS.MIX");
+#ifdef __riscos__
+            /*
+            ** Every EVA line was read from disc as it was spoken, and on RISC OS a
+            ** file read stops everything, sound included: on a real Risc PC that
+            ** was a noticeable hitch each time. SPEECH.MIX is only 600 KB.
+            */
+            MFCD::Cache("SPEECH.MIX");
+#endif
         }
     }
     Call_Back();

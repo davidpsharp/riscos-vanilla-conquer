@@ -6,12 +6,26 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 bool Phase_Timing = getenv("VC_FPSLOG") != nullptr;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
 static unsigned Frame_Us[PHASE_COUNT]; // the current game frame's share
 static unsigned Frame_Started = 0;
+static intptr_t Frame_Heap = 0;
+
+// The top of the heap, to see whether a stall came with the heap growing.
+static intptr_t Heap_Top()
+{
+#if defined(_WIN32) || defined(__APPLE__)
+    return 0;
+#else
+    return reinterpret_cast<intptr_t>(sbrk(0));
+#endif
+}
 unsigned Phase_Counts[COUNT_MAX];
 
 #ifdef __riscos__
@@ -127,6 +141,7 @@ void Phase_Frame_Begin()
         Frame_Us[i] = 0;
     }
     Frame_Started = Phase_Now_Us();
+    Frame_Heap = Heap_Top();
 }
 
 /*
@@ -148,7 +163,7 @@ void Phase_Frame_End()
     unsigned other = took * 1000 > accounted ? took * 1000 - accounted : 0;
     fprintf(stderr,
             "stall: game frame took %u ms at %u.%03u s: draw %u (map %u) logic %u queue %u callback %u present %u sleep %u "
-            "other %u [logic: teams %u objects %u map %u factories %u houses %u]\n",
+            "other %u [logic: teams %u objects %u map %u factories %u houses %u] heap %+ld KB\n",
             took,
 #ifdef SDL_BUILD
             (SDL_GetTicks() - took) / 1000,
@@ -169,7 +184,8 @@ void Phase_Frame_End()
             Frame_Us[PHASE_LOGIC_OBJECTS] / 1000,
             Frame_Us[PHASE_LOGIC_MAP] / 1000,
             Frame_Us[PHASE_LOGIC_FACTORIES] / 1000,
-            Frame_Us[PHASE_LOGIC_HOUSES] / 1000);
+            Frame_Us[PHASE_LOGIC_HOUSES] / 1000,
+            long((Heap_Top() - Frame_Heap) / 1024));
 }
 
 void Phase_Report(unsigned elapsed_ms)
