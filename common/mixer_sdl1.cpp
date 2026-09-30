@@ -122,6 +122,27 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
     }
 }
 
+/*
+** Several loud sounds at once add up past 16 bits. Rather than chop them off
+** (harsh distortion), leave everything below 3/4 of full scale alone and bend
+** what's above it smoothly towards full scale.
+*/
+static inline int Soft_Limit(int x)
+{
+    const int knee = 24576;
+    const int room = 32767 - knee;
+    int a = x < 0 ? -x : x;
+    if (a <= knee) {
+        return x;
+    }
+    unsigned over = unsigned(a - knee);
+    if (over > 200000) {
+        over = 200000; // keeps over * room within 32 bits
+    }
+    a = knee + int(over * unsigned(room) / (over + unsigned(room)));
+    return x < 0 ? -a : a;
+}
+
 static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 {
     (void)userdata;
@@ -169,8 +190,10 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
             l = r;
             r = t;
         }
-        out[i * 2] = (Sint16)(l > 32767 ? 32767 : (l < -32768 ? -32768 : l));
-        out[i * 2 + 1] = (Sint16)(r > 32767 ? 32767 : (r < -32768 ? -32768 : r));
+        l = Soft_Limit(l);
+        r = Soft_Limit(r);
+        out[i * 2] = (Sint16)l;
+        out[i * 2 + 1] = (Sint16)r;
         int al = l < 0 ? -l : l;
         int ar = r < 0 ? -r : r;
         int level = al > ar ? al : ar;
@@ -195,11 +218,18 @@ bool Mixer_Init(int rate, bool reverse_channels)
     desired.freq = rate > 0 ? rate : 22050;
     desired.format = AUDIO_S16SYS;
     desired.channels = 2;
-#ifdef __riscos__
-    desired.samples = 2048; // Larger buffer to ride out slow frames on older machines.
-#else
+    /*
+    ** Each callback mixes this many frames, so a sound waits up to that long to
+    ** start; at 2048 (93 ms) short effects retriggered quickly, like gunfire, were
+    ** often replaced before any of them was heard. VC_AUDIOBUF=<frames> overrides.
+    */
     desired.samples = 1024;
-#endif
+    if (const char* frames = getenv("VC_AUDIOBUF")) {
+        int n = atoi(frames);
+        if (n >= 256 && n <= 8192) {
+            desired.samples = Uint16(n);
+        }
+    }
     desired.callback = Mixer_Callback;
 
     // Passing no "obtained" spec makes SDL convert to the device format for us.

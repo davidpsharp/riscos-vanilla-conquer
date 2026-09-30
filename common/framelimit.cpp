@@ -17,6 +17,36 @@ unsigned Logic_Frame_Count = 0;
 #ifdef NEW_VIDEO_BUILD
 void Video_Render_Frame();
 #endif
+#ifdef SDL1_BUILD
+void Video_Update_Cursor();
+#endif
+
+/*
+** Sleeps for "us" microseconds, moving the cursor at up to 60 Hz meanwhile. The
+** frame limit holds presents to 30 a second, but a cursor-only update is cheap,
+** and a pointer that only moves 30 times a second feels sluggish. The pieces run
+** to a fixed end time, so splitting the sleep doesn't make it any longer.
+*/
+static void Sleep_Updating_Cursor(unsigned us)
+{
+#ifdef SDL1_BUILD
+    using namespace std::chrono;
+    const auto step = microseconds(16667);
+    const auto end = steady_clock::now() + microseconds(us);
+    for (;;) {
+        auto left = end - steady_clock::now();
+        if (left <= steady_clock::duration::zero()) {
+            break;
+        }
+        us_sleep(unsigned(duration_cast<microseconds>(left < step ? left : step).count()));
+        if (steady_clock::now() + milliseconds(2) < end) {
+            Video_Update_Cursor(); // not when the next present is about due anyway
+        }
+    }
+#else
+    us_sleep(us);
+#endif
+}
 
 void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
 {
@@ -37,7 +67,8 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
         PhaseTimer phase_timer(PHASE_SLEEP);
         if (!(flags & FrameLimitFlags::FL_NO_BLOCK)) {
             // Oversleeping the game's next frame makes each one take a whole extra present slot.
-            ms_sleep(unsigned(max_sleep_ms >= 0 && max_sleep_ms < render_remaining ? max_sleep_ms : render_remaining));
+            Sleep_Updating_Cursor(
+                unsigned(max_sleep_ms >= 0 && max_sleep_ms < render_remaining ? max_sleep_ms : render_remaining) * 1000);
         } else {
             ms_sleep(1); // Unconditionally yield for minimum time.
         }
@@ -72,7 +103,7 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
                 if (max_sleep_ms >= 0 && unsigned(max_sleep_ms) * 1000 < wait) {
                     wait = unsigned(max_sleep_ms) * 1000;
                 }
-                us_sleep(wait);
+                Sleep_Updating_Cursor(wait);
             }
         } else {
             frame_start = frame_end;

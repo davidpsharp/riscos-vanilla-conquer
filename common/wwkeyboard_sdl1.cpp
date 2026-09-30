@@ -13,6 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+#include "phasetime.h"
 #include "macros.h"
 #include "wwkeyboard_sdl1.h"
 #include "video.h"
@@ -130,6 +131,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             }
             break;
         case SDL_MOUSEMOTION:
+            ++Phase_Counts[COUNT_MOTION_BY_GAME];
             Move_Video_Mouse(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
             break;
         case SDL_MOUSEBUTTONDOWN:

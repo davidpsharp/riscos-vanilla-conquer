@@ -32,6 +32,8 @@ enum PhaseCountId
     COUNT_PRESENT_SKIPPED,
     COUNT_DELAY_ASKED_MS, // Call_Back_Delay: time asked for...
     COUNT_DELAY_TOOK_MS,  // ...and time taken
+    COUNT_MOTION_BETWEEN_FRAMES, // pointer moves picked up while the frame limiter sleeps
+    COUNT_MOTION_BY_GAME,        // and by the game's own input handling
     COUNT_MAX
 };
 

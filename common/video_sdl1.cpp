@@ -573,6 +573,36 @@ public:
         return true;
     }
 
+    /*
+    ** Between presents: move the cursor if nothing else has changed. A new frame
+    ** waits for the next proper present, to keep those to the frame limit.
+    */
+    void Update_Cursor()
+    {
+        static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
+        if (always_full || changed || !presented || (mirror != nullptr && !mirror_shown)) {
+            return;
+        }
+        /*
+        ** Pick up pointer movement since the game last read its input. In fullscreen
+        ** (RawInput) the pointer is moved by the motion events, so apply those, but
+        ** leave everything else queued for the game; and if a click is waiting, leave
+        ** the motion too, so the click still lands where the pointer was.
+        */
+        SDL_PumpEvents();
+        SDL_Event events[32];
+        if (SDL_PeepEvents(events, 32, SDL_PEEKEVENT, SDL_MOUSEBUTTONDOWNMASK | SDL_MOUSEBUTTONUPMASK) == 0) {
+            int n;
+            while ((n = SDL_PeepEvents(events, 32, SDL_GETEVENT, SDL_MOUSEMOTIONMASK)) > 0) {
+                for (int i = 0; i < n; ++i) {
+                    ++Phase_Counts[COUNT_MOTION_BETWEEN_FRAMES];
+                    Move_Video_Mouse(float(events[i].motion.xrel), float(events[i].motion.yrel));
+                }
+            }
+        }
+        RenderSurface();
+    }
+
     // Fill in the surface with the frame it stands for, before anything uses it.
     void Settle()
     {
@@ -811,6 +841,14 @@ bool Video_Show_Hidden(VideoSurface* hidden)
         return false;
     }
     return frontSurface->Show_Hidden(static_cast<VideoSurfaceSDL1*>(hidden));
+}
+
+// Moves the cursor between presents (see Frame_Limiter).
+void Video_Update_Cursor()
+{
+    if (frontSurface != nullptr && window != nullptr) {
+        frontSurface->Update_Cursor();
+    }
 }
 
 // Before the screen changes under the visible surface (a new video mode).
