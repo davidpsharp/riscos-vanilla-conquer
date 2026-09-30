@@ -4070,6 +4070,10 @@ void Blit_Hid_Page_To_Seen_Buff(void)
  * HISTORY:                                                                                    *
  *   09/04/1996 BWG : Created.                                                                 *
  *=============================================================================================*/
+#ifdef SDL1_BUILD
+void Video_Queue_Shake(int dy);
+#endif
+
 void Shake_The_Screen(int shakes, HousesType house)
 {
 #ifdef REMASTER_BUILD
@@ -4084,6 +4088,28 @@ void Shake_The_Screen(int shakes, HousesType house)
     }
 #else
     shakes += shakes;
+
+#ifdef SDL1_BUILD
+    /*
+    ** Shaking synchronously froze the game for 6 presents (twice per destroyed
+    ** unit, as the unit code shakes for both houses): 200 ms or more on a slow
+    ** machine. Instead queue the offsets for the next presents to show, as the
+    ** Remaster does, and only for the player's own house. The synced random
+    ** numbers are drawn exactly as before, so every machine stays in step.
+    */
+    bool mine = house == HOUSE_NONE || (PlayerPtr != nullptr && house == PlayerPtr->Class->House);
+    int oldoff = 0;
+    int newoff = 0;
+    while (shakes--) {
+        do {
+            newoff = Sim_Random_Pick(0, 2) - 1;
+        } while (newoff == oldoff);
+        if (mine) {
+            Video_Queue_Shake(newoff * 2);
+        }
+    }
+    return;
+#endif
 
     Hide_Mouse();
     SeenBuff.Blit(HidPage);

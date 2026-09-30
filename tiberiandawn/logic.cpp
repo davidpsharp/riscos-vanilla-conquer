@@ -34,6 +34,7 @@
  *   LogicClass::Debug_Dump -- Displays logic class status to the mono screen.                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "logic.h"
 
@@ -192,9 +193,11 @@ void LogicClass::AI(void)
     /*
     **	Team AI is processed.
     */
+    Phase_Timer_Begin(PHASE_LOGIC_TEAMS);
     for (index = 0; index < Teams.Count(); index++) {
         Teams.Ptr(index)->AI();
     }
+    Phase_Timer_Switch(PHASE_LOGIC_OBJECTS);
 
     //	Heap_Dump_Check( "After Team AI" );
 
@@ -271,7 +274,9 @@ void LogicClass::AI(void)
     /*
     **	Map related logic is performed.
     */
+    Phase_Timer_Switch(PHASE_LOGIC_MAP);
     Map.Logic();
+    Phase_Timer_Switch(PHASE_LOGIC_FACTORIES);
 
     //	Heap_Dump_Check( "After Map.Logic" );
 
@@ -284,6 +289,7 @@ void LogicClass::AI(void)
 
     //	Heap_Dump_Check( "After Factory AI" );
 
+    Phase_Timer_Switch(PHASE_LOGIC_HOUSES);
 #if (1)
     /*
     ** Changed integrated from RA to only call AI on the houses that need it. Without this change, AI houses immediately
@@ -331,6 +337,7 @@ void LogicClass::AI(void)
 #endif
 
     //	Heap_Dump_Check( "After House AI" );
+    Phase_Timer_End();
 }
 
 /***********************************************************************************************

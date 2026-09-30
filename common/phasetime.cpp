@@ -87,6 +87,37 @@ void Phase_Add(PhaseId id, unsigned us)
     Frame_Us[id] += us;
 }
 
+static PhaseId Seq_Phase;
+static unsigned Seq_Start;
+static bool Seq_Active = false;
+
+void Phase_Timer_Begin(PhaseId id)
+{
+    if (Phase_Timing) {
+        Seq_Phase = id;
+        Seq_Start = Phase_Now_Us();
+        Seq_Active = true;
+    }
+}
+
+void Phase_Timer_Switch(PhaseId id)
+{
+    if (Seq_Active) {
+        unsigned now = Phase_Now_Us();
+        Phase_Add(Seq_Phase, now - Seq_Start);
+        Seq_Phase = id;
+        Seq_Start = now;
+    }
+}
+
+void Phase_Timer_End()
+{
+    if (Seq_Active) {
+        Phase_Add(Seq_Phase, Phase_Now_Us() - Seq_Start);
+        Seq_Active = false;
+    }
+}
+
 void Phase_Frame_Begin()
 {
     if (!Phase_Timing) {
@@ -107,8 +138,9 @@ void Phase_Frame_End()
     if (!Phase_Timing || Frame_Started == 0) {
         return;
     }
+    static const unsigned threshold = getenv("VC_STALLMS") ? unsigned(atoi(getenv("VC_STALLMS"))) : 150;
     unsigned took = (Phase_Now_Us() - Frame_Started) / 1000;
-    if (took < 150) {
+    if (took < threshold) {
         return;
     }
     unsigned accounted = Frame_Us[PHASE_RENDER] + Frame_Us[PHASE_LOGIC] + Frame_Us[PHASE_QUEUE] + Frame_Us[PHASE_CALLBACK]
@@ -116,7 +148,7 @@ void Phase_Frame_End()
     unsigned other = took * 1000 > accounted ? took * 1000 - accounted : 0;
     fprintf(stderr,
             "stall: game frame took %u ms at %u.%03u s: draw %u (map %u) logic %u queue %u callback %u present %u sleep %u "
-            "other %u\n",
+            "other %u [logic: teams %u objects %u map %u factories %u houses %u]\n",
             took,
 #ifdef SDL_BUILD
             (SDL_GetTicks() - took) / 1000,
@@ -132,7 +164,12 @@ void Phase_Frame_End()
             Frame_Us[PHASE_CALLBACK] / 1000,
             Frame_Us[PHASE_PRESENT] / 1000,
             Frame_Us[PHASE_SLEEP] / 1000,
-            other / 1000);
+            other / 1000,
+            Frame_Us[PHASE_LOGIC_TEAMS] / 1000,
+            Frame_Us[PHASE_LOGIC_OBJECTS] / 1000,
+            Frame_Us[PHASE_LOGIC_MAP] / 1000,
+            Frame_Us[PHASE_LOGIC_FACTORIES] / 1000,
+            Frame_Us[PHASE_LOGIC_HOUSES] / 1000);
 }
 
 void Phase_Report(unsigned elapsed_ms)

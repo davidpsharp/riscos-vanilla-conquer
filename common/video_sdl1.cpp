@@ -449,6 +449,21 @@ SurfaceMonitorClass::SurfaceMonitorClass()
 class VideoSurfaceSDL1;
 static VideoSurfaceSDL1* frontSurface = nullptr;
 
+/*
+** Screen shakes (Shake_The_Screen): vertical offsets for the next presents to show.
+*/
+static int Shake_Queue[16];
+static int Shake_Count = 0;
+static bool Shake_Undo = false; // the screen is shifted; the next present must be a normal full one
+
+void Video_Queue_Shake(int dy)
+{
+    if (Shake_Count < 16) {
+        Shake_Queue[Shake_Count++] = dy;
+    }
+}
+
+
 // Copies the overlapping part of two 8 bit surfaces byte for byte (SDL would remap
 // colours between 8 bit palettes).
 static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
@@ -581,7 +596,8 @@ public:
     {
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
         static const bool off = getenv("VC_NOPOINTERUPDATE") != nullptr;
-        if (off || always_full || changed || !presented || (mirror != nullptr && !mirror_shown)) {
+        if (off || always_full || changed || !presented || (mirror != nullptr && !mirror_shown) || Shake_Count > 0
+            || Shake_Undo) {
             return;
         }
         /*
@@ -642,7 +658,12 @@ public:
         ** this off, for comparison.
         */
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
-        bool full = changed || always_full || !presented;
+        if (Shake_Count > 0) {
+            Present_Shaken();
+            return;
+        }
+        bool full = changed || always_full || !presented || Shake_Undo;
+        Shake_Undo = false;
         if (!full && cursor == last_cursor && Cursor_Generation == last_generation
             && (!cursor || (area.x == last_area.x && area.y == last_area.y))) {
             ++Phase_Counts[COUNT_PRESENT_SKIPPED];
@@ -718,6 +739,46 @@ public:
     }
 
 private:
+    /*
+    ** Shows the frame moved up or down by the next queued shake offset, without the
+    ** cursor (as the original hid it). The rows it uncovers keep what was there.
+    ** The screen then isn't the frame, so the mirror isn't marked shown, and the
+    ** next ordinary present is a full one.
+    */
+    void Present_Shaken()
+    {
+        int dy = Shake_Queue[0];
+        for (int i = 1; i < Shake_Count; ++i) {
+            Shake_Queue[i - 1] = Shake_Queue[i];
+        }
+        --Shake_Count;
+        ++Phase_Counts[COUNT_PRESENT_FULL];
+
+        SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
+        int h = (frame->h < window->h ? frame->h : window->h) - (dy < 0 ? -dy : dy);
+        int w = frame->w < window->w ? frame->w : window->w;
+        SDL_LockSurface(frame);
+        SDL_LockSurface(window);
+        for (int row = 0; row < h; ++row) {
+            int from = dy < 0 ? row - dy : row;
+            int to = dy < 0 ? row : row + dy;
+            memcpy(static_cast<Uint8*>(window->pixels) + to * window->pitch,
+                   static_cast<const Uint8*>(frame->pixels) + from * frame->pitch,
+                   w);
+        }
+        SDL_UnlockSurface(window);
+        SDL_UnlockSurface(frame);
+        SDL_Flip(window);
+        if (mirror != nullptr && mirror_shown) {
+            // The frame was only on the screen, which is now shifted: keep a copy first.
+            Raw_Copy(mirror->surface, surface);
+            mirror = nullptr;
+        }
+        Shake_Undo = true;
+        last_cursor = false;
+        presented = true;
+    }
+
     // About to be read or written: make sure it holds what it should.
     void Touch()
     {

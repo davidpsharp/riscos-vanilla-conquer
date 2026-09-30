@@ -18,6 +18,11 @@ enum PhaseId
     PHASE_CALLBACK, // Call_Back (sound, music, network)
     PHASE_PRESENT,  // Video_Render_Frame (cursor, copy to screen)
     PHASE_SLEEP,    // the frame limiter sleeping
+    PHASE_LOGIC_TEAMS,   // parts of Logic.AI, for the stall report
+    PHASE_LOGIC_OBJECTS,
+    PHASE_LOGIC_MAP,
+    PHASE_LOGIC_FACTORIES,
+    PHASE_LOGIC_HOUSES,
     // Audio mixing isn't timed: it runs on its own thread, overlapping the rest
     // (about 55 ms/s on a StrongARM Risc PC).
     PHASE_COUNT
@@ -42,6 +47,11 @@ extern unsigned Phase_Counts[COUNT_MAX];
 unsigned Phase_Now_Us();
 void Phase_Add(PhaseId id, unsigned us);
 void Phase_Report(unsigned elapsed_ms);
+
+// Sequential timing within one function: Begin, Switch to the next phase, End.
+void Phase_Timer_Begin(PhaseId id);
+void Phase_Timer_Switch(PhaseId id);
+void Phase_Timer_End();
 
 // Around one game frame: logs it, with where its time went, if it took over 150 ms.
 void Phase_Frame_Begin();
