@@ -43,6 +43,10 @@ unsigned Phase_Now_Us();
 void Phase_Add(PhaseId id, unsigned us);
 void Phase_Report(unsigned elapsed_ms);
 
+// Around one game frame: logs it, with where its time went, if it took over 150 ms.
+void Phase_Frame_Begin();
+void Phase_Frame_End();
+
 class PhaseTimer
 {
 public:

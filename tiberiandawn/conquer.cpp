@@ -1609,6 +1609,7 @@ bool Main_Loop()
     // Initialize our AI processing timer
     //
     ProcessTimer.Set(0, true);
+    Phase_Frame_Begin();
 
 #if 1
     if (TrapCheckHeap) {
@@ -1822,6 +1823,7 @@ bool Main_Loop()
     }
 
     Sync_Delay();
+    Phase_Frame_End();
     //	InMainLoop = false;
     return (!GameActive);
 }

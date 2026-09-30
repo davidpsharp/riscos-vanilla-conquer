@@ -1,12 +1,17 @@
 #include "phasetime.h"
 
 #include <chrono>
+#ifdef SDL_BUILD
+#include <SDL.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
 bool Phase_Timing = getenv("VC_FPSLOG") != nullptr;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
+static unsigned Frame_Us[PHASE_COUNT]; // the current game frame's share
+static unsigned Frame_Started = 0;
 unsigned Phase_Counts[COUNT_MAX];
 
 #ifdef __riscos__
@@ -79,6 +84,55 @@ unsigned Phase_Now_Us()
 void Phase_Add(PhaseId id, unsigned us)
 {
     Phase_Us[id] += us;
+    Frame_Us[id] += us;
+}
+
+void Phase_Frame_Begin()
+{
+    if (!Phase_Timing) {
+        return;
+    }
+    for (int i = 0; i < PHASE_COUNT; ++i) {
+        Frame_Us[i] = 0;
+    }
+    Frame_Started = Phase_Now_Us();
+}
+
+/*
+** A pause the player notices is a single long frame, which the 5 second averages
+** hide, so log each one with where its time went.
+*/
+void Phase_Frame_End()
+{
+    if (!Phase_Timing || Frame_Started == 0) {
+        return;
+    }
+    unsigned took = (Phase_Now_Us() - Frame_Started) / 1000;
+    if (took < 150) {
+        return;
+    }
+    unsigned accounted = Frame_Us[PHASE_RENDER] + Frame_Us[PHASE_LOGIC] + Frame_Us[PHASE_QUEUE] + Frame_Us[PHASE_CALLBACK]
+                + Frame_Us[PHASE_PRESENT] + Frame_Us[PHASE_SLEEP];
+    unsigned other = took * 1000 > accounted ? took * 1000 - accounted : 0;
+    fprintf(stderr,
+            "stall: game frame took %u ms at %u.%03u s: draw %u (map %u) logic %u queue %u callback %u present %u sleep %u "
+            "other %u\n",
+            took,
+#ifdef SDL_BUILD
+            (SDL_GetTicks() - took) / 1000,
+            (SDL_GetTicks() - took) % 1000,
+#else
+            0u,
+            0u,
+#endif
+            Frame_Us[PHASE_RENDER] / 1000,
+            Frame_Us[PHASE_TACTICAL] / 1000,
+            Frame_Us[PHASE_LOGIC] / 1000,
+            Frame_Us[PHASE_QUEUE] / 1000,
+            Frame_Us[PHASE_CALLBACK] / 1000,
+            Frame_Us[PHASE_PRESENT] / 1000,
+            Frame_Us[PHASE_SLEEP] / 1000,
+            other / 1000);
 }
 
 void Phase_Report(unsigned elapsed_ms)

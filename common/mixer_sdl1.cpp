@@ -58,6 +58,8 @@ static unsigned LastCallbackMs = 0;
 static unsigned MaxGapMs = 0;
 static unsigned DryCount = 0;
 static int PeakLevel = 0;
+static MixerStall Stalls[4];
+static int StallCount = 0;
 static int MaxPlaying = 0;
 static int OutputSamples = 0;
 static bool AudioOpen = false;
@@ -166,6 +168,12 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
     unsigned now = SDL_GetTicks();
     if (Callbacks++ != 0 && now - LastCallbackMs > MaxGapMs) {
         MaxGapMs = now - LastCallbackMs;
+    }
+    if (Callbacks > 1 && now - LastCallbackMs >= 150 && StallCount < 4) {
+        // Noted here, printed by the main thread (Mixer_Get_Stats), for matching up with game stalls.
+        Stalls[StallCount].AtMs = LastCallbackMs;
+        Stalls[StallCount].GapMs = now - LastCallbackMs;
+        ++StallCount;
     }
     LastCallbackMs = now;
 
@@ -288,6 +296,11 @@ void Mixer_Get_Stats(MixerStats& stats)
     MaxGapMs = 0;
     PeakLevel = 0;
     MaxPlaying = 0;
+    stats.StallCount = StallCount;
+    for (int i = 0; i < StallCount; ++i) {
+        stats.Stalls[i] = Stalls[i];
+    }
+    StallCount = 0;
     SDL_UnlockAudio();
 }
 

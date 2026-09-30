@@ -580,7 +580,8 @@ public:
     void Update_Cursor()
     {
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
-        if (always_full || changed || !presented || (mirror != nullptr && !mirror_shown)) {
+        static const bool off = getenv("VC_NOPOINTERUPDATE") != nullptr;
+        if (off || always_full || changed || !presented || (mirror != nullptr && !mirror_shown)) {
             return;
         }
         /*
@@ -909,6 +910,13 @@ static void Log_Frame_Rate(Uint32 render_ms)
                 audio.DryCount - last_audio.DryCount,
                 audio.Peak,
                 audio.MaxChannels);
+        for (int i = 0; i < audio.StallCount; ++i) {
+            fprintf(stderr,
+                    "stall: audio thread didn't run for %u ms at %u.%03u s\n",
+                    audio.Stalls[i].GapMs,
+                    audio.Stalls[i].AtMs / 1000,
+                    audio.Stalls[i].AtMs % 1000);
+        }
         last_audio = audio;
 #endif
         Phase_Report(now - start);

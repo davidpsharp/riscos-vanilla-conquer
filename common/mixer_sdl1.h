@@ -45,6 +45,12 @@ void Mixer_Stop(MixerChannel* ch);
 bool Mixer_Is_Playing(MixerChannel* ch);
 
 // Running totals for diagnosing playback pacing.
+struct MixerStall
+{
+    unsigned AtMs;  // SDL_GetTicks() when the audio thread last ran before the gap
+    unsigned GapMs;
+};
+
 struct MixerStats
 {
     unsigned Callbacks;    // Audio callbacks so far.
@@ -55,6 +61,8 @@ struct MixerStats
     int OutputSamples;     // Callback size in frames.
     int Peak;              // Loudest output sample since the last call (0 = silence).
     int MaxChannels;       // Most channels playing in one callback since the last call.
+    int StallCount;        // Gaps of 150 ms or more between callbacks since the last call (up to 4).
+    MixerStall Stalls[4];
 };
 void Mixer_Get_Stats(MixerStats& stats);
 // Bytes queued and played since the channel was last stopped.
