@@ -59,6 +59,8 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 
 **Kinetic StrongARM Risc PC, 2 MB VRAM:** GDI mission 1 played through to the end (build `e9b66f3`, the first built without halfword instructions). The monitor has no 640×400 mode, so the game runs centred in 640×480. Measured with `VC_FPSLOG`: 26–30 frames presented per second, 13.4–14.2 game logic fps against a target of 15, and about 10–16 ms per full-screen copy.
 
+**After the presentation and pacing fixes** (build `760a4d6`, same machine, in play): game logic 14.5–15.0 fps, 30 frames presented per second, the hidden-to-visible page copy down from ~250–300 to 1–2 ms/s, and about half of every second idle.
+
 **Movies:** they play smoothly with sound in `InterpolationMode=1`, the RISC OS default. That mode blends horizontally and doubles lines. In mode 2 (vertical blending too, the desktop default), the GDI 1 briefing took 33–37 ms to scale plus 15 ms to copy to the screen, against a 67 ms frame budget, so it lagged with sound on. Mode 3 doubles pixels with no blending. `VC_FPSLOG` prints `movie:` lines with the per-frame scale and present times. The VQA audio buffer was also raised from 1.5 s to 3 s, because the briefing stores its audio further ahead of the video than that.
 
 **Where the time goes:** with `VC_FPSLOG` set, the game also prints a `time ms/s:` line every 5 seconds, from `common/phasetime.*`. It gives milliseconds per second of wall time for:
