@@ -44,6 +44,7 @@
  *   ScoreClass::Pulse_Bar_Graph -- Pulses the bargraph color.                                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "common/interpal.h"
 #include <string.h>
@@ -2056,6 +2057,7 @@ void Call_Back_Delay(int time)
         time = 0;
 
     cd.Set(time);
+    unsigned started = Phase_Timing ? Phase_Now_Us() : 0;
     StreamLowImpact = true;
     do {
         Call_Back();
@@ -2078,9 +2080,22 @@ void Call_Back_Delay(int time)
         Present_Score_Frame(true);
         //}
 
-        Frame_Limiter();
+        /*
+        ** Don't sleep past the end of the delay: the frame limiter would otherwise
+        ** wait for its next present slot, so a one tick delay took two or more.
+        */
+        int ticks = int(cd.Time());
+        if (ticks <= 1) {
+            Frame_Limiter(FL_NO_SLEEP); // present only if a frame is due, and don't wait
+        } else {
+            Frame_Limiter(FL_FORCE_RENDER, (ticks - 1) * 1000 / TIMER_SECOND);
+        }
     } while (cd.Time());
     StreamLowImpact = false;
+    if (Phase_Timing) {
+        Phase_Counts[COUNT_DELAY_ASKED_MS] += unsigned(time) * 1000 / TIMER_SECOND;
+        Phase_Counts[COUNT_DELAY_TOOK_MS] += (Phase_Now_Us() - started) / 1000;
+    }
 }
 
 void Animate_Score_Objs()

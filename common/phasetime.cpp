@@ -92,6 +92,12 @@ void Phase_Report(unsigned elapsed_ms)
             Phase_Counts[COUNT_PRESENT_FULL] * 1000.0 / elapsed_ms,
             Phase_Counts[COUNT_PRESENT_PARTIAL] * 1000.0 / elapsed_ms,
             Phase_Counts[COUNT_PRESENT_SKIPPED] * 1000.0 / elapsed_ms);
+    if (Phase_Counts[COUNT_DELAY_ASKED_MS] != 0) {
+        fprintf(stderr,
+                "delays: asked %u ms, took %u ms\n",
+                Phase_Counts[COUNT_DELAY_ASKED_MS],
+                Phase_Counts[COUNT_DELAY_TOOK_MS]);
+    }
     for (int i = 0; i < COUNT_MAX; ++i) {
         Phase_Counts[i] = 0;
     }

@@ -4036,8 +4036,20 @@ int Get_Resolution_Factor(void)
  *
  * History: 1/3/2019 11:33AM - ST
  **************************************************************************************************/
+#ifdef SDL1_BUILD
+bool Video_Show_Hidden(VideoSurface* hidden);
+#endif
+
 void Blit_Hid_Page_To_Seen_Buff(void)
 {
+#ifdef SDL1_BUILD
+    // Present the hidden page directly rather than copying it (see video_sdl1.cpp).
+    if (HidPage.Get_XPos() == 0 && HidPage.Get_YPos() == 0 && HidPage.Get_Width() == SeenBuff.Get_Width()
+        && HidPage.Get_Height() == SeenBuff.Get_Height()
+        && Video_Show_Hidden(HidPage.Get_Graphic_Buffer()->Get_DD_Surface())) {
+        return;
+    }
+#endif
     HidPage.Blit(SeenBuff);
 }
 

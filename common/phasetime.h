@@ -30,6 +30,8 @@ enum PhaseCountId
     COUNT_PRESENT_FULL,
     COUNT_PRESENT_PARTIAL,
     COUNT_PRESENT_SKIPPED,
+    COUNT_DELAY_ASKED_MS, // Call_Back_Delay: time asked for...
+    COUNT_DELAY_TOOK_MS,  // ...and time taken
     COUNT_MAX
 };
 
