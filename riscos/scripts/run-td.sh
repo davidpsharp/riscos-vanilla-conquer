@@ -4,7 +4,8 @@
 # Usage: run-td.sh <371|371-1mb|530> [game args...]    e.g. run-td.sh 371 -AUTOSTART=G1
 # VC_APP overrides the application path, e.g. VC_APP='ADFS::HardDisc4.$.!VanillaTD'.
 set -euo pipefail
-WORK=${VC_WORK:-$HOME/vcport-work}
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
 DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
 M=/Applications/RPCEmu.app/Contents/MacOS
 case "$1" in

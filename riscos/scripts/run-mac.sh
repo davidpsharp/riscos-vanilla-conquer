@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BUILD=${1:-$ROOT/build/mac-ubsan}
 shift || true
-WORK=${VC_WORK:-$HOME/vcport-work}
+WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
 RUN="$WORK/mac-run"
 [ -d "$WORK/tddata" ] || { echo "no game data in $WORK/tddata (see prepare-td-data.sh)" >&2; exit 1; }
 mkdir -p "$RUN"

@@ -12,7 +12,7 @@ sleep 8
 for i in $(seq 1 12); do
     "$P" "$ROOT/riscos/scripts/vnc.py" "$VNC" slowkey 0.15 esc
     sleep 3
-    if "$P" "$ROOT/riscos/scripts/vnc.py" "$VNC" until 30 0 120 12 "$HOME/vcport-work/ref-options-tab.raw" 2 >/dev/null 2>&1; then
+    if "$P" "$ROOT/riscos/scripts/vnc.py" "$VNC" until 30 0 120 12 "${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}/ref-options-tab.raw" 2 >/dev/null 2>&1; then
         echo "in mission $MISSION"
         exit 0
     fi

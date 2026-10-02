@@ -4,13 +4,13 @@
 #   "VC SA RO371 1MB": as above but with 1MB VRAM and 64MB RAM
 #   "VC SA RO530": RISC OS 5.30, cloned from "RISC OS 5.30" (see --fetch-riscos)
 # The 2MB/1MB VRAM pair matches the two VRAM options on a real Risc PC.
-# Each machine's HostFS gets a "vc" link to ~/vcport-work/hostfs (outside the
+# Each machine's HostFS gets a "vc" link to ../vcport-work/hostfs (outside the
 # Synology-synced source tree).
 # Re-running refreshes the config but keeps the existing disc and CMOS.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
-HOSTFS=${VC_WORK:-$HOME/vcport-work}/hostfs
+HOSTFS=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}/hostfs
 mkdir -p "$HOSTFS"
 
 # make_machine <name> <template> <rom> <vnc port> <hostcmd port> <mac> <vram MB> <ram MB> <host sound 0/1>

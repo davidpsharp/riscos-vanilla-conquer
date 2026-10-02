@@ -5,7 +5,7 @@
 #   e.g. make-release.sh preview  ->  build/release/VanillaTD-riscos-preview.zip
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WORK=${VC_WORK:-$HOME/vcport-work}
+WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
 VERSION=${1:?usage: make-release.sh <version> [--no-build]}
 OUT=$ROOT/build/release
 PKG=$OUT/pkg

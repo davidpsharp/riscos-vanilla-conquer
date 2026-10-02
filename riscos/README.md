@@ -11,7 +11,7 @@ Vanilla Conquer for RISC OS. The first target is a StrongARM Risc PC running RIS
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |
 | `scripts/setup-rpcemu-machines.sh` | Create the `VC SA RO371` and `VC SA RO530` StrongARM machines in RPCEmu Extended |
-| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `~/vcport-work/hostfs/modules` |
+| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `../vcport-work/hostfs/modules` |
 | `scripts/screenshot.sh` | Grab a machine's screen as PNG over VNC |
 | `tests/` | Toolchain smoke tests: `hello`, `unaligned`, `sdltest` |
 
@@ -30,7 +30,7 @@ RPCEmu Extended must be installed at `/Applications/RPCEmu.app`, with its data d
 riscos/scripts/setup-rpcemu-machines.sh
 riscos/scripts/fetch-runtime.sh
 riscos/scripts/build-tests.sh
-mkdir -p ~/vcport-work/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb ~/vcport-work/hostfs/tests/
+mkdir -p ../vcport-work/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb ../vcport-work/hostfs/tests/
 
 RPCEMU=/Applications/RPCEmu.app/Contents/MacOS
 $RPCEMU/rpcemu --machine "VC SA RO371" --headless &      # VNC 5920, HostCmd 5921
@@ -40,7 +40,7 @@ $RPCEMU/rpcemu-run --tcp 127.0.0.1:5921 -- 'Filer_Run HostFS:$.vc.tests.runsdl' 
 riscos/scripts/screenshot.sh 5920 build/shot.png
 ```
 
-`HostFS:$.vc` in each machine points at `~/vcport-work/hostfs`.
+`HostFS:$.vc` in each machine points at `../vcport-work/hostfs`.
 
 ## Findings so far
 
@@ -107,7 +107,7 @@ Tested using `-PLAYTEST` (Alt+W wins, Alt+L loses) and `-AUTOSTART=<G|N><n>[A-D]
 There's no OpenAL on RISC OS, so SDL builds without OpenAL use a small software mixer on SDL 1.2's audio callback (`common/mixer_sdl1.cpp`). Its channels mimic the OpenAL sources that `soundio_common.cpp` and the VQA player expect. `soundio_sdl1.cpp` handles effects, music and speech, and `vqaaudio_sdl1.cpp` handles movie soundtracks. On RISC OS, SDL plays through **DigitalRenderer**, which `!Run` loads from `System:Modules` or from `!VanillaTD.Modules`. If audio can't be opened, the game runs silently.
 
 **How it was verified:**
-- **macOS:** `SDL_AUDIODRIVER=disk` writes the mixed output to a file. The logo, music, speech and effects all decode as real audio (zero-crossing rate 0.01–0.08). A capture is in `~/vcport-work/td-audio-mac.wav`.
+- **macOS:** `SDL_AUDIODRIVER=disk` writes the mixed output to a file. The logo, music, speech and effects all decode as real audio (zero-crossing rate 0.01–0.08). A capture is in `../vcport-work/td-audio-mac.wav`.
 - **RISC OS 3.71 and 5.30 (RPCEmu):** `scripts/capture-mixer.py` breaks on `Mixer_Callback` and reads back the buffer it filled. The output is real audio in both the logo movie and GDI 1. Playback is paced at 22009 and 22207 frames/s against 22050 expected (from `Mixer_Frames_Mixed`), so the sound hardware consumes it in real time.
 - **Cost:** the game still runs at 15.6 logic fps. Uncapped throughput drops by about 5.5% (827 vs 876 fps), mostly from UnixLib's pthread audio thread rather than the mixing itself.
 
@@ -244,9 +244,9 @@ It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype i
 VC_DEBUG=1 riscos/scripts/deploy-td.sh        # cross-build (with debug log) and deploy
 riscos/scripts/run-td.sh 371 -AUTOSTART=G1    # reset machine, launch TD
 riscos/scripts/screenshot.sh 5920 /tmp/s.png  # look at it
-tail ~/vcport-work/hostfs/'!VanillaTD'/stderr # debug log (flushed in 1 KB blocks)
+tail ../vcport-work/hostfs/'!VanillaTD'/stderr # debug log (flushed in 1 KB blocks)
 ```
 
-When debugging, `rpcemu-debug trace config data_abort=1 prefetch_abort=1 undefined=1` stops the emulator at the faulting instruction. `scripts/guest-stack.py` gives a heuristic backtrace. On the Mac, `scripts/run-mac.sh build/mac-ubsan -AUTOSTART=G1` runs the sanitizer build and writes reports to `~/vcport-work/ubsan.*`.
+When debugging, `rpcemu-debug trace config data_abort=1 prefetch_abort=1 undefined=1` stops the emulator at the faulting instruction. `scripts/guest-stack.py` gives a heuristic backtrace. On the Mac, `scripts/run-mac.sh build/mac-ubsan -AUTOSTART=G1` runs the sanitizer build and writes reports to `../vcport-work/ubsan.*`.
 
-Game data, the HostFS deploy directory and the Mac run directory all live in `~/vcport-work`. They stay out of the Synology-synced source tree, which otherwise uploads about 500 MB and has reverted local edits.
+Game data, the HostFS deploy directory and the Mac run directory all live in `../vcport-work`, next to the repo (`VC_WORK` overrides it). They're kept outside the repo, since the game data isn't redistributable and the builds and logs run to gigabytes. Keep both out of cloud-synced folders: Synology sync once reverted local edits here.

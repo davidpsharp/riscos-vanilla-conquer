@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Cross-build VanillaTD and assemble the !VanillaTD application in
-# ~/vcport-work/hostfs (seen by the test machines as HostFS:$.vc).
-# Game data is hard-linked from ~/vcport-work/tddata (see prepare-td-data.sh).
+# ../vcport-work/hostfs next to the repo (seen by the test machines as HostFS:$.vc).
+# Game data is hard-linked from ../vcport-work/tddata (see prepare-td-data.sh).
 # Usage: [VC_DEBUG=1] deploy-td.sh [--no-build]
 #   VC_DEBUG=1 builds with -D_DEBUG so the game's debug log goes to stdout.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WORK=${VC_WORK:-$HOME/vcport-work}
+WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
 APP="$WORK/hostfs/!VanillaTD"
 
 if [ "${VC_DEBUG:-0}" = 1 ]; then

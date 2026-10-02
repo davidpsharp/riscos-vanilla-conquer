@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Assemble Tiberian Dawn game data from a C&C Gold (C&C95) CD image into
-# ~/vcport-work/tddata. Local testing only; the data is not redistributable.
+# ../vcport-work/tddata (next to the repo). Local testing only; the data is not redistributable.
 # Usage: prepare-td-data.sh <CNC95_GDI.iso> [--movies] [--nod <CNC95_Nod.iso>]
 #
 # The GDI and Nod discs differ only in GENERAL.MIX and MOVIES.MIX. Those are
@@ -22,7 +22,7 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-OUT="${VC_WORK:-$HOME/vcport-work}/tddata"
+OUT="${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}/tddata"
 MNT=$(mktemp -d)
 
 UNSHIELD=$(command -v unshieldv3 || true)

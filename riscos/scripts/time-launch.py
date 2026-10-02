@@ -18,7 +18,7 @@ def grab():
     return got
 
 app = sys.argv[3] if len(sys.argv) > 3 else "HostFS:$.vc.!VanillaTD"
-work = os.path.expanduser("~/vcport-work/hostfs")
+work = os.path.join(os.environ.get("VC_WORK") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "vcport-work"), "hostfs")
 pre = os.environ.get("VC_PRE", "")  # extra *commands before launching, ';'-separated
 open(os.path.join(work, "runtd,feb"), "w").write("".join(c + "\n" for c in pre.split(";") if c) + "Run %s\n" % app)
 # Make sure the desktop (not a leftover game screen) is showing first.
