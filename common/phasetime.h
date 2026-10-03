@@ -23,6 +23,10 @@ enum PhaseId
     PHASE_LOGIC_MAP,
     PHASE_LOGIC_FACTORIES,
     PHASE_LOGIC_HOUSES,
+    PHASE_CB_THEME,      // parts of Call_Back, for the stall report
+    PHASE_CB_SPEAK,
+    PHASE_CB_STREAM_FILE, // music stream: opening and reading the file
+    PHASE_CB_AUDIO_LOCK,  // waiting for SDL's audio lock (the mixer thread)
     // Audio mixing isn't timed: it runs on its own thread, overlapping the rest
     // (about 55 ms/s on a StrongARM Risc PC).
     PHASE_COUNT

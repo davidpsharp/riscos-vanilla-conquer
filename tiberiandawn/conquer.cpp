@@ -1237,7 +1237,11 @@ void Call_Back(void)
     **	Score maintenance
     */
     if (SampleType) {
-        Theme.AI();
+        {
+            PhaseTimer theme_timer(PHASE_CB_THEME);
+            Theme.AI();
+        }
+        PhaseTimer speak_timer(PHASE_CB_SPEAK);
         Speak_AI();
     }
 

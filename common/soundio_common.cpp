@@ -9,6 +9,7 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+#include "phasetime.h"
 #include "audio.h"
 #include "auduncmp.h"
 #include "endianness.h"
@@ -414,7 +415,11 @@ static bool File_Callback(short id, short* odd, void** buffer, int* size)
                     static_cast<char*>(st->FileBuffer)
                     + LockedData.StreamBufferSize * ((st->FilePending + *odd) % LockedData.StreamBufferCount);
 
-                int psize = Read_File(st->FileHandle, tofill, LockedData.StreamBufferSize);
+                int psize;
+                {
+                    PhaseTimer file_timer(PHASE_CB_STREAM_FILE);
+                    psize = Read_File(st->FileHandle, tofill, LockedData.StreamBufferSize);
+                }
 
                 if (psize != LockedData.StreamBufferSize) {
                     Close_File(st->FileHandle);
@@ -456,6 +461,7 @@ static void File_Stream_Preload(int index)
     int i = 0;
 
     for (i = st->FilePending; i < num; ++i) {
+        PhaseTimer file_timer(PHASE_CB_STREAM_FILE);
         int size = Read_File(st->FileHandle,
                              static_cast<char*>(st->FileBuffer) + i * LockedData.StreamBufferSize,
                              LockedData.StreamBufferSize);
@@ -527,7 +533,11 @@ int File_Stream_Sample_Vol(char const* filename, int volume, bool real_time_star
         return INVALID_AUDIO_HANDLE;
     }
 
-    int fh = Open_File(filename, 1);
+    int fh;
+    {
+        PhaseTimer file_timer(PHASE_CB_STREAM_FILE);
+        fh = Open_File(filename, 1);
+    }
 
     if (fh == INVALID_FILE_HANDLE) {
         return INVALID_AUDIO_HANDLE;

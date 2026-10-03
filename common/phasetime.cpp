@@ -163,7 +163,8 @@ void Phase_Frame_End()
     unsigned other = took * 1000 > accounted ? took * 1000 - accounted : 0;
     fprintf(stderr,
             "stall: game frame took %u ms at %u.%03u s: draw %u (map %u) logic %u queue %u callback %u present %u sleep %u "
-            "other %u [logic: teams %u objects %u map %u factories %u houses %u] heap %+ld KB\n",
+            "other %u [logic: teams %u objects %u map %u factories %u houses %u] [callback: theme %u speech %u "
+            "stream file %u audio lock %u] heap %+ld KB\n",
             took,
 #ifdef SDL_BUILD
             (SDL_GetTicks() - took) / 1000,
@@ -185,6 +186,10 @@ void Phase_Frame_End()
             Frame_Us[PHASE_LOGIC_MAP] / 1000,
             Frame_Us[PHASE_LOGIC_FACTORIES] / 1000,
             Frame_Us[PHASE_LOGIC_HOUSES] / 1000,
+            Frame_Us[PHASE_CB_THEME] / 1000,
+            Frame_Us[PHASE_CB_SPEAK] / 1000,
+            Frame_Us[PHASE_CB_STREAM_FILE] / 1000,
+            Frame_Us[PHASE_CB_AUDIO_LOCK] / 1000,
             long((Heap_Top() - Frame_Heap) / 1024));
 }
 
