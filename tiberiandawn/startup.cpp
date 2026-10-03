@@ -333,7 +333,8 @@ int main(int argc, char** argv)
 
         CCDebugString("C&C95 - Initialising audio.\n");
 
-        SoundOn = Audio_Init(16, false, 11025 * 2, 0);
+        // VC_NOSOUND: no audio at all, e.g. to see how much of a benchmark the mixer takes.
+        SoundOn = getenv("VC_NOSOUND") ? false : Audio_Init(16, false, 11025 * 2, 0);
 
         Palette = new (MEM_CLEAR) unsigned char[768];
 

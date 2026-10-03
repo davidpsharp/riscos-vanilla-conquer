@@ -237,6 +237,27 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         SDL_ShowCursor(SDL_ENABLE);
     }
     Confine_Pointer();
+    {
+        // Which mode SDL chose matters for speed: the screen's refresh shares the memory bus.
+        _kernel_swi_regs regs;
+        regs.r[0] = 1; // OS_ScreenMode 1: read the current mode
+        _kernel_swi(OS_ScreenMode, &regs, &regs);
+        int rate = -1;
+        if (unsigned(regs.r[1]) >= 256) {
+            rate = reinterpret_cast<const int*>(regs.r[1])[4]; // mode selector: flags, x, y, log2bpp, rate
+        }
+        fprintf(stderr,
+                "video: %dx%d surface in a %dx%d mode (%d bpp, %d Hz, mode %s), offset %d,%d\n",
+                window->w,
+                window->h,
+                Mode_Variable(11) + 1,
+                Mode_Variable(12) + 1,
+                1 << Mode_Variable(9),
+                rate,
+                unsigned(regs.r[1]) >= 256 ? "selector" : "number",
+                window->pitch ? window->offset % window->pitch : 0,
+                window->pitch ? window->offset / window->pitch : 0);
+    }
 #endif
 
     SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
