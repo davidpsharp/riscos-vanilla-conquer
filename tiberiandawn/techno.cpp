@@ -111,6 +111,7 @@
  *   TechnoClass::Refund_Amount -- Returns with the money to refund if this object is sold.    *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "phasetime.h"
 #include "function.h"
 
 /***************************************************************************
@@ -1600,6 +1601,7 @@ bool TechnoClass::Evaluate_Cell(ThreatType method,
  *=============================================================================================*/
 TARGET TechnoClass::Greatest_Threat(ThreatType method) const
 {
+    PhaseTimer timer(PHASE_THREAT);
     ObjectClass const* bestobject = NULL;
     int bestval = -1;
 

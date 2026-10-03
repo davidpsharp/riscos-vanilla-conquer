@@ -165,4 +165,41 @@ protected:
     VideoSurface* VideoSurfacePtr; // Pointer to the related direct draw surface
 };
 
+/*
+** Partial presents (video_sdl1.cpp) need to know where the game draws, so the drawing
+** routines report each area they write with Mark_Written. Unless a video backend has
+** set Video_Written_Hook, that only counts the call. The hook gets the buffer's video
+** surface and the area in the buffer's coordinates. Each routine also calls it with
+** an empty area on entry, so that drawing nothing still counts as saying where.
+*/
+class VideoSurface;
+extern void (*Video_Written_Hook)(VideoSurface* surface, int x, int y, int w, int h);
+extern unsigned Video_Mark_Count;
+
+inline void Mark_Written(const GraphicViewPortClass& vp, int x, int y, int w, int h)
+{
+    ++Video_Mark_Count;
+    if (Video_Written_Hook == nullptr) {
+        return;
+    }
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (w > vp.Get_Width() - x) {
+        w = vp.Get_Width() - x;
+    }
+    if (h > vp.Get_Height() - y) {
+        h = vp.Get_Height() - y;
+    }
+    GraphicBufferClass* buffer = const_cast<GraphicViewPortClass&>(vp).Get_Graphic_Buffer();
+    if (w > 0 && h > 0 && buffer != nullptr && buffer->Get_DD_Surface() != nullptr) {
+        Video_Written_Hook(buffer->Get_DD_Surface(), vp.Get_XPos() + x, vp.Get_YPos() + y, w, h);
+    }
+}
+
 #endif

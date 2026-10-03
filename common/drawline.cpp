@@ -10,6 +10,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "drawline.h"
+#include "gbuffer.h"
 #include "graphicsviewport.h"
 #include <string.h>
 
@@ -65,6 +66,11 @@ void Buffer_Draw_Line(void* this_object, int sx, int sy, int dx, int dy, unsigne
 {
     GraphicViewPortClass& vp = *static_cast<GraphicViewPortClass*>(this_object);
     uint8_t* screen = reinterpret_cast<uint8_t*>(vp.Get_Offset());
+    Mark_Written(vp,
+                 sx < dx ? sx : dx,
+                 sy < dy ? sy : dy,
+                 (sx < dx ? dx - sx : sx - dx) + 1,
+                 (sy < dy ? dy - sy : sy - dy) + 1);
     int increment = 1;
 
     // Do we need to do any clipping

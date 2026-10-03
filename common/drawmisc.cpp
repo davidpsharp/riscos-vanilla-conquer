@@ -33,6 +33,7 @@ void Fat_Put_Pixel(int x, int y, int value, int size, GraphicViewPortClass& gvp)
         return;
     }
 
+    Mark_Written(gvp, x, y, size, size);
     buf = reinterpret_cast<char*>(x + (gvp.Get_Pitch() + gvp.Get_XAdd() + gvp.Get_Width()) * y + gvp.Get_Offset());
     w = size;
     pitch = gvp.Get_Pitch() + gvp.Get_XAdd() + gvp.Get_Width();

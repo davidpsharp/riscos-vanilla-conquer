@@ -341,6 +341,9 @@ bool GraphicViewPortClass::DD_Linear_Blit_To_Linear(GraphicViewPortClass& dest,
  *   09-19-95 12:33pm ST : Created                                                             *
  *   10/09/1995     : Moved actually functionality to GraphicBuffer                            *
  *=============================================================================================*/
+void (*Video_Written_Hook)(VideoSurface* surface, int x, int y, int w, int h) = nullptr;
+unsigned Video_Mark_Count;
+
 bool GraphicViewPortClass::Lock()
 {
     bool lock = GraphicBuff->Lock();

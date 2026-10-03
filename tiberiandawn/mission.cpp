@@ -43,6 +43,7 @@
  *   MissionClass::Set_Mission -- Sets the mission to the specified value.                     *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "phasetime.h"
 #include "function.h"
 
 /***********************************************************************************************
@@ -244,6 +245,7 @@ void MissionClass::AI(void)
     **	This is the script AI equivalent processing.
     */
     if (Timer.Expired() && Strength > 0) {
+        PhaseTimer timer(PHASE_MISSION);
         switch (Mission) {
         default:
         case MISSION_STICKY:

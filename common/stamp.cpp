@@ -10,6 +10,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "endianness.h"
+#include "gbuffer.h"
 #include "graphicsviewport.h"
 #include <string.h>
 #include <stdint.h>
@@ -107,6 +108,7 @@ void Buffer_Draw_Stamp(void* thisptr, void* icondata, int icon, int x, int y, co
 {
     GraphicViewPortClass& viewport = *static_cast<GraphicViewPortClass*>(thisptr);
     IconControlType* tileset = static_cast<IconControlType*>(icondata);
+    Mark_Written(viewport, 0, 0, 0, 0); // see gbuffer.h
 
     if (!tileset) {
         return;
@@ -119,6 +121,7 @@ void Buffer_Draw_Stamp(void* thisptr, void* icondata, int icon, int x, int y, co
     int32_t icon_index = MapPtr != nullptr ? MapPtr[icon] : icon;
 
     if (icon_index < IconCount) {
+        Mark_Written(viewport, x, y, IconWidth, IconHeight);
 
         int32_t fullpitch = viewport.Get_Pitch() + viewport.Get_XAdd() + viewport.Get_Width();
         uint8_t* dst = x + y * fullpitch + reinterpret_cast<uint8_t*>(viewport.Get_Offset());
@@ -178,6 +181,7 @@ void Buffer_Draw_Stamp_Clip(void const* thisptr,
 {
     const GraphicViewPortClass& viewport = *static_cast<const GraphicViewPortClass*>(thisptr);
     const IconControlType* tileset = static_cast<const IconControlType*>(icondata);
+    Mark_Written(viewport, 0, 0, 0, 0); // see gbuffer.h
 
     if (!tileset) {
         return;
@@ -190,6 +194,7 @@ void Buffer_Draw_Stamp_Clip(void const* thisptr,
     int icon_index = MapPtr != nullptr ? MapPtr[icon] : icon;
 
     if (icon_index < IconCount) {
+        Mark_Written(viewport, left + x, top + y, IconWidth, IconHeight);
         int blit_height = IconHeight;
         int blit_width = IconWidth;
         const uint8_t* src = &StampPtr[IconSize * icon_index];

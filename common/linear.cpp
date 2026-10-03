@@ -10,6 +10,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "linear.h"
+#include "gbuffer.h"
 #include "graphicsviewport.h"
 #include <algorithm>
 #include <string.h>
@@ -27,6 +28,7 @@ int Linear_Blit_To_Linear(void* thisptr,
     GraphicViewPortClass& src_vp = *static_cast<GraphicViewPortClass*>(thisptr);
     GraphicViewPortClass& dst_vp = *static_cast<GraphicViewPortClass*>(dest);
     unsigned char* src = reinterpret_cast<unsigned char*>(src_vp.Get_Offset());
+    Mark_Written(dst_vp, 0, 0, 0, 0); // see gbuffer.h
     unsigned char* dst = reinterpret_cast<unsigned char*>(dst_vp.Get_Offset());
     int src_pitch = (src_vp.Get_Pitch() + src_vp.Get_XAdd() + src_vp.Get_Width());
     int dst_pitch = (dst_vp.Get_Pitch() + dst_vp.Get_XAdd() + dst_vp.Get_Width());
@@ -43,6 +45,8 @@ int Linear_Blit_To_Linear(void* thisptr,
 
     h = (dst_y + h) > dst_vp.Get_Height() ? dst_vp.Get_Height() - 1 - dst_y : h;
     w = (dst_x + w) > dst_vp.Get_Width() ? dst_vp.Get_Width() - 1 - dst_x : w;
+
+    Mark_Written(dst_vp, dst_x, dst_y, w, h);
 
     // move our pointers to the start locations
     src += src_x + src_y * src_pitch;
@@ -118,9 +122,11 @@ bool Linear_Scale_To_Linear(void* thisptr,
     GraphicViewPortClass& src_vp = *static_cast<GraphicViewPortClass*>(thisptr);
     GraphicViewPortClass& dst_vp = *static_cast<GraphicViewPortClass*>(dest);
     // If there is nothing to scale, just return.
+    Mark_Written(dst_vp, 0, 0, 0, 0); // see gbuffer.h
     if (src_width <= 0 || src_height <= 0 || dst_width <= 0 || dst_height <= 0) {
         return true;
     }
+    Mark_Written(dst_vp, dst_x, dst_y, dst_width, dst_height);
 
     int src_x0 = src_x;
     int src_y0 = src_y;

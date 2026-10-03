@@ -317,6 +317,7 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
 {
     GraphicViewPortClass& vp = *static_cast<GraphicViewPortClass*>(thisptr);
     const FontHeader* fntheader = reinterpret_cast<const FontHeader*>(FontPtr);
+    Mark_Written(vp, 0, 0, 0, 0); // see gbuffer.h
     int pitch = vp.Get_XAdd() + vp.Get_Width() + vp.Get_Pitch();
     unsigned char* offset = y * pitch + reinterpret_cast<unsigned char*>(vp.Get_Offset());
     unsigned char* dst = x + offset;
@@ -336,6 +337,7 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
         // Check if we are drawing in bounds, we don't draw clipped text
         if (y + fntheight <= vp.Get_Height()) {
             int fntbottom = y + fntheight;
+            Mark_Written(vp, x, y, vp.Get_Width() - x, fntheight); // and each new line below
             // Set colors to draw with
             ColorXlat[0][1] = fground;
             ColorXlat[0][0] = bground;
@@ -369,6 +371,7 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
                     dst = ydisplace * pitch + offset + x;
                     offset += ydisplace * pitch;
                     fntbottom += ydisplace;
+                    Mark_Written(vp, 0, fntbottom - ydisplace, vp.Get_Width(), ydisplace);
                 }
 
                 // Move to the start of the next char
@@ -391,6 +394,7 @@ int Buffer_Print(void* thisptr, const char* string, int x, int y, int fground, i
                     dst = ydisplace * pitch + offset + x;
                     offset += ydisplace * pitch;
                     fntbottom += ydisplace;
+                    Mark_Written(vp, 0, fntbottom - ydisplace, vp.Get_Width(), ydisplace);
 
                     continue;
                 }

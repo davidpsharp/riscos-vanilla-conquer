@@ -20,6 +20,10 @@ static unsigned long long Bench_Rtti_Us[32];
 static unsigned Frame_Rtti_Us[32];
 static unsigned Frame_Paths, Frame_Path_Us, Frame_Path_Longest_Us;
 static unsigned long long Bench_Paths, Bench_Path_Us;
+unsigned long long Dirty_Partial, Dirty_Full_Unknown, Dirty_Full_Other, Dirty_Tiles_Copied, Dirty_Missed,
+    Dirty_Unknown_Locks; // partial presents, from video_sdl1.cpp
+unsigned long long Dirty_Frames, Dirty_Tiles, Dirty_Tiles_Total, Dirty_Bands, Dirty_Bands_Total, Dirty_Box_Pixels,
+    Dirty_Pixels_Total; // VC_DIRTYSTAT, from video_sdl1.cpp
 static unsigned Bench_Rtti_Calls[32];
 static unsigned Bench_Started = 0;
 static unsigned Bench_Worst_Ms = 0;
@@ -253,9 +257,32 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_PRESENT] * per,
             Bench_Us[PHASE_SLEEP] * per);
     fprintf(stderr,
-            "bench paths: %.1f Find_Path calls a frame, %.2f ms/frame\n",
+            "bench paths: %.1f Find_Path calls a frame, %.2f ms/frame; missions %.2f ms/frame, of which looking for "
+            "targets %.2f\n",
             double(Bench_Paths) / frames,
-            Bench_Path_Us * per);
+            Bench_Path_Us * per,
+            Bench_Us[PHASE_MISSION] * per,
+            Bench_Us[PHASE_THREAT] * per);
+    if (Dirty_Partial + Dirty_Full_Unknown + Dirty_Full_Other > 0) {
+        fprintf(stderr,
+                "bench presents: %llu partial (%.1f tiles each), %llu full after unmarked drawing, %llu full otherwise; "
+                "%llu unmarked locks; %llu tiles missed\n",
+                Dirty_Partial,
+                Dirty_Partial ? double(Dirty_Tiles_Copied) / Dirty_Partial : 0.0,
+                Dirty_Full_Unknown,
+                Dirty_Full_Other,
+                Dirty_Unknown_Locks,
+                Dirty_Missed);
+    }
+    if (Dirty_Frames > 0) {
+        fprintf(stderr,
+                "bench changed per full present (%llu): %.1f%% of 16x16 tiles, %.1f%% of 16-row bands, bounding box "
+                "%.1f%%\n",
+                Dirty_Frames,
+                100.0 * Dirty_Tiles / Dirty_Tiles_Total,
+                100.0 * Dirty_Bands / Dirty_Bands_Total,
+                100.0 * Dirty_Box_Pixels / Dirty_Pixels_Total);
+    }
     fprintf(stderr, "bench object AI ms/frame (calls/frame):");
     for (int i = 0; i < 32; ++i) {
         if (Bench_Rtti_Calls[i] != 0) {
@@ -330,10 +357,12 @@ void Phase_Frame_End()
         }
     }
     fprintf(stderr,
-            "] [paths: %u taking %u ms, longest %u ms]\n",
+            "] [paths: %u taking %u ms, longest %u ms] [missions %u, targets %u]\n",
             Frame_Paths,
             Frame_Path_Us / 1000,
-            Frame_Path_Longest_Us / 1000);
+            Frame_Path_Longest_Us / 1000,
+            Frame_Us[PHASE_MISSION] / 1000,
+            Frame_Us[PHASE_THREAT] / 1000);
 }
 
 void Phase_Report(unsigned elapsed_ms)

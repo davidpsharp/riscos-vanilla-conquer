@@ -10,6 +10,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 #include "debugstring.h"
+#include "gbuffer.h"
 #include "graphicsviewport.h"
 #include "keyframe.h"
 #include "shape.h"
@@ -1424,6 +1425,7 @@ void Buffer_Frame_To_Page(int x,
     unsigned char* fade_table = nullptr;
     unsigned char* ghost_table = nullptr;
     unsigned char* ghost_lookup = nullptr;
+    Mark_Written(viewport, 0, 0, 0, 0); // see gbuffer.h
 
     if (!shape) {
         return;
@@ -1532,6 +1534,7 @@ void Buffer_Frame_To_Page(int x,
     int ystart = y;
     int yend = y + height - 1;
     int xend = x + width - 1;
+    Mark_Written(viewport, x, y, width, height);
     int ms_img_offset = 0;
 
     // If we aren't drawing within the viewport, return.

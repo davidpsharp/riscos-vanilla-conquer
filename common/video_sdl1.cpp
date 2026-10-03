@@ -51,6 +51,9 @@
 #include "debugstring.h"
 
 #include <SDL.h>
+#ifdef __APPLE__
+#include <execinfo.h> // VC_DIRTYCHECK=2
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +61,7 @@
 
 extern WWKeyboardClass* Keyboard;
 static SDL_Surface* window;
+static unsigned Window_Generation; // a new window holds nothing presented
 static SDL_Color logpal[256], physpal[256];
 void Video_Settle_Front();
 
@@ -136,6 +140,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 
     Video_Settle_Front();
     window = SDL_SetVideoMode(w, h, 8, win_flags);
+    ++Window_Generation;
     if (window == nullptr) {
         DBG_ERROR("SDL_SetVideoMode failed: %s", SDL_GetError());
         Reset_Video_Mode();
@@ -204,6 +209,7 @@ void Toggle_Video_Fullscreen()
         new_window = SDL_SetVideoMode(window->w, window->h, 8, win_flags);
         if (new_window) {
             window = new_window;
+            ++Window_Generation;
 
             /* The palette needs to be restored when switching to a new video mode */
             SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
@@ -487,6 +493,62 @@ static void Copy_32(void* dst, const void* src, unsigned bytes)
 }
 #endif
 
+/*
+** VC_DIRTYSTAT: for each full present, count how much of the frame differs from the
+** last one, to judge whether presenting only what changed would pay. Measured in
+** 16x16 tiles, in full-width bands of 16 rows, and as one bounding rectangle.
+*/
+extern unsigned long long Dirty_Partial, Dirty_Full_Unknown, Dirty_Full_Other, Dirty_Tiles_Copied, Dirty_Missed,
+    Dirty_Unknown_Locks;
+extern unsigned long long Dirty_Frames, Dirty_Tiles, Dirty_Tiles_Total, Dirty_Bands, Dirty_Bands_Total, Dirty_Box_Pixels,
+    Dirty_Pixels_Total;
+
+static void Dirty_Stat(SDL_Surface* frame)
+{
+    static unsigned char* last = nullptr;
+    int w = frame->w, h = frame->h, pitch = frame->pitch;
+    const unsigned char* now = static_cast<const unsigned char*>(frame->pixels);
+    if (last == nullptr) {
+        last = static_cast<unsigned char*>(malloc(w * h));
+        for (int y = 0; y < h; ++y) {
+            memcpy(last + y * w, now + y * pitch, w);
+        }
+        return;
+    }
+    int tw = (w + 15) / 16, th = (h + 15) / 16;
+    int x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (int ty = 0; ty < th; ++ty) {
+        bool band = false;
+        for (int tx = 0; tx < tw; ++tx) {
+            bool tile = false;
+            for (int y = ty * 16; y < ty * 16 + 16 && y < h; ++y) {
+                int xs = tx * 16, n = xs + 16 <= w ? 16 : w - xs;
+                if (memcmp(now + y * pitch + xs, last + y * w + xs, n) != 0) {
+                    tile = true;
+                    break;
+                }
+            }
+            if (tile) {
+                ++Dirty_Tiles;
+                band = true;
+                x0 = tx * 16 < x0 ? tx * 16 : x0;
+                y0 = ty * 16 < y0 ? ty * 16 : y0;
+                x1 = tx * 16 + 15 > x1 ? tx * 16 + 15 : x1;
+                y1 = ty * 16 + 15 > y1 ? ty * 16 + 15 : y1;
+            }
+        }
+        Dirty_Bands += band ? 1 : 0;
+    }
+    Dirty_Tiles_Total += tw * th;
+    Dirty_Bands_Total += th;
+    Dirty_Box_Pixels += x1 >= 0 ? (unsigned long long)(x1 - x0 + 1) * (y1 - y0 + 1) : 0;
+    Dirty_Pixels_Total += (unsigned long long)w * h;
+    ++Dirty_Frames;
+    for (int y = 0; y < h; ++y) {
+        memcpy(last + y * w, now + y * pitch, w);
+    }
+}
+
 static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
 {
     int w = from->w < to->w ? from->w : to->w;
@@ -540,6 +602,14 @@ public:
     {
         surface = SDL_CreateRGBSurface(SDL_HWSURFACE, w, h, 8, 0, 0, 0, 0);
         SDL_SetPalette(surface, SDL_LOGPAL, logpal, 0, 256);
+        tiles_w = (w + TILE - 1) / TILE;
+        tiles_h = (h + TILE - 1) / TILE;
+        tiles.assign(size_t(tiles_w) * tiles_h, 0);
+        All_Surfaces->push_back(this);
+        static const bool partial = getenv("VC_PARTIALPRESENT") != nullptr;
+        if (partial) {
+            Video_Written_Hook = Written;
+        }
 
         if (flags & GBC_VISIBLE) {
             frontSurface = this;
@@ -548,6 +618,15 @@ public:
 
     virtual ~VideoSurfaceSDL1()
     {
+        for (size_t i = 0; i < All_Surfaces->size(); ++i) {
+            if ((*All_Surfaces)[i] == this) {
+                All_Surfaces->erase(All_Surfaces->begin() + i);
+                break;
+            }
+        }
+        if (frontSurface != nullptr && frontSurface->screen_holds == this) {
+            frontSurface->screen_holds = nullptr;
+        }
         if (frontSurface != nullptr && frontSurface->mirror == this) {
             frontSurface->Settle();
         }
@@ -585,11 +664,21 @@ public:
     {
         Touch();
         changed = true; // Anything that draws on the surface locks it first.
+        marks_at_lock = Video_Mark_Count;
         return (SDL_LockSurface(surface) == 0);
     }
 
     virtual bool Unlock()
     {
+        static const bool strict = getenv("VC_DIRTYCHECK") != nullptr && atoi(getenv("VC_DIRTYCHECK")) == 2;
+        if (strict && shadow_of == this) {
+            fprintf(stderr, "dirtycheck: (at unlock)\n");
+            Check_Unmarked_Now();
+        }
+        if (Video_Mark_Count == marks_at_lock) {
+            all_dirty = true; // locked by something that doesn't say where it draws
+            ++Dirty_Unknown_Locks;
+        }
         SDL_UnlockSurface(surface);
         return true;
     }
@@ -601,6 +690,7 @@ public:
         ((VideoSurfaceSDL1*)src)->Touch();
         Touch();
         changed = true;
+        Mark(destRectSDL.x, destRectSDL.y, destRectSDL.w, destRectSDL.h);
         SDL_BlitSurface(((VideoSurfaceSDL1*)src)->surface, &srcRectSDL, surface, &destRectSDL);
     }
 
@@ -609,6 +699,7 @@ public:
         SDL_Rect rectSDL = Make_SDL_Rect(rect.X, rect.Y, rect.Width + 1, rect.Height + 1);
         Touch();
         changed = true;
+        Mark(rectSDL.x, rectSDL.y, rectSDL.w, rectSDL.h);
         SDL_FillRect(surface, &rectSDL, color);
     }
 
@@ -669,7 +760,7 @@ public:
         }
         if (!mirror_shown) {
             Raw_Copy(from->surface, surface);
-        } else if (window != nullptr) {
+        } else if (window != nullptr && window->pixels != nullptr) {
             // The frame is on the screen, with the cursor drawn over it.
             Raw_Copy(window, surface);
             if (last_cursor) {
@@ -701,7 +792,8 @@ public:
             Present_Shaken();
             return;
         }
-        bool full = changed || always_full || !presented || Shake_Undo;
+        bool force_full = always_full || !presented || Shake_Undo; // copy all of it, not just what changed
+        bool full = changed || force_full;
         Shake_Undo = false;
         if (!full && cursor == last_cursor && Cursor_Generation == last_generation
             && (!cursor || (area.x == last_area.x && area.y == last_area.y))) {
@@ -746,7 +838,18 @@ public:
             }
 
             if (full) {
-                Raw_Copy(frame, window);
+                static const bool dirty_stat = getenv("VC_DIRTYSTAT") != nullptr;
+                if (dirty_stat) {
+                    Dirty_Stat(frame);
+                }
+                if (!Copy_Changed(frame, drawn, cursor, force_full)) {
+                    static const bool check = getenv("VC_DIRTYCHECK") != nullptr;
+                    if (check && mirror != nullptr) {
+                        Check_Marks(frame, drawn, cursor, false); // just take a copy
+                        ++Presents;
+                    }
+                    Raw_Copy(frame, window);
+                }
             } else {
                 dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
                 if (dirty.w > 0 && dirty.h > 0) {
@@ -761,9 +864,19 @@ public:
             if (mirror != nullptr) {
                 mirror_shown = true;
             }
+            if (full) {
+                // What the screen now holds, for the next present to copy only changes to it.
+                screen_holds = mirror;
+                screen_generation = Window_Generation;
+                if (mirror != nullptr) {
+                    mirror->Clear_Marks();
+                }
+            }
         }
 
-        if (full) {
+        if (full && !spans.empty()) {
+            SDL_UpdateRects(window, int(spans.size()), &spans[0]);
+        } else if (full) {
             SDL_Flip(window);
         } else if (dirty.w > 0 && dirty.h > 0) {
             SDL_UpdateRects(window, 1, &dirty);
@@ -816,6 +929,7 @@ private:
         Shake_Undo = true;
         last_cursor = false;
         presented = true;
+        screen_holds = nullptr;
     }
 
     // About to be read or written: make sure it holds what it should.
@@ -911,6 +1025,231 @@ private:
         SDL_UnlockSurface(on);
     }
 
+    /*
+    ** Partial presents. Each surface keeps a grid of 16x16 tiles, marked as the
+    ** drawing routines report what they write (Mark_Written, via Written). When the
+    ** screen already holds this surface's last frame, a present copies only the tiles
+    ** written since, plus the cursor's old and new places: in a busy battle about 6%
+    ** of the screen changes per frame. A lock that ends with nothing marked means
+    ** something drew without saying where, so then the whole surface is copied.
+    **
+    ** For now it's only on with VC_PARTIALPRESENT=1. On the StrongARM Risc PC it
+    ** halved the present time in the battle benchmark (10.7 to 5.2 ms/frame), but
+    ** marking added to the drawing time, and a clean comparison is still to do.
+    ** VC_DIRTYCHECK=1 compares each partial present with the whole frame and reports
+    ** tiles that changed without being marked; VC_DIRTYCHECK=2 (slow) checks at
+    ** every drawing call and lock, with a backtrace on the Mac, to find the culprit.
+    */
+    enum
+    {
+        TILE_SHIFT = 4,
+        TILE = 1 << TILE_SHIFT
+    };
+
+    void Mark(int x, int y, int w, int h)
+    {
+        ++Video_Mark_Count;
+        if (w <= 0 || h <= 0 || x + w <= 0 || y + h <= 0) {
+            return;
+        }
+        int x0 = x < 0 ? 0 : x >> TILE_SHIFT;
+        int y0 = y < 0 ? 0 : y >> TILE_SHIFT;
+        int x1 = (x + w - 1) >> TILE_SHIFT;
+        int y1 = (y + h - 1) >> TILE_SHIFT;
+        if (x0 >= tiles_w || y0 >= tiles_h) {
+            return;
+        }
+        x1 = x1 < tiles_w ? x1 : tiles_w - 1;
+        y1 = y1 < tiles_h ? y1 : tiles_h - 1;
+        for (int ty = y0; ty <= y1; ++ty) {
+            memset(&tiles[size_t(ty) * tiles_w + x0], 1, x1 - x0 + 1 > 0 ? x1 - x0 + 1 : 0);
+        }
+    }
+
+    void Clear_Marks()
+    {
+        memset(&tiles[0], 0, tiles.size());
+        all_dirty = false;
+    }
+
+    // Video_Written_Hook.
+    static void Written(VideoSurface* where, int x, int y, int w, int h)
+    {
+        static const bool strict = getenv("VC_DIRTYCHECK") != nullptr && atoi(getenv("VC_DIRTYCHECK")) == 2;
+        if (strict && shadow_of != nullptr) {
+            shadow_of->Check_Unmarked_Now();
+            Last_Presents = Presents;
+#ifdef __APPLE__
+            Last_Depth = backtrace(Last_Frames, 10);
+            Last_Rect[0] = x;
+            Last_Rect[1] = y;
+            Last_Rect[2] = w;
+            Last_Rect[3] = h;
+#endif
+        }
+        static_cast<VideoSurfaceSDL1*>(where)->Mark(x, y, w, h);
+    }
+
+    /*
+    ** Copies the changed tiles of "frame" (the mirrored hidden surface, cursor drawn
+    ** in) to the screen, as spans of adjacent tiles, and lists them in "spans".
+    ** Returns false, copying nothing, if it all has to be copied.
+    */
+    bool Copy_Changed(SDL_Surface* frame, const SDL_Rect& drawn, bool cursor, bool force_full)
+    {
+        spans.clear();
+        if (Video_Written_Hook == nullptr || mirror == nullptr || force_full || mirror->all_dirty || screen_holds != mirror
+            || screen_generation != Window_Generation || frame->w != window->w || frame->h != window->h
+            || mirror->tiles_w != (window->w + TILE - 1) / TILE) {
+            if (mirror != nullptr) {
+                ++(mirror->all_dirty ? Dirty_Full_Unknown : Dirty_Full_Other);
+            }
+            return false;
+        }
+        std::vector<Uint8>& t = mirror->tiles;
+        if (last_cursor) {
+            mirror->Mark(last_drawn.x, last_drawn.y, last_drawn.w, last_drawn.h);
+        }
+        if (cursor) {
+            mirror->Mark(drawn.x, drawn.y, drawn.w, drawn.h);
+        }
+
+        static const bool check = getenv("VC_DIRTYCHECK") != nullptr;
+        if (check) {
+            Check_Marks(frame, drawn, cursor, true);
+            ++Presents;
+        }
+
+        SDL_LockSurface(frame);
+        SDL_LockSurface(window);
+        int tw = mirror->tiles_w;
+        for (int ty = 0; ty < mirror->tiles_h; ++ty) {
+            for (int tx = 0; tx < tw;) {
+                if (!t[size_t(ty) * tw + tx]) {
+                    ++tx;
+                    continue;
+                }
+                int start = tx;
+                while (tx < tw && t[size_t(ty) * tw + tx]) {
+                    ++tx;
+                }
+                SDL_Rect span = Make_SDL_Rect(start * TILE, ty * TILE, (tx - start) * TILE, TILE);
+                span.w = span.x + span.w > frame->w ? frame->w - span.x : span.w;
+                span.h = span.y + span.h > frame->h ? frame->h - span.y : span.h;
+                for (int row = 0; row < span.h; ++row) {
+                    Uint8* to = static_cast<Uint8*>(window->pixels) + (span.y + row) * window->pitch + span.x;
+                    const Uint8* from = static_cast<const Uint8*>(frame->pixels) + (span.y + row) * frame->pitch + span.x;
+#if defined(__riscos__) && defined(__arm__)
+                    if ((span.w & 31) == 0 && ((reinterpret_cast<uintptr_t>(to) | reinterpret_cast<uintptr_t>(from)) & 3) == 0) {
+                        Copy_32(to, from, unsigned(span.w));
+                        continue;
+                    }
+#endif
+                    memcpy(to, from, span.w);
+                }
+                spans.push_back(span);
+                Dirty_Tiles_Copied += tx - start;
+            }
+        }
+        SDL_UnlockSurface(window);
+        SDL_UnlockSurface(frame);
+        ++Dirty_Partial;
+        return true;
+    }
+
+    // VC_DIRTYCHECK: compare the frame with the last one presented, outside the marked tiles.
+    void Check_Marks(SDL_Surface* frame, const SDL_Rect& drawn, bool cursor, bool compare)
+    {
+        int w = frame->w, h = frame->h, tw = mirror->tiles_w;
+        if (compare && shadow_of == mirror && shadow.size() == size_t(w) * h) {
+            int missed = 0;
+            for (int ty = 0; ty < mirror->tiles_h; ++ty) {
+                for (int tx = 0; tx < tw; ++tx) {
+                    if (mirror->tiles[size_t(ty) * tw + tx]) {
+                        continue;
+                    }
+                    for (int y = ty * TILE; y < ty * TILE + TILE && y < h; ++y) {
+                        int x = tx * TILE, n = x + TILE <= w ? TILE : w - x;
+                        if (memcmp(static_cast<const Uint8*>(frame->pixels) + y * frame->pitch + x, &shadow[size_t(y) * w + x], n)
+                            != 0) {
+                            if (missed < 4) {
+                                fprintf(stderr, "dirtycheck: tile at %d,%d changed without being marked\n", x, ty * TILE);
+                            }
+                            ++missed;
+                            break;
+                        }
+                    }
+                }
+            }
+            Dirty_Missed += missed;
+        }
+        // Keep the frame without the cursor (put back what it covers in the copy).
+        shadow.resize(size_t(w) * h);
+        for (int y = 0; y < h; ++y) {
+            memcpy(&shadow[size_t(y) * w], static_cast<const Uint8*>(frame->pixels) + y * frame->pitch, w);
+        }
+        if (cursor && under.size() >= size_t(drawn.w) * drawn.h) {
+            for (int row = 0; row < drawn.h; ++row) {
+                memcpy(&shadow[size_t(drawn.y + row) * w + drawn.x], &under[size_t(row) * drawn.w], drawn.w);
+            }
+        }
+        shadow_of = mirror;
+    }
+
+    // VC_DIRTYCHECK=2 (slow): has an unmarked tile changed since the last present?
+    void Check_Unmarked_Now()
+    {
+        int w = surface->w, h = surface->h;
+        if (shadow.size() != size_t(w) * h) {
+            return;
+        }
+        for (int ty = 0; ty < tiles_h; ++ty) {
+            for (int tx = 0; tx < tiles_w; ++tx) {
+                if (tiles[size_t(ty) * tiles_w + tx]) {
+                    continue;
+                }
+                for (int y = ty * TILE; y < ty * TILE + TILE && y < h; ++y) {
+                    int x = tx * TILE, n = x + TILE <= w ? TILE : w - x;
+                    if (memcmp(static_cast<const Uint8*>(surface->pixels) + y * surface->pitch + x, &shadow[size_t(y) * w + x], n) != 0) {
+                        fprintf(stderr,
+                                "dirtycheck: unmarked write to tile at %d,%d, %u presents since the previous report, "
+                                "found at:\n",
+                                x,
+                                ty * TILE,
+                                Presents - Last_Presents);
+#ifdef __APPLE__
+                        void* frames[10];
+                        backtrace_symbols_fd(frames, backtrace(frames, 10), 2);
+                        fprintf(stderr,
+                                "dirtycheck: the previous report was %d,%d %dx%d from:\n",
+                                Last_Rect[0],
+                                Last_Rect[1],
+                                Last_Rect[2],
+                                Last_Rect[3]);
+                        backtrace_symbols_fd(Last_Frames, Last_Depth, 2);
+#endif
+                        tiles[size_t(ty) * tiles_w + tx] = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    static std::vector<VideoSurfaceSDL1*>* All_Surfaces; // never freed: surfaces outlive static destructors
+    static std::vector<Uint8> shadow;                    // VC_DIRTYCHECK: the last frame presented
+    static void* Last_Frames[10];
+    static int Last_Depth, Last_Rect[4];
+    static unsigned Presents, Last_Presents;
+    static VideoSurfaceSDL1* shadow_of;
+    std::vector<Uint8> tiles;
+    int tiles_w = 0, tiles_h = 0;
+    bool all_dirty = true;
+    unsigned marks_at_lock = 0;
+    VideoSurfaceSDL1* screen_holds = nullptr; // whose frame the screen shows, if any
+    unsigned screen_generation = 0;
+    std::vector<SDL_Rect> spans;
+
     // What was presented last, so an unchanged frame needn't be copied again.
     bool changed = true;
     bool presented = false;
@@ -930,6 +1269,13 @@ private:
     friend bool Video_Show_Hidden(VideoSurface* hidden);
     friend void Video_Settle_Front();
 };
+
+std::vector<VideoSurfaceSDL1*>* VideoSurfaceSDL1::All_Surfaces = new std::vector<VideoSurfaceSDL1*>;
+std::vector<Uint8> VideoSurfaceSDL1::shadow;
+void* VideoSurfaceSDL1::Last_Frames[10];
+unsigned VideoSurfaceSDL1::Presents, VideoSurfaceSDL1::Last_Presents;
+int VideoSurfaceSDL1::Last_Depth, VideoSurfaceSDL1::Last_Rect[4];
+VideoSurfaceSDL1* VideoSurfaceSDL1::shadow_of = nullptr;
 
 /*
 ** Blit_Display calls this instead of copying the hidden page to the visible one;
