@@ -7,13 +7,21 @@ the functions most often seen, both as the innermost frame ("self") and
 anywhere on the stack ("total").
 
 Usage: profile.py <debug sock> <elf> <seconds> [--interval s] [--exclude substr,...]
-Samples whose stack contains an --exclude substring (e.g. VQA_Play) are dropped.
+                  [--require substr] [--top N] [--stack bytes] [--fast] [--dump file]
+Samples whose stack contains an --exclude substring (e.g. VQA_Play) are dropped;
+with --require, only samples whose stack contains it (e.g. LogicClass::AI) are
+kept. The stack is a heuristic scan, so --require can let in a few strays.
 """
 import collections, json, os, socket, subprocess, sys, time
 
 sock_path, elf, seconds = sys.argv[1], sys.argv[2], float(sys.argv[3])
 interval = float(sys.argv[sys.argv.index("--interval") + 1]) if "--interval" in sys.argv else 0.05
 exclude = sys.argv[sys.argv.index("--exclude") + 1].split(",") if "--exclude" in sys.argv else []
+require = sys.argv[sys.argv.index("--require") + 1] if "--require" in sys.argv else None
+top = int(sys.argv[sys.argv.index("--top") + 1]) if "--top" in sys.argv else 15
+depth = int(sys.argv[sys.argv.index("--stack") + 1]) if "--stack" in sys.argv else 1024  # bytes of stack to scan
+fast = "--fast" in sys.argv  # just the PC and return address: several times the samples
+dump = sys.argv[sys.argv.index("--dump") + 1] if "--dump" in sys.argv else None  # append each sample's frames here
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def cmd(c):
@@ -48,6 +56,7 @@ def name(a):
 samples = []
 end = time.time() + seconds
 while time.time() < end:
+  try:
     cmd("pause")
     r = cmd("regs")
     regs = [int(x, 16) for x in r["regs"]]
@@ -59,7 +68,7 @@ while time.time() < end:
         usr = [x for x in b["banks"] if x["mode"] == "USR"][0]
         sp = int(usr["r13"], 16); frames = [int(usr["r14"], 16) & 0x03FFFFFC]
         frames.insert(0, -1)  # in the OS (SWI/IRQ)
-    m = cmd("mem %x 1024" % sp)
+    m = cmd("mem %x %d" % (sp, depth)) if not fast else {}
     if m.get("ok"):
         d = bytes.fromhex(m["data"])
         for i in range(0, len(d) - 3, 4):
@@ -68,10 +77,16 @@ while time.time() < end:
                 frames.append(w)
     cmd("resume")
     names = ["<os>" if a == -1 else name(a) for a in frames if a == -1 or lo <= a < hi]
-    if not any(e in n for n in names for e in exclude):
+    if not any(e in n for n in names for e in exclude) and (require is None or any(require in n for n in names)):
         samples.append(names)
     time.sleep(interval)
+  except (OSError, ValueError, KeyError):
+    time.sleep(0.5)  # the emulator is resetting or busy: skip this sample
 
+if dump:
+    with open(dump, "a") as f:
+        for s in samples:
+            f.write("\t".join(s) + "\n")
 selfc = collections.Counter(s[0] for s in samples if s)
 total = collections.Counter()
 for s in samples:
@@ -79,8 +94,12 @@ for s in samples:
         total[n] += 1
 print("%d samples" % len(samples))
 print("-- innermost --")
-for n, c in selfc.most_common(15):
+for n, c in selfc.most_common(top):
     print("%5.1f%%  %s" % (100.0 * c / len(samples), n[:100]))
+print("-- callers of the top innermost (the next frame) --")
+for n, c in selfc.most_common(10):
+    callers = collections.Counter(s[1] for s in samples if len(s) > 1 and s[0] == n)
+    print("%s: %s" % (n[:60], ", ".join("%s %d" % (k[:50], v) for k, v in callers.most_common(4))))
 print("-- anywhere on stack --")
 for n, c in total.most_common(40):
     print("%5.1f%%  %s" % (100.0 * c / len(samples), n[:100]))

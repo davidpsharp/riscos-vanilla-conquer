@@ -36,6 +36,13 @@ set(RISCOS_ABI_FLAGS "-march=${RISCOS_ARCH} -mtune=${RISCOS_TUNE} -fsigned-char 
 set(CMAKE_C_FLAGS_INIT "${RISCOS_ABI_FLAGS} ${RISCOS_EXTRA_FLAGS}")
 set(CMAKE_CXX_FLAGS_INIT
     "${RISCOS_ABI_FLAGS} -include ${CMAKE_CURRENT_LIST_DIR}/../compat/cxx11_compat.h ${RISCOS_EXTRA_FLAGS}")
+# -O2, not CMake's Release default of -O3: on a StrongARM Risc PC the -O3 build
+#   was 25% slower (77.2 against 61.7 ms per frame in riscos/bench's battle),
+#   presumably as its larger code fits the 16 KB instruction cache worse. -O1
+#   (65.0 ms) and -O2 with -flto (61.6 ms) were no better; -Os crashes GCC 4.7.
+#   (The _INIT variables would get CMake's -O3 appended, so set the cache.)
+set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "C flags for Release builds")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "C++ flags for Release builds")
 # Static link so the binary can be converted to an AIF absolute and run on
 # RISC OS 3.7 without SharedLibs.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static")

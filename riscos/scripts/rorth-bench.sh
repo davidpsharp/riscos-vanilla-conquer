@@ -13,7 +13,8 @@
 # GENERAL.MIX by riscos/bench/make-battle.py when it's missing: GDI 1 with 57
 # vehicles and 80 infantry set to Hunt and no win or lose triggers.
 #
-# RO_TARGET (default riscpc) and VC_APP (the !VanillaTD path there) override.
+# RO_TARGET (default riscpc) and VC_APP (the !VanillaTD path there) override;
+# BENCH_IMAGE picks the program to test (default build/riscos/vanillatd,ff8).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
@@ -40,7 +41,7 @@ cleanup()
 }
 trap cleanup EXIT
 
-"$RO" -t "$T" put build/riscos/vanillatd,ff8 "$APP.!RunImage" --type ff8 >/dev/null
+"$RO" -t "$T" put "${BENCH_IMAGE:-build/riscos/vanillatd,ff8}" "$APP.!RunImage" --type ff8 >/dev/null
 "$RO" -t "$T" put "$BATTLE" "$APP.INI.SCG01EA" --type fff >/dev/null
 "$RO" -t "$T" cmd "Set VC_BENCH $FRAMES" >/dev/null
 "$RO" -t "$T" cmd "Set VC_SEED $SEED" >/dev/null
