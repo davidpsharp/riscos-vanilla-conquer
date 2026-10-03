@@ -17,6 +17,7 @@
 # BENCH_IMAGE picks the program to test (default build/riscos/vanillatd,ff8), and
 # BENCH_VARS="NAME=value ..." sets more variables for the run (unset afterwards).
 # BENCH_MISSION=G3 (say) plays that campaign mission as it is instead of the battle.
+# BENCH_ARGS adds arguments for the game, e.g. BENCH_ARGS=-LOWRES.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
@@ -57,7 +58,7 @@ fi
 for v in ${BENCH_VARS:-}; do
     "$RO" -t "$T" cmd "Set ${v%%=*} ${v#*=}" >/dev/null
 done
-"$RO" -t "$T" launch "Run $APP -AUTOSTART=$MISSION" >/dev/null
+"$RO" -t "$T" launch "Run $APP -AUTOSTART=$MISSION ${BENCH_ARGS:-}" >/dev/null
 
 # The game holds stderr open until it exits; fetching it succeeds once it has.
 for _ in $(seq 1 120); do
