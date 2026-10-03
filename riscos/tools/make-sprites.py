@@ -12,7 +12,9 @@ its gradients more faithfully than ImageMagick's built-in renderer, but onto
 an opaque white background; so the transparency comes from ImageMagick's
 render. ImageMagick also does the downscaling.
 
-Usage: make-sprites.py <output directory>
+Usage: make-sprites.py <output directory> [game]
+  game: td (the default, !vanillatd from vanillatd_icon.svg) or ra (!vanillara
+  from vanillara_icon.svg).
 """
 import os
 import struct
@@ -21,8 +23,9 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SVG = os.path.join(ROOT, "resources", "vanillatd_icon.svg")
-NAME = "!vanillatd"
+GAME = sys.argv[2] if len(sys.argv) > 2 else "td"
+SVG = os.path.join(ROOT, "resources", "vanilla%s_icon.svg" % GAME)
+NAME = "!vanilla%s" % GAME
 
 
 def render(size, tmp):

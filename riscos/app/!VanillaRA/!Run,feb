@@ -1,0 +1,13 @@
+| !Run for Vanilla Conquer: Red Alert
+Set VanillaRA$Dir <Obey$Dir>
+IconSprites <VanillaRA$Dir>.!Sprites
+| SharedUnixLibrary is normally in !System; fall back to the copy shipped here.
+RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaRA$Dir>.Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
+| DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
+RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
+RMEnsure DigitalRenderer 0.56 RMLoad <VanillaRA$Dir>.Modules.DRenderer
+| The heap is in a dynamic area of its own (see redalert/startup.cpp).
+WimpSlot -min 6000K -max 6000K
+Run <VanillaRA$Dir>.!RunImage %*0 >/<VanillaRA$Dir>/stdout 2>/<VanillaRA$Dir>/stderr

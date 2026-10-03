@@ -40,6 +40,17 @@
 #include "common/paths.h"
 #include "common/utfargs.h"
 
+#ifdef __riscos__
+/*
+** RISC OS 3.x and 4 limit the application slot to 28 MB, which Red Alert doesn't
+** fit in. Defining these makes UnixLib put the heap in a dynamic area of its own
+** (up to 64 MB) instead, so !Run's WimpSlot only has to hold the program.
+*/
+#include <features.h>
+extern const char* const __dynamic_da_name = "Vanilla RA heap"; // extern: a const would be file local
+int __dynamic_da_max_size = 64 * 1024 * 1024;
+#endif
+
 extern char RedAlertINI[_MAX_PATH];
 
 bool Read_Private_Config_Struct(FileClass& file, NewConfigType* config);
