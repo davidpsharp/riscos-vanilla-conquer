@@ -62,6 +62,81 @@
 extern WWKeyboardClass* Keyboard;
 static SDL_Surface* window;
 static unsigned Window_Generation; // a new window holds nothing presented
+
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+
+/*
+** SDL 1.2's RISC OS port works out full screen pointer positions as if the screen
+** were the size of the surface. When there's no mode that size (320x200, say) it
+** uses a bigger one and centres the surface in it, and then the positions are
+** off by the centring, with y clamped to 0: the game sees the pointer stuck on the
+** top edge and scrolls the map north for ever. So for a centred surface, work the
+** position out from the OS pointer and the mode instead, and keep the pointer
+** inside the surface.
+*/
+static bool Centred_Surface(int& offx, int& offy)
+{
+    if (window == nullptr || window->offset == 0 || window->pitch <= 0) {
+        return false;
+    }
+    offx = window->offset % window->pitch;
+    offy = window->offset / window->pitch;
+    return true;
+}
+
+static int Mode_Variable(int var)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = -1;
+    regs.r[1] = var;
+    _kernel_swi(OS_ReadModeVariable, &regs, &regs);
+    return regs.r[2];
+}
+
+bool RISCOS_Pointer_Position(int& x, int& y)
+{
+    int offx, offy;
+    if (!Centred_Surface(offx, offy)) {
+        return false;
+    }
+    _kernel_swi_regs regs;
+    _kernel_swi(OS_Mouse, &regs, &regs);
+    x = (regs.r[0] >> Mode_Variable(4)) - offx;                     // XEigFactor
+    y = Mode_Variable(12) - (regs.r[1] >> Mode_Variable(5)) - offy; // YWindLimit, YEigFactor
+    x = x < 0 ? 0 : (x >= window->w ? window->w - 1 : x);
+    y = y < 0 ? 0 : (y >= window->h ? window->h - 1 : y);
+    return true;
+}
+
+// Keep the pointer inside a centred surface (OS_Word 21,1 sets the bounding box),
+// starting in the middle of it (OS_Word 21,3 moves it).
+static void Confine_Pointer()
+{
+    int offx, offy;
+    if (!Centred_Surface(offx, offy)) {
+        return;
+    }
+    int xeig = Mode_Variable(4), yeig = Mode_Variable(5), ymax = Mode_Variable(12);
+    int left = offx << xeig, right = (offx + window->w - 1) << xeig;
+    int bottom = (ymax - (offy + window->h - 1)) << yeig, top = (ymax - offy) << yeig;
+    unsigned char block[9] = {1,
+                              Uint8(left),
+                              Uint8(left >> 8),
+                              Uint8(bottom),
+                              Uint8(bottom >> 8),
+                              Uint8(right),
+                              Uint8(right >> 8),
+                              Uint8(top),
+                              Uint8(top >> 8)};
+    _kernel_osword(21, reinterpret_cast<int*>(block));
+
+    int cx = (left + right) / 2, cy = (bottom + top) / 2;
+    unsigned char move[5] = {3, Uint8(cx), Uint8(cx >> 8), Uint8(cy), Uint8(cy >> 8)};
+    _kernel_osword(21, reinterpret_cast<int*>(move));
+}
+#endif
 static SDL_Color logpal[256], physpal[256];
 void Video_Settle_Front();
 
@@ -161,6 +236,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         SDL_SetCursor(blank_cursor);
         SDL_ShowCursor(SDL_ENABLE);
     }
+    Confine_Pointer();
 #endif
 
     SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
@@ -263,6 +339,9 @@ void Get_Video_Mouse(int& x, int& y)
     if (Keyboard->Is_Gamepad_Active() || (Settings.Mouse.RawInput && (hwcursor.Clip || !Settings.Video.Windowed))) {
         x = hwcursor.X;
         y = hwcursor.Y;
+#ifdef __riscos__
+    } else if (RISCOS_Pointer_Position(x, y)) {
+#endif
     } else {
         SDL_GetMouseState(&x, &y);
     }

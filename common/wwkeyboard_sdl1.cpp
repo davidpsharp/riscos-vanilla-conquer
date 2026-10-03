@@ -53,6 +53,10 @@ unsigned SDL1_Mouse_Button_Events = 0;
 ** the position passed to the game, SDL's current mouse state (where the cursor
 ** is drawn) and, on RISC OS, where the OS pointer really is.
 */
+#ifdef __riscos__
+bool RISCOS_Pointer_Position(int& x, int& y); // video_sdl1.cpp
+#endif
+
 static void Log_Mouse_Button(const SDL_Event& event, int x, int y, bool stored)
 {
     static const bool enabled = getenv("VC_FPSLOG") != nullptr;
@@ -160,6 +164,10 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 
             if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {
                 Get_Video_Mouse(x, y);
+#ifdef __riscos__
+            } else if (RISCOS_Pointer_Position(x, y)) {
+                // A centred surface: SDL's event position is off (see video_sdl1.cpp).
+#endif
             } else {
                 float scale_x = 1.0f, scale_y = 1.0f;
                 Get_Video_Scale(scale_x, scale_y);
