@@ -43,14 +43,29 @@ enum PhaseCountId
     COUNT_DELAY_TOOK_MS,  // ...and time taken
     COUNT_MOTION_BETWEEN_FRAMES, // pointer moves picked up while the frame limiter sleeps
     COUNT_MOTION_BY_GAME,        // and by the game's own input handling
+    COUNT_STREAM_READS,      // music stream: reads from its file
+    COUNT_STREAM_SLOW_READS, // ...that took 20 ms or more
+    COUNT_STREAM_LONGEST_MS, // ...the longest
     COUNT_MAX
 };
 
 extern bool Phase_Timing;
+
+/*
+** Benchmark (VC_BENCH=<game frames>): run uncapped for that many game frames from
+** the first one, print the totals (Phase_Bench_Report) and exit.
+*/
+extern int Bench_Frames;
+void Phase_Object_AI(int rtti, unsigned us);   // one object's AI, by its RTTI
+void Phase_Bench_Report(unsigned frames);      // the totals since the first game frame
+unsigned Phase_Bench_Started_Us();
 extern unsigned Phase_Counts[COUNT_MAX];
 unsigned Phase_Now_Us();
 void Phase_Add(PhaseId id, unsigned us);
 void Phase_Report(unsigned elapsed_ms);
+
+// The music stream's file reads, for the report.
+void Phase_Stream_Read(unsigned us);
 
 // Sequential timing within one function: Begin, Switch to the next phase, End.
 void Phase_Timer_Begin(PhaseId id);

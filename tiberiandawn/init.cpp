@@ -2623,7 +2623,9 @@ void Init_Random(void)
         /*
         ** Set the optional user-specified seed
         */
-        if (CustomSeed != 0) {
+        if (getenv("VC_SEED") != nullptr) {
+            Seed = atoi(getenv("VC_SEED")); // the same battle every time, for benchmarks
+        } else if (CustomSeed != 0) {
             Seed = CustomSeed;
         } else {
             srand((unsigned)time(NULL));

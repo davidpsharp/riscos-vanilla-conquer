@@ -205,6 +205,15 @@ int main(int argc, char** argv)
     // Output is usually redirected to a file by !Run; don't lose it on a crash.
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
+    if (getenv("VC_FPSLOG") != nullptr) {
+        /*
+        ** Except when logging timings: then every line was a disc write, interleaved
+        ** with the music stream's reads from the same disc. Flushed every 5 seconds
+        ** with the report (Phase_Report), so a crash loses at most that.
+        */
+        static char stderr_buffer[16384];
+        setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
+    }
     // Record which build wrote this log.
     fprintf(stderr, "Vanilla Conquer TD %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
 #endif

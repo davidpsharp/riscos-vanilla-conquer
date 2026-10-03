@@ -88,16 +88,25 @@ static void Read_Frame(const MixerChannel* ch, const MixerSlot* slot, unsigned f
     }
 }
 
+/*
+** Mixes this channel into "mix" (stereo ints). Called for every channel on every
+** callback, so it matters on a slow machine: the frames in a slot are worked out
+** once per slot with a shift (the old loop divided for every sample, and an ARMv3
+** has no divide instruction), and the common case, 16 bit mono at the output rate,
+** has a loop of its own.
+*/
 static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
 {
-    int bytes_per_frame = (ch->BitsPerSample / 8) * ch->Channels;
+    const unsigned shift = (ch->BitsPerSample == 16 ? 1 : 0) + (ch->Channels > 1 ? 1 : 0); // log2 bytes per frame
+    int i = 0;
 
-    for (int i = 0; i < frames && ch->Playing; ++i) {
+    while (i < frames && ch->Playing) {
         MixerSlot* slot = &ch->Slots[ch->Head];
+        unsigned slot_frames = 0;
 
         // Move on to the next queued slot when this one runs out.
-        while (slot->State == SLOT_QUEUED && ch->Frame >= slot->Length / bytes_per_frame) {
-            ch->Frame -= unsigned(slot->Length / bytes_per_frame);
+        while (slot->State == SLOT_QUEUED && ch->Frame >= (slot_frames = unsigned(slot->Length >> shift))) {
+            ch->Frame -= slot_frames;
             ch->BytesPlayed += unsigned(slot->Length);
             slot->State = SLOT_DONE;
             ch->Head = (ch->Head + 1) % ch->SlotCount;
@@ -114,14 +123,38 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
             break;
         }
 
-        int left, right;
-        Read_Frame(ch, slot, ch->Frame, left, right);
-        mix[i * 2] += (int)(((long long)left * ch->Gain) >> 16);
-        mix[i * 2 + 1] += (int)(((long long)right * ch->Gain) >> 16);
+        unsigned frame = ch->Frame;
+        unsigned frac = ch->Frac;
+        const unsigned step = ch->Step;
+        const long long gain = ch->Gain;
 
-        unsigned pos = ch->Frac + ch->Step;
-        ch->Frame += pos >> 16;
-        ch->Frac = pos & 0xFFFF;
+        if (ch->BitsPerSample == 16 && ch->Channels == 1 && step == 0x10000) {
+            const unsigned char* p = slot->Data + frame * 2;
+            int n = frames - i;
+            if (unsigned(n) > slot_frames - frame) {
+                n = int(slot_frames - frame);
+            }
+            for (int k = 0; k < n; ++k, p += 2) {
+                int v = int(((short)(p[0] | (p[1] << 8)) * gain) >> 16);
+                mix[i * 2] += v;
+                mix[i * 2 + 1] += v;
+                ++i;
+            }
+            frame += unsigned(n);
+        } else {
+            for (; i < frames && frame < slot_frames; ++i) {
+                int left, right;
+                Read_Frame(ch, slot, frame, left, right);
+                mix[i * 2] += int((left * gain) >> 16);
+                mix[i * 2 + 1] += int((right * gain) >> 16);
+
+                unsigned pos = frac + step;
+                frame += pos >> 16;
+                frac = pos & 0xFFFF;
+            }
+        }
+        ch->Frame = frame;
+        ch->Frac = frac;
     }
 }
 
@@ -135,21 +168,38 @@ static void Lock_Audio()
 /*
 ** Several loud sounds at once add up past 16 bits. Rather than chop them off
 ** (harsh distortion), leave everything below 3/4 of full scale alone and bend
-** what's above it smoothly towards full scale.
+** what's above it smoothly towards full scale: knee + over * room / (over + room).
+** That's looked up in a table (in steps of 32) rather than divided per sample.
 */
+enum
+{
+    LIMIT_KNEE = 24576,
+    LIMIT_ROOM = 32767 - LIMIT_KNEE,
+    LIMIT_STEP_SHIFT = 5,
+    LIMIT_MAX_OVER = 200000,
+    LIMIT_TABLE_SIZE = (LIMIT_MAX_OVER >> LIMIT_STEP_SHIFT) + 2,
+};
+static unsigned short Limit_Table[LIMIT_TABLE_SIZE];
+
+static void Init_Limit_Table()
+{
+    for (int i = 0; i < LIMIT_TABLE_SIZE; ++i) {
+        unsigned over = unsigned(i) << LIMIT_STEP_SHIFT;
+        Limit_Table[i] = (unsigned short)(LIMIT_KNEE + over * unsigned(LIMIT_ROOM) / (over + unsigned(LIMIT_ROOM)));
+    }
+}
+
 static inline int Soft_Limit(int x)
 {
-    const int knee = 24576;
-    const int room = 32767 - knee;
     int a = x < 0 ? -x : x;
-    if (a <= knee) {
+    if (a <= LIMIT_KNEE) {
         return x;
     }
-    unsigned over = unsigned(a - knee);
-    if (over > 200000) {
-        over = 200000; // keeps over * room within 32 bits
+    unsigned over = unsigned(a - LIMIT_KNEE);
+    if (over > LIMIT_MAX_OVER) {
+        over = LIMIT_MAX_OVER;
     }
-    a = knee + int(over * unsigned(room) / (over + unsigned(room)));
+    a = Limit_Table[over >> LIMIT_STEP_SHIFT];
     return x < 0 ? -a : a;
 }
 
@@ -221,6 +271,7 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 
 bool Mixer_Init(int rate, bool reverse_channels)
 {
+    Init_Limit_Table();
     if (AudioOpen) {
         return true;
     }

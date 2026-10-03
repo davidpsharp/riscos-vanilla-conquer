@@ -10,10 +10,17 @@
 #include <unistd.h>
 #endif
 
-bool Phase_Timing = getenv("VC_FPSLOG") != nullptr;
+int Bench_Frames = getenv("VC_BENCH") ? atoi(getenv("VC_BENCH")) : 0;
+bool Phase_Timing = getenv("VC_FPSLOG") != nullptr || Bench_Frames > 0;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
 static unsigned Frame_Us[PHASE_COUNT]; // the current game frame's share
+static unsigned long long Bench_Us[PHASE_COUNT]; // since the first game frame
+static unsigned long long Bench_Rtti_Us[32];
+static unsigned Bench_Rtti_Calls[32];
+static unsigned Bench_Started = 0;
+static unsigned Bench_Worst_Ms = 0;
+static unsigned Bench_Over_100 = 0;
 static unsigned Frame_Started = 0;
 static intptr_t Frame_Heap = 0;
 
@@ -99,6 +106,7 @@ void Phase_Add(PhaseId id, unsigned us)
 {
     Phase_Us[id] += us;
     Frame_Us[id] += us;
+    Bench_Us[id] += us;
 }
 
 static PhaseId Seq_Phase;
@@ -132,6 +140,21 @@ void Phase_Timer_End()
     }
 }
 
+void Phase_Stream_Read(unsigned us)
+{
+    if (!Phase_Timing) {
+        return;
+    }
+    unsigned ms = us / 1000;
+    ++Phase_Counts[COUNT_STREAM_READS];
+    if (ms >= 20) {
+        ++Phase_Counts[COUNT_STREAM_SLOW_READS];
+    }
+    if (ms > Phase_Counts[COUNT_STREAM_LONGEST_MS]) {
+        Phase_Counts[COUNT_STREAM_LONGEST_MS] = ms;
+    }
+}
+
 void Phase_Frame_Begin()
 {
     if (!Phase_Timing) {
@@ -142,6 +165,71 @@ void Phase_Frame_Begin()
     }
     Frame_Started = Phase_Now_Us();
     Frame_Heap = Heap_Top();
+    if (Bench_Started == 0) {
+        Bench_Started = Frame_Started;
+        for (int i = 0; i < PHASE_COUNT; ++i) {
+            Bench_Us[i] = 0;
+        }
+    }
+}
+
+void Phase_Object_AI(int rtti, unsigned us)
+{
+    if (rtti >= 0 && rtti < 32) {
+        Bench_Rtti_Us[rtti] += us;
+        ++Bench_Rtti_Calls[rtti];
+    }
+}
+
+unsigned Phase_Bench_Started_Us()
+{
+    return Bench_Started;
+}
+
+void Phase_Bench_Report(unsigned frames)
+{
+    if (frames == 0) {
+        return;
+    }
+    unsigned total_ms = (Phase_Now_Us() - Bench_Started) / 1000;
+    double per = 1.0 / (1000.0 * frames); // us -> ms per frame
+    fprintf(stderr,
+            "bench: %u game frames in %u ms = %.2f ms/frame (%.1f frames/s); slowest frame %u ms; %u frames of 100 ms "
+            "or more\n",
+            frames,
+            total_ms,
+            double(total_ms) / frames,
+            frames * 1000.0 / (total_ms ? total_ms : 1),
+            Bench_Worst_Ms,
+            Bench_Over_100);
+    fprintf(stderr,
+            "bench ms/frame: draw %.2f (map %.2f) logic %.2f [teams %.2f objects %.2f map %.2f factories %.2f houses "
+            "%.2f] callback %.2f present %.2f sleep %.2f\n",
+            Bench_Us[PHASE_RENDER] * per,
+            Bench_Us[PHASE_TACTICAL] * per,
+            Bench_Us[PHASE_LOGIC] * per,
+            Bench_Us[PHASE_LOGIC_TEAMS] * per,
+            Bench_Us[PHASE_LOGIC_OBJECTS] * per,
+            Bench_Us[PHASE_LOGIC_MAP] * per,
+            Bench_Us[PHASE_LOGIC_FACTORIES] * per,
+            Bench_Us[PHASE_LOGIC_HOUSES] * per,
+            Bench_Us[PHASE_CALLBACK] * per,
+            Bench_Us[PHASE_PRESENT] * per,
+            Bench_Us[PHASE_SLEEP] * per);
+    static const char* const names[] = {"none", "infantry", "?", "unit", "?", "aircraft", "?", "building", "?",
+                                        "terrain", "?", "anim", "?", "bullet", "?", "overlay", "?", "smudge"};
+    fprintf(stderr, "bench object AI ms/frame (calls/frame):");
+    for (int i = 0; i < 32; ++i) {
+        if (Bench_Rtti_Calls[i] != 0) {
+            fprintf(stderr,
+                    " %s %.2f (%.1f)",
+                    i < int(sizeof(names) / sizeof(names[0])) ? names[i] : "other",
+                    Bench_Rtti_Us[i] * per,
+                    double(Bench_Rtti_Calls[i]) / frames);
+        }
+    }
+    fprintf(stderr, "\n");
+    fflush(stderr);
 }
 
 /*
@@ -155,6 +243,12 @@ void Phase_Frame_End()
     }
     static const unsigned threshold = getenv("VC_STALLMS") ? unsigned(atoi(getenv("VC_STALLMS"))) : 150;
     unsigned took = (Phase_Now_Us() - Frame_Started) / 1000;
+    if (took > Bench_Worst_Ms) {
+        Bench_Worst_Ms = took;
+    }
+    if (took >= 100) {
+        ++Bench_Over_100;
+    }
     if (took < threshold) {
         return;
     }
@@ -210,6 +304,13 @@ void Phase_Report(unsigned elapsed_ms)
                 Phase_Counts[COUNT_MOTION_BETWEEN_FRAMES],
                 Phase_Counts[COUNT_MOTION_BY_GAME]);
     }
+    if (Phase_Counts[COUNT_STREAM_READS] != 0) {
+        fprintf(stderr,
+                "stream: %u reads, %u of 20 ms or more, longest %u ms\n",
+                Phase_Counts[COUNT_STREAM_READS],
+                Phase_Counts[COUNT_STREAM_SLOW_READS],
+                Phase_Counts[COUNT_STREAM_LONGEST_MS]);
+    }
     if (Phase_Counts[COUNT_DELAY_ASKED_MS] != 0) {
         fprintf(stderr,
                 "delays: asked %u ms, took %u ms\n",
@@ -251,4 +352,5 @@ void Phase_Report(unsigned elapsed_ms)
             ms[PHASE_PRESENT] * scale,
             ms[PHASE_SLEEP] * scale,
             elapsed_ms > accounted ? (elapsed_ms - accounted) * scale : 0.0);
+    fflush(stderr); // stderr is fully buffered while logging (see main)
 }

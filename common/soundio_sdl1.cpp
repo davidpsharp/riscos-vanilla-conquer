@@ -8,7 +8,7 @@
 // With VC_FPSLOG set, log each sound's start and stop, with bytes queued and played.
 static bool Sound_Log()
 {
-    static const bool enabled = getenv("VC_FPSLOG") != nullptr;
+    static const bool enabled = getenv("VC_SOUNDLOG") != nullptr;
     return enabled;
 }
 

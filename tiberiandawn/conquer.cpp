@@ -1645,7 +1645,7 @@ bool Main_Loop()
         framedelay = 60 / DesiredFrameRate;
         FrameTimer.Set(framedelay);
     } else {
-        FrameTimer.Set(Options.GameSpeed);
+        FrameTimer.Set(Bench_Frames > 0 ? 0 : Options.GameSpeed); // the benchmark runs flat out
     }
 
     /*
@@ -1828,6 +1828,23 @@ bool Main_Loop()
 
     Sync_Delay();
     Phase_Frame_End();
+    if (Bench_Frames > 0) {
+        static int frames = 0;
+        if (++frames >= Bench_Frames) {
+            Phase_Bench_Report(frames);
+            fprintf(stderr,
+                    "bench objects at the end: units %d infantry %d buildings %d aircraft %d bullets %d anims %d\n",
+                    Units.Count(),
+                    Infantry.Count(),
+                    Buildings.Count(),
+                    Aircraft.Count(),
+                    Bullets.Count(),
+                    Anims.Count());
+            fflush(stderr);
+            Sound_End(); // stop the audio thread first, as the game's own exit does
+            exit(0);
+        }
+    }
     //	InMainLoop = false;
     return (!GameActive);
 }
@@ -2183,6 +2200,9 @@ extern void Play_Movie_GlyphX(const char* movie_name, ThemeType theme);
 
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn)
 {
+    if (Bench_Frames > 0) {
+        return; // the benchmark goes straight to the game
+    }
 #if REMASTER_BUILD
     if (strcmp(name, "x") == 0 || strcmp(name, "X") == 0) {
         return;

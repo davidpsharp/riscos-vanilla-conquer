@@ -418,7 +418,9 @@ static bool File_Callback(short id, short* odd, void** buffer, int* size)
                 int psize;
                 {
                     PhaseTimer file_timer(PHASE_CB_STREAM_FILE);
+                    unsigned started = Phase_Timing ? Phase_Now_Us() : 0;
                     psize = Read_File(st->FileHandle, tofill, LockedData.StreamBufferSize);
+                    Phase_Stream_Read(Phase_Timing ? Phase_Now_Us() - started : 0);
                 }
 
                 if (psize != LockedData.StreamBufferSize) {
@@ -462,9 +464,11 @@ static void File_Stream_Preload(int index)
 
     for (i = st->FilePending; i < num; ++i) {
         PhaseTimer file_timer(PHASE_CB_STREAM_FILE);
+        unsigned started = Phase_Timing ? Phase_Now_Us() : 0;
         int size = Read_File(st->FileHandle,
                              static_cast<char*>(st->FileBuffer) + i * LockedData.StreamBufferSize,
                              LockedData.StreamBufferSize);
+        Phase_Stream_Read(Phase_Timing ? Phase_Now_Us() - started : 0);
 
         if (size > 0) {
             st->FilePendingSize = size;

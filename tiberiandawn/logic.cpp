@@ -208,7 +208,14 @@ void LogicClass::AI(void)
         ObjectClass* obj = (*this)[index];
         int count = Count();
 
-        obj->AI();
+        if (Phase_Timing) {
+            unsigned started = Phase_Now_Us();
+            int rtti = obj->What_Am_I();
+            obj->AI();
+            Phase_Object_AI(rtti, Phase_Now_Us() - started);
+        } else {
+            obj->AI();
+        }
 
         /*
         **	If the object was destroyed in the process of performing its AI, then
