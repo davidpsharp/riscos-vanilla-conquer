@@ -214,6 +214,11 @@ int main(int argc, char** argv)
         static char stderr_buffer[16384];
         setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
     }
+    if (getenv("VC_BLITTEST") != nullptr) {
+        void Blit_Self_Test();
+        Blit_Self_Test();
+        return 0;
+    }
     // Record which build wrote this log.
     fprintf(stderr, "Vanilla Conquer TD %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
 #endif

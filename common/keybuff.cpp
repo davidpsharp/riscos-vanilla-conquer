@@ -16,6 +16,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "blit_arm.h"
 
 #define SHP_HAS_PAL            0x0001
 #define SHP_LCW_FRAME          0x80
@@ -110,6 +113,20 @@ static inline void Trans_Rows(int width, int height, unsigned char* dst, const u
     }
 }
 
+#ifdef BLIT_ARM_AVAILABLE
+BLIT_ROUTINE(Blit_Trans_ARM, TRANS_PIXEL(0), TRANS_PIXEL(1), TRANS_PIXEL(2), TRANS_PIXEL(3));
+BLIT_ROUTINE(Blit_Ghost_Trans_ARM, GHOST_PIXEL(0), GHOST_PIXEL(1), GHOST_PIXEL(2), GHOST_PIXEL(3));
+BLIT_ROUTINE(Blit_Fading_Trans_ARM, FADE_PIXEL(0), FADE_PIXEL(1), FADE_PIXEL(2), FADE_PIXEL(3));
+BLIT_ROUTINE(Blit_Ghost_Fading_Trans_ARM,
+             GHOST_FADE_PIXEL(0),
+             GHOST_FADE_PIXEL(1),
+             GHOST_FADE_PIXEL(2),
+             GHOST_FADE_PIXEL(3));
+
+// VC_BLITC selects the C blitters instead, for comparison.
+static const bool Blit_Use_ARM = getenv("VC_BLITC") == nullptr;
+#endif
+
 // Just copy source to dest as is.
 void BF_Copy(int width,
              int height,
@@ -130,7 +147,7 @@ void BF_Copy(int width,
 }
 
 // Index 0 transparency
-void BF_Trans(int width,
+static void BF_Trans_C(int width,
               int height,
               unsigned char* dst,
               unsigned char* src,
@@ -144,6 +161,26 @@ void BF_Trans(int width,
     Trans_Rows(width, height, dst, src, dst_pitch, src_pitch, [](unsigned char* d, unsigned char sbyte) {
         *d = sbyte;
     });
+}
+
+void BF_Trans(int width,
+              int height,
+              unsigned char* dst,
+              unsigned char* src,
+              int dst_pitch,
+              int src_pitch,
+              unsigned char* ghost_lookup,
+              unsigned char* ghost_tab,
+              unsigned char* fade_tab,
+              int count)
+{
+#ifdef BLIT_ARM_AVAILABLE
+    if (Blit_Use_ARM) {
+        Blit_Trans_ARM(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
+        return;
+    }
+#endif
+    BF_Trans_C(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
 }
 
 // Fading table based shadow and transparency
@@ -176,7 +213,7 @@ void BF_Ghost(int width,
 }
 
 // Fading table based shadow and transparency with index 0 ignored
-void BF_Ghost_Trans(int width,
+static void BF_Ghost_Trans_C(int width,
                     int height,
                     unsigned char* dst,
                     unsigned char* src,
@@ -194,6 +231,26 @@ void BF_Ghost_Trans(int width,
         }
         *d = sbyte;
     });
+}
+
+void BF_Ghost_Trans(int width,
+                    int height,
+                    unsigned char* dst,
+                    unsigned char* src,
+                    int dst_pitch,
+                    int src_pitch,
+                    unsigned char* ghost_lookup,
+                    unsigned char* ghost_tab,
+                    unsigned char* fade_tab,
+                    int count)
+{
+#ifdef BLIT_ARM_AVAILABLE
+    if (Blit_Use_ARM) {
+        Blit_Ghost_Trans_ARM(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
+        return;
+    }
+#endif
+    BF_Ghost_Trans_C(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
 }
 
 void BF_Fading(int width,
@@ -223,7 +280,7 @@ void BF_Fading(int width,
     }
 }
 
-void BF_Fading_Trans(int width,
+static void BF_Fading_Trans_C(int width,
                      int height,
                      unsigned char* dst,
                      unsigned char* src,
@@ -246,6 +303,26 @@ void BF_Fading_Trans(int width,
         }
         *d = sbyte;
     });
+}
+
+void BF_Fading_Trans(int width,
+                     int height,
+                     unsigned char* dst,
+                     unsigned char* src,
+                     int dst_pitch,
+                     int src_pitch,
+                     unsigned char* ghost_lookup,
+                     unsigned char* ghost_tab,
+                     unsigned char* fade_tab,
+                     int count)
+{
+#ifdef BLIT_ARM_AVAILABLE
+    if (Blit_Use_ARM && count == 1) {
+        Blit_Fading_Trans_ARM(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
+        return;
+    }
+#endif
+    BF_Fading_Trans_C(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
 }
 
 void BF_Ghost_Fading(int width,
@@ -280,7 +357,7 @@ void BF_Ghost_Fading(int width,
     }
 }
 
-void BF_Ghost_Fading_Trans(int width,
+static void BF_Ghost_Fading_Trans_C(int width,
                            int height,
                            unsigned char* dst,
                            unsigned char* src,
@@ -311,6 +388,27 @@ void BF_Ghost_Fading_Trans(int width,
         }
         *d = sbyte;
     });
+}
+
+void BF_Ghost_Fading_Trans(int width,
+                           int height,
+                           unsigned char* dst,
+                           unsigned char* src,
+                           int dst_pitch,
+                           int src_pitch,
+                           unsigned char* ghost_lookup,
+                           unsigned char* ghost_tab,
+                           unsigned char* fade_tab,
+                           int count)
+{
+#ifdef BLIT_ARM_AVAILABLE
+    if (Blit_Use_ARM && count == 1) {
+        Blit_Ghost_Fading_Trans_ARM(
+            width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
+        return;
+    }
+#endif
+    BF_Ghost_Fading_Trans_C(width, height, dst, src, dst_pitch, src_pitch, ghost_lookup, ghost_tab, fade_tab, count);
 }
 
 void BF_Predator(int width,
@@ -651,6 +749,52 @@ void BF_Predator_Ghost_Fading_Trans(int width,
         dst += dst_pitch;
     }
 }
+
+#ifdef BLIT_ARM_AVAILABLE
+/*
+** VC_BLITTEST: compare the ARM blitters with the C ones on random shapes, then exit.
+*/
+void Blit_Self_Test()
+{
+    static unsigned char lookup[256], ghost[256 * 256], fade[256];
+    static unsigned char src[64 * 80 + 16], d1[80 * 80 + 16], d2[80 * 80 + 16];
+    unsigned seed = 1;
+    auto rnd = [&seed]() {
+        seed = seed * 1103515245u + 12345u;
+        return (seed >> 16) & 0x7FFF;
+    };
+    for (int i = 0; i < 256; ++i) {
+        lookup[i] = (rnd() % 5 == 0) ? rnd() % 4 : 0xFF;
+        fade[i] = rnd();
+    }
+    for (int i = 0; i < 65536; ++i) {
+        ghost[i] = rnd();
+    }
+    BF_Function arm[] = {Blit_Trans_ARM, Blit_Ghost_Trans_ARM, Blit_Fading_Trans_ARM, Blit_Ghost_Fading_Trans_ARM};
+    BF_Function c[] = {BF_Trans_C, BF_Ghost_Trans_C, BF_Fading_Trans_C, BF_Ghost_Fading_Trans_C};
+    long tests = 0, fails = 0;
+    for (int t = 0; t < 40000; ++t) {
+        int w = 1 + rnd() % 60, h = 1 + rnd() % 20, sp = rnd() % 9, dp = rnd() % 9, so = rnd() % 4, dof = rnd() % 4;
+        for (unsigned i = 0; i < sizeof(src); ++i) {
+            src[i] = (rnd() % 3 == 0) ? rnd() : 0;
+        }
+        for (unsigned i = 0; i < sizeof(d1); ++i) {
+            d1[i] = d2[i] = rnd();
+        }
+        int k = t % 4;
+        arm[k](w, h, d1 + dof, src + so, dp, sp, lookup, ghost, fade, 1);
+        c[k](w, h, d2 + dof, src + so, dp, sp, lookup, ghost, fade, 1);
+        ++tests;
+        if (memcmp(d1, d2, sizeof(d1)) != 0) {
+            if (fails < 5) {
+                fprintf(stderr, "blittest: mismatch, routine %d w %d h %d sp %d dp %d so %d dof %d\n", k, w, h, sp, dp, so, dof);
+            }
+            ++fails;
+        }
+    }
+    fprintf(stderr, "blittest: %ld tests, %ld mismatches\n", tests, fails);
+}
+#endif
 
 // Jump table for BF_* functions
 static const BF_Function OldShapeJumpTable[16] = {BF_Copy,
