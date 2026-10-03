@@ -5,7 +5,8 @@
 ** interface (sidebar strips, build icons, tabs, power bar, radar frame). Their high
 ** resolution versions are there, at exactly twice the size, so when one of those
 ** is asked for and isn't found, make it here: decode each frame of the high
-** resolution shape (H<name>, or <x>ICNH.SHP for a build icon <x>ICON.SHP), halve
+** resolution shape (H<name>, or <x>ICNH.<ext> for a build icon <x>ICON.<ext>, which
+** C&C95 has for each theater, .TEM, .WIN and .DES), halve
 ** it, and keep the result as a shape of LCW keyframes. The game world's art is
 ** the same in both resolutions, so only the interface is involved.
 **
@@ -18,7 +19,6 @@
 #include "function.h"
 #include "common/endianness.h"
 #include "common/keyframe.h"
-#include "common/lcw.h"
 
 #include <ctype.h>
 #include <map>
@@ -46,8 +46,9 @@ bool High_Res_Name(const char* name, std::string& out)
     for (size_t i = 0; i < n.size(); ++i) {
         n[i] = char(toupper((unsigned char)n[i]));
     }
-    if (n.size() > 8 && n.compare(n.size() - 8, 8, "ICON.SHP") == 0) {
-        out = n.substr(0, n.size() - 8) + "ICNH.SHP"; // build icons: E1ICON.SHP -> E1ICNH.SHP
+    size_t dot = n.rfind('.');
+    if (dot != std::string::npos && dot >= 4 && n.compare(dot - 4, 4, "ICON") == 0) {
+        out = n.substr(0, dot - 4) + "ICNH" + n.substr(dot); // build icons: E1ICON.TEM -> E1ICNH.TEM
         return true;
     }
     static const char* const interface[] = {"STRIP.SHP",
@@ -95,6 +96,25 @@ unsigned char Most_Common(unsigned char a, unsigned char b, unsigned char c, uns
     return v[best];
 }
 
+/*
+** LCW data that only uses "copy the next n bytes" commands (0x80 | n, n up to 63),
+** ending with 0x80: always valid, and only 1.6% bigger than the data. LCW_Comp's
+** output didn't always come back the same through LCW_Uncompress.
+*/
+std::vector<char> LCW_Literal(const unsigned char* data, size_t size)
+{
+    std::vector<char> out;
+    out.reserve(size + size / 63 + 2);
+    for (size_t at = 0; at < size;) {
+        size_t n = size - at < 63 ? size - at : 63;
+        out.push_back(char(0x80 | n));
+        out.insert(out.end(), data + at, data + at + n);
+        at += n;
+    }
+    out.push_back(char(0x80));
+    return out;
+}
+
 void const* Make_Low_Res(char const* filename)
 {
     if (Made == nullptr) {
@@ -108,7 +128,20 @@ void const* Make_Low_Res(char const* filename)
     if (!High_Res_Name(filename, high_name)) {
         return nullptr;
     }
+    /*
+    ** From a cached mixfile if it's in one, else read it (the build icons are in
+    ** mixfiles that are only cached in high resolution). No recursion meanwhile.
+    */
+    Mix_Missing_Hook = nullptr;
     void const* high = MFCD::Retrieve(high_name.c_str());
+    void* loaded = nullptr;
+    if (high == nullptr) {
+        CCFileClass file(high_name.c_str());
+        if (file.Is_Available()) {
+            high = loaded = Load_Alloc_Data(file);
+        }
+    }
+    Mix_Missing_Hook = Make_Low_Res;
     if (high == nullptr) {
         return nullptr;
     }
@@ -117,6 +150,9 @@ void const* Make_Low_Res(char const* filename)
     int w = Get_Build_Frame_Width(high), h = Get_Build_Frame_Height(high);
     int w2 = (w + 1) / 2, h2 = (h + 1) / 2;
     if (frames <= 0 || w <= 0 || h <= 0) {
+        if (loaded != nullptr) {
+            Free(loaded);
+        }
         return nullptr;
     }
 
@@ -134,10 +170,12 @@ void const* Make_Low_Res(char const* filename)
                 small[y * w2 + x] = Most_Common(big[y0 * w + x0], big[y0 * w + x1], big[y1 * w + x0], big[y1 * w + x1]);
             }
         }
-        packed[f].resize(small.size() * 2 + 64);
-        packed[f].resize(LCW_Comp(&small[0], &packed[f][0], unsigned(small.size())));
+        packed[f] = LCW_Literal(&small[0], small.size());
     }
     UseBigShapeBuffer = saved;
+    if (loaded != nullptr) {
+        Free(loaded);
+    }
 
     // The header, then (frames + 2) pairs of offsets, then the frames.
     size_t table = sizeof(ShapeHeader) + size_t(frames + 2) * 8;
@@ -212,7 +250,7 @@ void const* Low_Res_Font(void const* font, void const* font8, bool gradient)
 
     std::vector<unsigned char> out(sizeof(FontHeader) + chars * 5);
     FontHeader nh = h8;
-    nh.InfoBlockOffset = htole16(uint16_t(sizeof(FontHeader)));
+    // InfoBlockOffset stays: it points into the header itself, at MaxHeight and MaxWidth (Set_Font).
     nh.OffsetBlockOffset = htole16(uint16_t(sizeof(FontHeader)));
     nh.WidthBlockOffset = htole16(uint16_t(sizeof(FontHeader) + chars * 2));
     nh.HeightOffset = htole16(uint16_t(sizeof(FontHeader) + chars * 3));

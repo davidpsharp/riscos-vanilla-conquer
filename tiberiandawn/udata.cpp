@@ -1572,8 +1572,9 @@ void UnitTypeClass::One_Time(void)
 
 void UnitTypeClass::Init(TheaterType theater)
 {
-
-    if (Get_Resolution_Factor()) {
+    // Low resolution too: lowres.cpp makes <name>ICON.<theater> from <name>ICNH.<theater>,
+    // and a cameo that isn't found (DOS data) is left as it was.
+    {
 
         if (theater != LastTheater) {
 
@@ -1585,10 +1586,8 @@ void UnitTypeClass::Init(TheaterType theater)
 
                 UnitTypeClass const& uclass = As_Reference(index);
 
-                ((void const*&)uclass.CameoData) = NULL;
-
                 if (uclass.IsBuildable) {
-                    sprintf(buffer, "%sICNH", uclass.IniName);
+                    sprintf(buffer, Get_Resolution_Factor() ? "%sICNH" : "%sICON", uclass.IniName);
                     _makepath(fullname, NULL, NULL, buffer, Theaters[theater].Suffix);
                     cameo_ptr = MFCD::Retrieve(fullname);
                     if (cameo_ptr) {

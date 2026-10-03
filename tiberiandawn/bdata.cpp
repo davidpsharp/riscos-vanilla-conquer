@@ -4187,14 +4187,14 @@ void BuildingTypeClass::Init(TheaterType theater)
                 ((void const*&)classptr->ImageData) = MFCD::Retrieve(fullname);
             }
 
-            if (Get_Resolution_Factor()) {
+            {
+                // Low resolution too: lowres.cpp makes <name>ICON.<theater> from <name>ICNH.<theater>,
+                // and a cameo that isn't found (DOS data) is left as it was.
                 char buffer[_MAX_FNAME];
                 char fullname[_MAX_FNAME + _MAX_EXT];
                 void const* cameo_ptr;
 
-                ((void const*&)classptr->CameoData) = NULL;
-
-                sprintf(buffer, "%.4sICNH", classptr->IniName);
+                sprintf(buffer, Get_Resolution_Factor() ? "%.4sICNH" : "%.4sICON", classptr->IniName);
                 _makepath(fullname, NULL, NULL, buffer, Theaters[theater].Suffix);
                 cameo_ptr = MFCD::Retrieve(fullname);
                 if (cameo_ptr) {

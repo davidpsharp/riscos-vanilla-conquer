@@ -708,8 +708,9 @@ bool AircraftTypeClass::Create_And_Place(CELL, HousesType) const
 void AircraftTypeClass::Init(TheaterType theater)
 {
     if (theater != LastTheater) {
-        if (Get_Resolution_Factor()) {
-
+        {
+            // Low resolution too: lowres.cpp makes <name>ICON.<theater> from <name>ICNH.<theater>,
+            // and a cameo that isn't found (DOS data) is left as it was.
             AircraftType index;
             char buffer[_MAX_FNAME];
             char fullname[_MAX_FNAME + _MAX_EXT];
@@ -718,9 +719,7 @@ void AircraftTypeClass::Init(TheaterType theater)
             for (index = AIRCRAFT_FIRST; index < AIRCRAFT_COUNT; index++) {
                 AircraftTypeClass const& uclass = As_Reference(index);
 
-                ((void const*&)uclass.CameoData) = NULL;
-
-                sprintf(buffer, "%.4sICNH", uclass.IniName);
+                sprintf(buffer, Get_Resolution_Factor() ? "%.4sICNH" : "%.4sICON", uclass.IniName);
                 _makepath(fullname, NULL, NULL, buffer, Theaters[theater].Suffix);
                 cameo_ptr = MFCD::Retrieve(fullname);
                 if (cameo_ptr) {
