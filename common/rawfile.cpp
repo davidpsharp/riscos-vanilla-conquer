@@ -63,14 +63,17 @@
 #include <unistd.h>
 #define _unlink         RISCOS_Unlink
 #define raw_fopen(x, y) RISCOS_Fopen(x, y)
+#define raw_fclose(x)   RISCOS_Fclose(x)
 #elif !defined(_WIN32)
 #include <unistd.h>
 #define _unlink         unlink
 #define raw_fopen(x, y) fopen(x, y)
+#define raw_fclose(x)   fclose(x)
 #else
 #include <tchar.h>
 #include "utf.h"
 #define raw_fopen(x, y) _tfopen(UTF8ToTCHAR(x), UTF8ToTCHAR(y))
+#define raw_fclose(x)   fclose(x)
 #endif
 
 #include <sys/stat.h>
@@ -354,7 +357,7 @@ int RawFileClass::Is_Available(int forced)
     /*
     **	Since the file could be opened, then close it and return that the file exists.
     */
-    if (fclose(Handle) != 0) {
+    if (raw_fclose(Handle) != 0) {
         Error(errno, false, Filename);
     }
     Handle = nullptr;
@@ -405,7 +408,7 @@ void RawFileClass::Close(void)
         **	Try to close the file. If there was an error (who knows what that could be), then
         **	call the error routine.
         */
-        if (fclose(Handle) != 0) {
+        if (raw_fclose(Handle) != 0) {
             Error(errno, false, Filename);
         }
 

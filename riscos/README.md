@@ -210,6 +210,7 @@ RISC OS 3.x FileCore allows 10-character leaf names and silently truncates longe
 - **Writing:** the extension directory is created when needed. See `common/riscos_fs.h`.
 - **Directory scans:** `Find_First` searches both layouts.
 - **Deploying:** `deploy-td.sh` lays the data out this way and warns about any name over 10 characters.
+- **Fewer filing system calls:** opening a file through UnixLib takes a few milliseconds on a Risc PC, and the game opened 1631 files on the way to GDI 1. Most were probes for loose files that would override the MIX files, and the rest reopened the MIX files for every file read from them. So each directory is listed once and a file it doesn't contain fails without a filing system call (`VC_NODIRCACHE` turns this off). Files opened for reading are also kept open, up to 8, and reused when opened again. Anything opened for writing or deleted closes them all and clears the listings. Start-up to the first game frame went from 12.4 s to 6.0 s on the StrongARM Risc PC. `VC_FSTEST=1` checks this layer (writes, other spellings of a name, deletes) in the current directory, then exits.
 - **Testing on the Mac:** build with `-DSHORT_FILENAMES=ON`, and set `VC_FSLOG=1` to trace file opens.
 
 This was verified by copying the app (without `MIX.MOVIES`, since the 256 MB HardDisc4 can't hold it) to `ADFS::HardDisc4.$` on RISC OS 3.71. From there, GDI 1, Save and Load all work.

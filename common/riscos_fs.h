@@ -26,6 +26,9 @@ bool RISCOS_Short_Path(const char* path, std::string& out);
 // fopen/unlink replacements that use the short form (see above).
 FILE* RISCOS_Fopen(const char* path, const char* mode);
 int RISCOS_Unlink(const char* path);
+// fclose replacement: files opened for reading are kept open for a while, so
+// that opening them again is quick (see riscos_fs.cpp).
+int RISCOS_Fclose(FILE* fp);
 #endif
 
 #endif // COMMON_RISCOS_FS_H

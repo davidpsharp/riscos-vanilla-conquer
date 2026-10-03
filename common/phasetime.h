@@ -46,6 +46,8 @@ enum PhaseCountId
     COUNT_STREAM_READS,      // music stream: reads from its file
     COUNT_STREAM_SLOW_READS, // ...that took 20 ms or more
     COUNT_STREAM_LONGEST_MS, // ...the longest
+    COUNT_FOPENS,            // files opened (RISC OS), and the time it took
+    COUNT_FOPEN_US,
     COUNT_MAX
 };
 

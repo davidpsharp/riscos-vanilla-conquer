@@ -169,7 +169,11 @@ void Phase_Frame_Begin()
         Bench_Started = Frame_Started;
 #ifdef SDL_BUILD
         if (Bench_Frames > 0) {
-            fprintf(stderr, "bench: first game frame %u ms after start-up\n", unsigned(SDL_GetTicks()));
+            fprintf(stderr,
+                    "bench: first game frame %u ms after start-up; %u files opened, taking %u ms\n",
+                    unsigned(SDL_GetTicks()),
+                    Phase_Counts[COUNT_FOPENS],
+                    Phase_Counts[COUNT_FOPEN_US] / 1000);
         }
 #endif
         for (int i = 0; i < PHASE_COUNT; ++i) {
@@ -323,7 +327,9 @@ void Phase_Report(unsigned elapsed_ms)
                 Phase_Counts[COUNT_DELAY_TOOK_MS]);
     }
     for (int i = 0; i < COUNT_MAX; ++i) {
-        Phase_Counts[i] = 0;
+        if (i != COUNT_FOPENS && i != COUNT_FOPEN_US) { // these count from start-up
+            Phase_Counts[i] = 0;
+        }
     }
     unsigned ms[PHASE_COUNT];
     for (int i = 0; i < PHASE_COUNT; ++i) {

@@ -34,6 +34,7 @@
  *   main -- Initial startup routine (preps library systems).                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "riscos_fs.h"
 #include "function.h"
 #include "common/gitinfo.h"
 #include "common/ini.h"
@@ -214,6 +215,13 @@ int main(int argc, char** argv)
         static char stderr_buffer[16384];
         setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
     }
+#ifdef USE_SHORT_FILENAMES
+    if (getenv("VC_FSTEST") != nullptr) {
+        void RISCOS_Fs_Self_Test();
+        RISCOS_Fs_Self_Test();
+        return 0;
+    }
+#endif
     if (getenv("VC_BLITTEST") != nullptr) {
         void Blit_Self_Test();
         Blit_Self_Test();
