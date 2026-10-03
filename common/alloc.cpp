@@ -37,6 +37,7 @@
  *   Total_Ram_Free -- Total amount of free RAM.                           *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -98,6 +99,7 @@ void* Alloc(size_t bytes_to_alloc, MemoryFlagType flags)
     mem_ptr = malloc(bytes_to_alloc);
 
     if (!mem_ptr && Memory_Error) {
+        fprintf(stderr, "Alloc: %lu bytes not available\n", (unsigned long)bytes_to_alloc);
         Memory_Error();
     }
 

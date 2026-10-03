@@ -320,8 +320,17 @@ int main(int argc, char** argv)
         CCDebugString("C&C95 - Creating main window.\n");
 
 #ifndef REMASTER_BUILD
-        /* If DOSMode is enabled, adjust resolution accordingly. */
-        if (Settings.Video.DOSMode || Is_Demo() || Is_DOS_Files()) {
+        /*
+        ** If DOSMode is enabled, adjust resolution accordingly. -LOWRES, or the variable
+        ** VanillaTD$LowRes (set by !Run on RISC OS), asks for it for this run only,
+        ** leaving CONQUER.INI as it is.
+        */
+        bool low_res_asked = getenv("VanillaTD$LowRes") != nullptr && *getenv("VanillaTD$LowRes") != '\0'
+                             && strcmp(getenv("VanillaTD$LowRes"), "0") != 0;
+        for (int i = 1; i < argc; ++i) {
+            low_res_asked = low_res_asked || strcasecmp(argv[i], "-LOWRES") == 0;
+        }
+        if (Settings.Video.DOSMode || low_res_asked || Is_Demo() || Is_DOS_Files()) {
             ScreenWidth = 320;
             ScreenHeight = 200;
         }

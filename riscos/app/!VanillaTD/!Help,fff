@@ -114,6 +114,14 @@ time it runs. Settings that may be useful on RISC OS:
   [Intro]
   PlayLogo=No            Skip the Westwood logo at start-up.
 
+Low resolution: for slower machines, the game can run at 320x200, the
+size of the original DOS version, which is about twice as fast. Set
+VanillaTD$LowRes to 1 in !VanillaTD.!Run to use it (Shift-double-click
+!VanillaTD to open it, then load !Run into a text editor). The map and
+units look exactly the same, but less of the map fits on the screen and
+the sidebar is smaller. The 320x200 sidebar and small fonts are made from
+the Windows 95 version's own graphics, so no other files are needed.
+
 Saved games are stored in !VanillaTD (for example !VanillaTD.000.SAVEGAME
 for slot 0). They can be moved between RISC OS machines but can't be
 loaded by Vanilla Conquer on other platforms, or by the original game.

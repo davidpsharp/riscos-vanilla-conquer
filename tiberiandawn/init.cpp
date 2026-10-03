@@ -201,12 +201,19 @@ bool Init_Game(int, char*[])
             new MFCD("CCLOCAL.MIX"); // Cached.
             MFCD::Cache("CCLOCAL.MIX");
         } else {
-            new MFCD("LOCAL.MIX"); // Cached.
-            MFCD::Cache("LOCAL.MIX");
             /*
-            ** With the Windows 95 data (DOSMode=yes), LOCAL.MIX has the low resolution fonts
-            ** and shapes but not everything, such as the strings (CONQUER.ENG): look for
-            ** those in CCLOCAL.MIX, after LOCAL.MIX. The DOS data has no CCLOCAL.MIX.
+            ** C&C95's LOCAL.MIX is a 4 byte placeholder, read as a mixfile it claims a
+            ** 900 MB index: only use a real one (the DOS disc's).
+            */
+            if (CCFileClass("LOCAL.MIX").Size() > 16) {
+                new MFCD("LOCAL.MIX"); // Cached.
+                MFCD::Cache("LOCAL.MIX");
+            }
+            /*
+            ** With the Windows 95 data (DOSMode=yes), the strings (CONQUER.ENG) and fonts are
+            ** in CCLOCAL.MIX: look there after LOCAL.MIX. The low resolution interface shapes
+            ** are made from the high resolution ones (lowres.cpp). The DOS data has no
+            ** CCLOCAL.MIX.
             */
             if (CCFileClass("CCLOCAL.MIX").Is_Available()) {
                 new MFCD("CCLOCAL.MIX"); // Cached, as files are retrieved from it.
@@ -228,17 +235,26 @@ bool Init_Game(int, char*[])
     }
 
     CCDebugString("C&C95 - About to load fonts\n");
+    void Init_Low_Res_Interface(); // lowres.cpp
+    Init_Low_Res_Interface();
     Font8Ptr = MFCD::Retrieve(FONT8);
     FontPtr = (char*)Font8Ptr;
     Set_Font(FontPtr);
     Font3Ptr = MFCD::Retrieve(FONT3);
     //	Font6Ptr = MFCD::Retrieve(FONT6);
     Font6Ptr = Load_Alloc_Data(CCFileClass("6POINT.FNT"));
+    void const* Low_Res_Font(void const* font, void const* font8, bool gradient); // lowres.cpp
+    if (Get_Resolution_Factor() == 0) {
+        Font6Ptr = Low_Res_Font(Font6Ptr, Font8Ptr, false);
+    }
     // ScoreFontPtr = MFCD::Retrieve("12GRNGRD.FNT");	//GRAD12FN");	//("SCOREFNT.FNT");
     FontLEDPtr = MFCD::Retrieve("LED.FNT");
     VCRFontPtr = MFCD::Retrieve("VCR.FNT");
     //	GradFont6Ptr = MFCD::Retrieve("GRAD6FNT.FNT");
     GradFont6Ptr = Load_Alloc_Data(CCFileClass("GRAD6FNT.FNT"));
+    if (Get_Resolution_Factor() == 0) {
+        GradFont6Ptr = Low_Res_Font(GradFont6Ptr, Font8Ptr, true);
+    }
     BlackPalette = new (MEM_CLEAR | MEM_REAL) unsigned char[768];
     GamePalette = new (MEM_CLEAR | MEM_REAL) unsigned char[768];
     OriginalPalette = new (MEM_CLEAR | MEM_REAL) unsigned char[768];

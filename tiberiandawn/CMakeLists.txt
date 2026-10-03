@@ -62,6 +62,7 @@ set(TIBDAWN_SRC
     lib.cpp
     list.cpp
     loaddlg.cpp
+    lowres.cpp
     logic.cpp
     map.cpp
     mapeddlg.cpp

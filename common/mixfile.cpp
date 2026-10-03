@@ -46,6 +46,8 @@
 #include "mixfile.h"
 #include "ccfile.h"
 
+void const* (*Mix_Missing_Hook)(char const* filename) = nullptr;
+
 template class MixFileClass<CCFileClass>;
 
 /*

@@ -41,6 +41,13 @@ void Emergency_Exit(int);
 extern int RequiredCD;
 extern bool RunningAsDLL;
 
+/*
+** If set, Retrieve asks this for any file it can't find in a cached mixfile, and
+** returns what it gives (or nullptr). Tiberian Dawn uses it to make the low
+** resolution interface from the high resolution one (lowres.cpp).
+*/
+extern void const* (*Mix_Missing_Hook)(char const* filename);
+
 template <class T, class TCRC = CRCEngine> class MixFileClass : public VanillaNode<MixFileClass<T>>
 {
 public:
@@ -501,6 +508,9 @@ template <class T, class TCRC> void const* MixFileClass<T, TCRC>::Retrieve(char 
 {
     void* ptr = 0;
     Offset(filename, &ptr);
+    if (ptr == 0 && Mix_Missing_Hook != nullptr) {
+        return Mix_Missing_Hook(filename);
+    }
     return (ptr);
 };
 

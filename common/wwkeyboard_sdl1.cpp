@@ -162,12 +162,13 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 break;
             }
 
-            if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {
-                Get_Video_Mouse(x, y);
 #ifdef __riscos__
-            } else if (RISCOS_Pointer_Position(x, y)) {
+            if (!Is_Gamepad_Active() && RISCOS_Pointer_Position(x, y)) {
                 // A centred surface: SDL's event position is off (see video_sdl1.cpp).
+            } else
 #endif
+                if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {
+                Get_Video_Mouse(x, y);
             } else {
                 float scale_x = 1.0f, scale_y = 1.0f;
                 Get_Video_Scale(scale_x, scale_y);

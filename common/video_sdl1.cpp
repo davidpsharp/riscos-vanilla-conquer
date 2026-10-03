@@ -357,12 +357,15 @@ void Move_Video_Mouse(float xrel, float yrel)
 
 void Get_Video_Mouse(int& x, int& y)
 {
+#ifdef __riscos__
+    // A centred surface: SDL's positions are off (see RISCOS_Pointer_Position), raw or not.
+    if (!Keyboard->Is_Gamepad_Active() && RISCOS_Pointer_Position(x, y)) {
+        return;
+    }
+#endif
     if (Keyboard->Is_Gamepad_Active() || (Settings.Mouse.RawInput && (hwcursor.Clip || !Settings.Video.Windowed))) {
         x = hwcursor.X;
         y = hwcursor.Y;
-#ifdef __riscos__
-    } else if (RISCOS_Pointer_Position(x, y)) {
-#endif
     } else {
         SDL_GetMouseState(&x, &y);
     }
