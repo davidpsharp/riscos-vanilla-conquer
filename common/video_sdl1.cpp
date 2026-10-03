@@ -1033,9 +1033,10 @@ private:
     ** of the screen changes per frame. A lock that ends with nothing marked means
     ** something drew without saying where, so then the whole surface is copied.
     **
-    ** For now it's only on with VC_PARTIALPRESENT=1. On the StrongARM Risc PC it
-    ** halved the present time in the battle benchmark (10.7 to 5.2 ms/frame), but
-    ** marking added to the drawing time, and a clean comparison is still to do.
+    ** For now it's only on with VC_PARTIALPRESENT=1, until it has been played with
+    ** more widely. In the battle benchmark on the StrongARM Risc PC (same image, runs
+    ** alternated) frames went from 54.4 to 48.1 ms: presenting 10.8 to 4.1 ms,
+    ** drawing 17.0 to 18.0 ms for the marking.
     ** VC_DIRTYCHECK=1 compares each partial present with the whole frame and reports
     ** tiles that changed without being marked; VC_DIRTYCHECK=2 (slow) checks at
     ** every drawing call and lock, with a backtrace on the Mac, to find the culprit.
