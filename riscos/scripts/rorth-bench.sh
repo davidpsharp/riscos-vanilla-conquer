@@ -14,7 +14,8 @@
 # vehicles and 80 infantry set to Hunt and no win or lose triggers.
 #
 # RO_TARGET (default riscpc) and VC_APP (the !VanillaTD path there) override;
-# BENCH_IMAGE picks the program to test (default build/riscos/vanillatd,ff8).
+# BENCH_IMAGE picks the program to test (default build/riscos/vanillatd,ff8), and
+# BENCH_VARS="NAME=value ..." sets more variables for the run (unset afterwards).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
@@ -36,6 +37,9 @@ cleanup()
 {
     "$RO" -t "$T" cmd 'Unset VC_BENCH' >/dev/null 2>&1 || true
     "$RO" -t "$T" cmd 'Unset VC_SEED' >/dev/null 2>&1 || true
+    for v in ${BENCH_VARS:-}; do
+        "$RO" -t "$T" cmd "Unset ${v%%=*}" >/dev/null 2>&1 || true
+    done
     "$RO" -t "$T" rm "$APP.INI.SCG01EA" >/dev/null 2>&1 || true
     "$RO" -t "$T" lease release >/dev/null 2>&1 || true
 }
@@ -45,6 +49,9 @@ trap cleanup EXIT
 "$RO" -t "$T" put "$BATTLE" "$APP.INI.SCG01EA" --type fff >/dev/null
 "$RO" -t "$T" cmd "Set VC_BENCH $FRAMES" >/dev/null
 "$RO" -t "$T" cmd "Set VC_SEED $SEED" >/dev/null
+for v in ${BENCH_VARS:-}; do
+    "$RO" -t "$T" cmd "Set ${v%%=*} ${v#*=}" >/dev/null
+done
 "$RO" -t "$T" launch "Run $APP -AUTOSTART=G1" >/dev/null
 
 # The game holds stderr open until it exits; fetching it succeeds once it has.
