@@ -512,6 +512,35 @@ template <class T> bool IndexClass<T>::Add_Index(int id, T data)
     }
 
     /*
+    **	If the table is already sorted, put the new element in its place (after any
+    **	equal IDs) and keep it sorted. Adding to the end and re-sorting the whole table
+    **	on the next search made loading an INI file quadratic: on a Risc PC it was most
+    **	of the time spent loading a mission.
+    */
+    if (IsSorted && IndexCount > 0) {
+        int low = 0;
+        int high = IndexCount;
+        NodeElement node;
+        node.ID = id;
+        while (low < high) {
+            int mid = (low + high) / 2;
+            if (search_compfunc(&IndexTable[mid], &node) <= 0) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        for (int i = IndexCount; i > low; --i) {
+            IndexTable[i] = IndexTable[i - 1];
+        }
+        IndexTable[low].ID = id;
+        IndexTable[low].Data = data;
+        IndexCount++;
+        Invalidate_Archive(); // the elements after it have moved
+        return (true);
+    }
+
+    /*
     **	Add the data to the end of the index data and then sort the index table.
     */
     IndexTable[IndexCount].ID = id;

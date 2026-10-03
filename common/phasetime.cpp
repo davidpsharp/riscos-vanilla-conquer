@@ -167,6 +167,11 @@ void Phase_Frame_Begin()
     Frame_Heap = Heap_Top();
     if (Bench_Started == 0) {
         Bench_Started = Frame_Started;
+#ifdef SDL_BUILD
+        if (Bench_Frames > 0) {
+            fprintf(stderr, "bench: first game frame %u ms after start-up\n", unsigned(SDL_GetTicks()));
+        }
+#endif
         for (int i = 0; i < PHASE_COUNT; ++i) {
             Bench_Us[i] = 0;
         }
