@@ -203,6 +203,15 @@ bool Init_Game(int, char*[])
         } else {
             new MFCD("LOCAL.MIX"); // Cached.
             MFCD::Cache("LOCAL.MIX");
+            /*
+            ** With the Windows 95 data (DOSMode=yes), LOCAL.MIX has the low resolution fonts
+            ** and shapes but not everything, such as the strings (CONQUER.ENG): look for
+            ** those in CCLOCAL.MIX, after LOCAL.MIX. The DOS data has no CCLOCAL.MIX.
+            */
+            if (CCFileClass("CCLOCAL.MIX").Is_Available()) {
+                new MFCD("CCLOCAL.MIX"); // Cached, as files are retrieved from it.
+                MFCD::Cache("CCLOCAL.MIX");
+            }
         }
         CCDebugString("C&C95 - About to register UPDATE.MIX\n");
         new MFCD("UPDATE.MIX"); // Cached.

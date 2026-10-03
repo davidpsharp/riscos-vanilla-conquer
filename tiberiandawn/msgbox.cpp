@@ -34,6 +34,7 @@
  *   WWMessageBox::Process -- Displays message box.                                            *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include <stdio.h>
 #include "function.h"
 #include "msgbox.h"
 #include "gadget.h"
@@ -80,6 +81,9 @@ int WWMessageBox::Process(const char* msg, const char* b1txt, const char* b2txt,
 {
 #define BUFFSIZE (511)
     char buffer[BUFFSIZE] = {0};
+
+    // Log it, so that a box that can't be read (say, its font is missing) still says something.
+    fprintf(stderr, "message box: %s [%s]\n", msg ? msg : "", b1txt ? b1txt : "");
     int retval = 0;
     bool process = false;       // loop while true
     KeyNumType input = KN_NONE; // user input
