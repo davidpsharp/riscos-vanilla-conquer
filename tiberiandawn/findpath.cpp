@@ -48,6 +48,7 @@
  *   Set_Path_Overlap -- Sets the overlap bit for given cell                                   *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "phasetime.h"
 #include "function.h"
 
 /*
@@ -544,8 +545,26 @@ bool FootClass::Register_Cell(PathType* path, CELL cell, FacingType dir, int cos
  * HISTORY:                                                                                    *
  *   07/08/1991  CY : Created.                                                                 *
  *=============================================================================================*/
+namespace {
+struct PathTimer
+{
+    unsigned Started;
+    PathTimer()
+        : Started(Phase_Timing ? Phase_Now_Us() : 0)
+    {
+    }
+    ~PathTimer()
+    {
+        if (Phase_Timing) {
+            Phase_Path(Phase_Now_Us() - Started);
+        }
+    }
+};
+} // namespace
+
 PathType* FootClass::Find_Path(CELL dest, FacingType* final_moves, int maxlen, MoveType threshhold)
 {
+    PathTimer path_timer;            // VC_FPSLOG / VC_BENCH
     PathCacheScope cache_scope;      // See Passable_Cell.
     CELL source = Coord_Cell(Coord); // Source expressed as cell
     static PathType path;            // Main path control.
@@ -1472,10 +1491,12 @@ int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType th
         move = Can_Enter_Cell(cell, face);
     }
 
-    if (move < MOVE_MOVING_BLOCK && Distance(cell) > 1)
-        threshhold = MOVE_MOVING_BLOCK;
-
-    if (move > threshhold)
+    /*
+    **	Beyond the next cell, a cell that's only blocked by something moving (or less) is
+    **	acceptable whatever the threshold. That only matters when the move would otherwise
+    **	be refused, so only work out the distance then.
+    */
+    if (move > threshhold && !(move < MOVE_MOVING_BLOCK && Distance(cell) > 1))
         return (0);
 
     if (GameToPlay == GAME_NORMAL) {

@@ -17,6 +17,9 @@ static volatile unsigned Phase_Us[PHASE_COUNT];
 static unsigned Frame_Us[PHASE_COUNT]; // the current game frame's share
 static unsigned long long Bench_Us[PHASE_COUNT]; // since the first game frame
 static unsigned long long Bench_Rtti_Us[32];
+static unsigned Frame_Rtti_Us[32];
+static unsigned Frame_Paths, Frame_Path_Us, Frame_Path_Longest_Us;
+static unsigned long long Bench_Paths, Bench_Path_Us;
 static unsigned Bench_Rtti_Calls[32];
 static unsigned Bench_Started = 0;
 static unsigned Bench_Worst_Ms = 0;
@@ -163,6 +166,10 @@ void Phase_Frame_Begin()
     for (int i = 0; i < PHASE_COUNT; ++i) {
         Frame_Us[i] = 0;
     }
+    for (int i = 0; i < 32; ++i) {
+        Frame_Rtti_Us[i] = 0;
+    }
+    Frame_Paths = Frame_Path_Us = Frame_Path_Longest_Us = 0;
     Frame_Started = Phase_Now_Us();
     Frame_Heap = Heap_Top();
     if (Bench_Started == 0) {
@@ -186,8 +193,28 @@ void Phase_Object_AI(int rtti, unsigned us)
 {
     if (rtti >= 0 && rtti < 32) {
         Bench_Rtti_Us[rtti] += us;
+        Frame_Rtti_Us[rtti] += us;
         ++Bench_Rtti_Calls[rtti];
     }
+}
+
+void Phase_Path(unsigned us)
+{
+    ++Frame_Paths;
+    Frame_Path_Us += us;
+    if (us > Frame_Path_Longest_Us) {
+        Frame_Path_Longest_Us = us;
+    }
+    ++Bench_Paths;
+    Bench_Path_Us += us;
+}
+
+static const char* const Rtti_Names[] = {"none", "infantry", "?", "unit", "?", "aircraft", "?", "building", "?",
+                                         "terrain", "?", "anim", "?", "bullet", "?", "overlay", "?", "smudge"};
+
+static const char* Rtti_Name(int rtti)
+{
+    return rtti < int(sizeof(Rtti_Names) / sizeof(Rtti_Names[0])) ? Rtti_Names[rtti] : "other";
 }
 
 unsigned Phase_Bench_Started_Us()
@@ -225,14 +252,16 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_CALLBACK] * per,
             Bench_Us[PHASE_PRESENT] * per,
             Bench_Us[PHASE_SLEEP] * per);
-    static const char* const names[] = {"none", "infantry", "?", "unit", "?", "aircraft", "?", "building", "?",
-                                        "terrain", "?", "anim", "?", "bullet", "?", "overlay", "?", "smudge"};
+    fprintf(stderr,
+            "bench paths: %.1f Find_Path calls a frame, %.2f ms/frame\n",
+            double(Bench_Paths) / frames,
+            Bench_Path_Us * per);
     fprintf(stderr, "bench object AI ms/frame (calls/frame):");
     for (int i = 0; i < 32; ++i) {
         if (Bench_Rtti_Calls[i] != 0) {
             fprintf(stderr,
                     " %s %.2f (%.1f)",
-                    i < int(sizeof(names) / sizeof(names[0])) ? names[i] : "other",
+                    Rtti_Name(i),
                     Bench_Rtti_Us[i] * per,
                     double(Bench_Rtti_Calls[i]) / frames);
         }
@@ -267,7 +296,7 @@ void Phase_Frame_End()
     fprintf(stderr,
             "stall: game frame took %u ms at %u.%03u s: draw %u (map %u) logic %u queue %u callback %u present %u sleep %u "
             "other %u [logic: teams %u objects %u map %u factories %u houses %u] [callback: theme %u speech %u "
-            "stream file %u audio lock %u] heap %+ld KB\n",
+            "stream file %u audio lock %u] heap %+ld KB",
             took,
 #ifdef SDL_BUILD
             (SDL_GetTicks() - took) / 1000,
@@ -294,6 +323,17 @@ void Phase_Frame_End()
             Frame_Us[PHASE_CB_STREAM_FILE] / 1000,
             Frame_Us[PHASE_CB_AUDIO_LOCK] / 1000,
             long((Heap_Top() - Frame_Heap) / 1024));
+    fprintf(stderr, " [objects:");
+    for (int i = 0; i < 32; ++i) {
+        if (Frame_Rtti_Us[i] >= 1000) {
+            fprintf(stderr, " %s %u", Rtti_Name(i), Frame_Rtti_Us[i] / 1000);
+        }
+    }
+    fprintf(stderr,
+            "] [paths: %u taking %u ms, longest %u ms]\n",
+            Frame_Paths,
+            Frame_Path_Us / 1000,
+            Frame_Path_Longest_Us / 1000);
 }
 
 void Phase_Report(unsigned elapsed_ms)
