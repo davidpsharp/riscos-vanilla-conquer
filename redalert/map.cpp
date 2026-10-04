@@ -59,6 +59,7 @@
  *   MapClass::Pick_Random_Location -- Picks a random location on the map.                     *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "lcwpipe.h"
 #include "lcwstraw.h"
@@ -575,6 +576,7 @@ void MapClass::Set_Map_Dimensions(int x, int y, int w, int h)
  *=============================================================================================*/
 void MapClass::Sight_From(CELL cell, int sightrange, HouseClass* house, bool incremental)
 {
+    PhaseTimer phase_timer(PHASE_SIGHT);
     int xx;         // Center cell X coordinate (bounds checking).
     int const* ptr; // Offset pointer.
     int count;      // Counter for number of offsets to process.
@@ -1466,7 +1468,7 @@ int MapClass::Cell_Region(CELL cell)
  *=========================================================================*/
 int MapClass::Cell_Threat(CELL cell, HousesType house)
 {
-    int threat = HouseClass::As_Pointer(house)->Regions[Map.Cell_Region(Map[cell].Cell_Number())].Threat_Value();
+    int threat = HouseClass::As_Pointer(house)->Region_Threat(Map.Cell_Region(Map[cell].Cell_Number()));
     // using function for IsVisible so we have different results for different players - JAS 2019/09/30
     if (!threat && Map[cell].Is_Visible(house)) {
         threat = 1;

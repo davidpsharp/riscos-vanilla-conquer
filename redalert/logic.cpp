@@ -214,6 +214,8 @@ void LogicClass::AI(void)
 
     FramesPerSecond++;
 
+    HouseClass::Threat_Check();
+
     /*
     ** Fading to B&W or color due to the chronosphere is handled here.
     */

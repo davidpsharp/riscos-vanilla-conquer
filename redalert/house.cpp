@@ -2275,6 +2275,8 @@ void HouseClass::Make_Ally(HousesType house)
 {
     assert(Houses.ID(this) == ID);
 
+    Threat_Flush();
+
     if (Is_Allowed_To_Ally(house)) {
 
         Allies |= (1L << house);
@@ -2375,6 +2377,8 @@ void HouseClass::Make_Ally(HousesType house)
 void HouseClass::Make_Enemy(HousesType house)
 {
     assert(Houses.ID(this) == ID);
+
+    Threat_Flush();
 
     if (house != HOUSE_NONE && Is_Ally(house)) {
         HouseClass* enemy = HouseClass::As_Pointer(house);
@@ -2490,6 +2494,138 @@ TeamTypeClass const* HouseClass::Suggested_New_Team(bool alertcheck)
  * HISTORY:                                                                                    *
  *   05/08/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** Threat changes by owner since the last Threat_Flush, and who counted for whom then:
+** each house's IsHuman and Allies.
+*/
+static int Threat_Delta[HOUSE_COUNT][MAP_TOTAL_REGIONS];
+static bool Threat_Pending = false;
+static bool Threat_Sig_Stale = true;
+static bool Threat_Sig_Human[HOUSE_COUNT];
+static int Threat_Sig_Allies[HOUSE_COUNT];
+static bool Threat_Sig_Exists[HOUSE_COUNT];
+
+static void Threat_Read_Sig()
+{
+    memset(Threat_Sig_Exists, 0, sizeof(Threat_Sig_Exists));
+    for (int index = 0; index < Houses.Count(); index++) {
+        HouseClass* house = Houses.Ptr(index);
+        HousesType id = house->Class->House;
+        Threat_Sig_Exists[id] = true;
+        Threat_Sig_Human[id] = house->IsHuman;
+        Threat_Sig_Allies[id] = house->Allies_Mask();
+    }
+    Threat_Sig_Stale = false;
+}
+
+static bool Threat_Sig_Changed()
+{
+    bool exists[HOUSE_COUNT] = {};
+    for (int index = 0; index < Houses.Count(); index++) {
+        HouseClass* house = Houses.Ptr(index);
+        HousesType id = house->Class->House;
+        exists[id] = true;
+        if (!Threat_Sig_Exists[id] || Threat_Sig_Human[id] != bool(house->IsHuman)
+            || Threat_Sig_Allies[id] != house->Allies_Mask()) {
+            return true;
+        }
+    }
+    return memcmp(exists, Threat_Sig_Exists, sizeof(exists)) != 0;
+}
+
+// Whether owner's threat counts for house, as CellClass::Adjust_Threat decided it.
+static bool Threat_Counts_For(HousesType house, HousesType owner)
+{
+    return house != owner && Threat_Sig_Exists[house]
+           && (!Threat_Sig_Human[house] || ((1 << owner) & Threat_Sig_Allies[house]) == 0);
+}
+
+void HouseClass::Owner_Threat(HousesType owner, int region, int threat)
+{
+    static const int _val[] = {-MAP_REGION_WIDTH - 1,
+                               -MAP_REGION_WIDTH,
+                               -MAP_REGION_WIDTH + 1,
+                               -1,
+                               0,
+                               1,
+                               MAP_REGION_WIDTH - 1,
+                               MAP_REGION_WIDTH,
+                               MAP_REGION_WIDTH + 1};
+    static const int _thr[] = {2, 1, 2, 1, 0, 1, 2, 1, 2};
+
+    if (Threat_Sig_Stale) {
+        Threat_Read_Sig();
+    }
+    bool neg = threat < 0;
+    if (neg) {
+        threat = -threat;
+    }
+    int* delta = &Threat_Delta[owner][region];
+    for (int lp = 0; lp < 9; lp++) {
+        int value = threat >> _thr[lp];
+        delta[_val[lp]] += neg ? -value : value;
+    }
+    Threat_Pending = true;
+}
+
+void HouseClass::Threat_Flush(void)
+{
+    if (Threat_Pending) {
+        if (Threat_Sig_Stale) {
+            Threat_Read_Sig(); // nothing has changed since the totals started
+        }
+        for (int index = 0; index < Houses.Count(); index++) {
+            HouseClass* house = Houses.Ptr(index);
+            HousesType id = house->Class->House;
+            for (HousesType owner = HOUSE_FIRST; owner < HOUSE_COUNT; owner++) {
+                if (Threat_Counts_For(id, owner)) {
+                    for (int region = 0; region < MAP_TOTAL_REGIONS; region++) {
+                        int value = Threat_Delta[owner][region];
+                        if (value != 0) {
+                            house->Regions[region].Adjust_Threat(value, false);
+                        }
+                    }
+                }
+            }
+        }
+        memset(Threat_Delta, 0, sizeof(Threat_Delta));
+        Threat_Pending = false;
+    }
+    Threat_Sig_Stale = true;
+}
+
+void HouseClass::Threat_Clear(void)
+{
+    memset(Threat_Delta, 0, sizeof(Threat_Delta));
+    Threat_Pending = false;
+    Threat_Sig_Stale = true;
+}
+
+// Once a frame: catch changes to who counts for whom that Threat_Flush wasn't told of.
+void HouseClass::Threat_Check(void)
+{
+    if (Threat_Pending && !Threat_Sig_Stale && Threat_Sig_Changed()) {
+        Threat_Flush();
+    }
+}
+
+int HouseClass::Region_Threat(int region)
+{
+    Threat_Check();
+    if (Threat_Sig_Stale) {
+        Threat_Read_Sig();
+    }
+    int threat = Regions[region].Threat_Value();
+    if (Threat_Pending) {
+        for (HousesType owner = HOUSE_FIRST; owner < HOUSE_COUNT; owner++) {
+            if (Threat_Counts_For(Class->House, owner)) {
+                threat += Threat_Delta[owner][region];
+            }
+        }
+    }
+    return threat;
+}
+
 void HouseClass::Adjust_Threat(int region, int threat)
 {
     assert(Houses.ID(this) == ID);

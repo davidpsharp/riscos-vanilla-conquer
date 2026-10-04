@@ -29,6 +29,10 @@ enum PhaseId
     PHASE_CB_AUDIO_LOCK,  // waiting for SDL's audio lock (the mixer thread)
     PHASE_MISSION,        // objects' mission scripts (MissionClass::AI), part of their AI
     PHASE_THREAT,         // looking for targets (Greatest_Threat), part of their missions
+    PHASE_SIGHT,          // revealing the map around units (Red Alert's Sight_From)
+    PHASE_X1,             // spare timers for investigating, reported if used
+    PHASE_X2,
+    PHASE_X3,
     // Audio mixing isn't timed: it runs on its own thread, overlapping the rest
     // (about 55 ms/s on a StrongARM Risc PC).
     PHASE_COUNT

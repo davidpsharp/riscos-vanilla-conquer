@@ -516,6 +516,7 @@ void Destroy_Connection(int id, int error)
     //------------------------------------------------------------------------
     //	Turn the player's house over to the computer's AI
     //------------------------------------------------------------------------
+    HouseClass::Threat_Flush();
     housep->IsHuman = false;
     housep->IQ = Rule.MaxIQ;
     strcpy(housep->IniName, Text_String(TXT_COMPUTER));

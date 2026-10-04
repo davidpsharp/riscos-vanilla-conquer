@@ -347,6 +347,8 @@ bool Save_Game(const char* file_name, const char* descr)
 {
     NowSavingGame = true; // TEMP MBL: Need to discuss better solution with Steve
 
+    HouseClass::Threat_Flush(); // the houses' Regions are saved
+
     int save_net = 0; // 1 = save network/modem game
 
     if (Session.Type == GAME_GLYPHX_MULTIPLAYER) {
@@ -514,6 +516,8 @@ bool Load_Game(const char* file_name)
     HousesType house;
     char descr_buf[DESCRIP_MAX];
     int load_net = 0; // 1 = save network/modem game
+
+    HouseClass::Threat_Clear(); // the houses' Regions come from the file
 
     /*
     **	Open the file
@@ -1581,6 +1585,7 @@ static int Reconcile_Players(void)
             /*
             **	Turn the player's house over to the computer's AI
             */
+            HouseClass::Threat_Flush();
             housep->IsHuman = false;
             housep->IsStarted = true;
             //			housep->Smartness = IQ_MENSA;

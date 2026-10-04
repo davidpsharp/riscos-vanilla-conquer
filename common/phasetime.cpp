@@ -266,11 +266,19 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_SLEEP] * per);
     fprintf(stderr,
             "bench paths: %.1f Find_Path calls a frame, %.2f ms/frame; missions %.2f ms/frame, of which looking for "
-            "targets %.2f\n",
+            "targets %.2f; sight %.2f\n",
             double(Bench_Paths) / frames,
             Bench_Path_Us * per,
             Bench_Us[PHASE_MISSION] * per,
-            Bench_Us[PHASE_THREAT] * per);
+            Bench_Us[PHASE_THREAT] * per,
+            Bench_Us[PHASE_SIGHT] * per);
+    if (Bench_Us[PHASE_X1] + Bench_Us[PHASE_X2] + Bench_Us[PHASE_X3] != 0) {
+        fprintf(stderr,
+                "bench spare timers ms/frame: x1 %.2f x2 %.2f x3 %.2f\n",
+                Bench_Us[PHASE_X1] * per,
+                Bench_Us[PHASE_X2] * per,
+                Bench_Us[PHASE_X3] * per);
+    }
     if (Dirty_Partial + Dirty_Full_Unknown + Dirty_Full_Other > 0) {
         fprintf(stderr,
                 "bench presents: %llu partial (%.1f tiles each), %llu full after unmarked drawing, %llu full otherwise; "

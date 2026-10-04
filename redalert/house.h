@@ -784,6 +784,31 @@ public:
     };
     TeamTypeClass const* Suggested_New_Team(bool alertcheck = false);
     void Adjust_Threat(int region, int threat);
+
+    /*
+    **	The threat in a region, for this house (see Owner_Threat).
+    */
+    int Region_Threat(int region);
+    int Allies_Mask(void) const
+    {
+        return int(Allies);
+    }
+
+    /*
+    **	Threat changes by owner. CellClass::Adjust_Threat used to add an object's threat
+    **	to the regions of every house it counts for (each other house, unless that one is
+    **	human and allied to the owner) as it moved: 19 houses, each in its own part of
+    **	memory, for every cell a unit enters, which the StrongARM's cache made slow. Now
+    **	the change goes into the owner's own totals, and Region_Threat adds them up for a
+    **	house when asked (rarely: roundabout teams' paths, and teams choosing a building).
+    **	Before anything changes who counts for whom (a house becoming an ally or enemy,
+    **	or human or not), Threat_Flush adds the totals into the houses' Regions as they
+    **	stood; changes it isn't told of are found at the next frame or read.
+    */
+    static void Owner_Threat(HousesType owner, int region, int threat);
+    static void Threat_Flush(void);
+    static void Threat_Clear(void);
+    static void Threat_Check(void);
     void Tracking_Remove(TechnoClass const* techno);
     void Tracking_Add(TechnoClass const* techno);
     void Active_Remove(TechnoClass const* techno);

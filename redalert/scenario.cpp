@@ -757,6 +757,7 @@ void Post_Load_Game(int load_multi)
  *=============================================================================================*/
 void Clear_Scenario(void)
 {
+    HouseClass::Threat_Clear();
     // TCTCTC -- possibly just use in-place new of scenario object?
     ChronalVortex.Stop();
 
@@ -2354,6 +2355,7 @@ bool Read_Scenario_INI(char* fname, bool)
     // This is needed to fix the object selection issues. OmniBlade - 09/07/2020
     CurrentObject.Set_Active_Context(PlayerPtr->Class->House);
 #endif
+    HouseClass::Threat_Flush();
     PlayerPtr->IsHuman = true;
     PlayerPtr->IsPlayerControl = true;
 
@@ -2831,6 +2833,7 @@ void Assign_Houses(void)
         //	Make another copy of name, permanent throughout entire game.
         strncpy((char*)housep->InitialName, Session.Players[index]->Name, MPLAYER_NAME_MAX - 1);
 #endif
+        HouseClass::Threat_Flush();
         housep->IsHuman = true;
         housep->Init_Data((PlayerColorType)(Session.Players[index]->Player.Color),
                           Session.Players[index]->Player.House,

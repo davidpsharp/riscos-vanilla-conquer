@@ -3269,6 +3269,7 @@ static int Execute_DoList(int max_houses,
                         // to the computer.
                         //
                         if (Session.Play && DoList[j].Type == EventClass::EXIT) {
+                            HouseClass::Threat_Flush();
                             hptr->IsHuman = false;
                             hptr->IQ = Rule.MaxIQ;
                             hptr->Computer_Paranoid();
