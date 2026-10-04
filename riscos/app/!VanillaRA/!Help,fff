@@ -1,0 +1,145 @@
+Vanilla Conquer: Red Alert for RISC OS
+======================================
+
+Preview release
+
+Command & Conquer: Red Alert (1996) for the Risc PC and the Raspberry Pi,
+built from the Vanilla Conquer source code, which is based on the game's
+source code as released by Electronic Arts under the GNU GPL.
+
+Source code, updates and bug reports:
+  https://github.com/davidpsharp/riscos-vanilla-conquer
+
+The title screen shows the version and when it was built.
+
+
+Requirements
+------------
+
+  * A StrongARM Risc PC (or RPCEmu set up as one), or a Raspberry Pi
+    with RISC OS 5. The same !VanillaRA runs on both. ARM610, ARM710 and
+    ARM7500 machines (including the A7000) are not supported.
+  * RISC OS 3.7 or later. Tested on RISC OS 3.7 on a real StrongARM Risc
+    PC, RISC OS 3.71 in RPCEmu and RISC OS 5.30 on a Raspberry Pi 4.
+  * A 640x400 (or 640x480) 256-colour screen mode, or 320x256 for the
+    low-resolution option below.
+  * About 40 MB of free memory. Most of it is taken by a dynamic area
+    called "Vanilla RA heap", which goes when the game quits.
+  * About 110 MB of disc space for the game data without movies, or
+    480 MB (Allied) or 525 MB (Soviet) for one disc's data with its
+    movies.
+  * For sound, the DigitalRenderer module (included). Without it the
+    game runs silently.
+
+SharedUnixLibrary and DigitalRenderer are included in !VanillaRA.Modules.
+!Run uses newer copies from !System if you have them.
+
+On a Risc PC the first campaign missions play at full speed (the others
+haven't been timed yet). Big battles with over a hundred units on screen
+slow the game down; the low-resolution option helps.
+
+
+Installing the game data
+------------------------
+
+The game data isn't included. You need the freeware Red Alert CD images
+that Electronic Arts released in 2008: the Allied disc and/or the Soviet
+disc. Make sure you get the Windows 95 versions. The expansion packs
+(Counterstrike and Aftermath) aren't supported yet.
+
+The images are available from Command & Conquer fan sites such as
+cnc-comm.com and CNCNZ.com. Prepare has been checked with the images
+named CD1_ALLIES.iso and CD2_SOVIET.iso. Unzip the downloads first: each
+holds one .iso file of about 600 MB.
+
+The Prepare file that comes next to !VanillaRA installs the data from
+the ISO files (it also installs Tiberian Dawn's, if you have !VanillaTD):
+
+  1. Put !VanillaRA where you want to keep the game, and open the
+     directory containing it, so the Filer has seen it.
+  2. Copy Prepare into the directory holding the ISO file(s). They
+     don't need to be on the same disc as !VanillaRA.
+  3. Double-click Prepare.
+
+Prepare installs from every disc image it finds in its own directory,
+reading the ISO files directly (no CD drive or CDFS needed), and checks
+each file it writes against a known checksum. Files already installed
+are skipped, so it's safe to run it again.
+
+From the command line you can also name the images and give options:
+
+  *Obey ADFS::HardDisc4.$.ISOs.Prepare -nomovies
+  *Obey ADFS::HardDisc4.$.Prepare SCSI::Big.$.CD1_ALLIES/iso
+
+  -nomovies  leaves out the movies (370 MB on the Allied disc, 415 MB on
+             the Soviet one). Prepare then writes one 85 MB copy of the
+             game data without them, the same from either disc, using
+             !VanillaRA.Utils.ramix.
+  -force     rewrites files that are already there
+
+With the movies, each disc's data goes in its own folder (!VanillaRA.allied
+and !VanillaRA.soviet), and the game uses whichever it needs, as it would
+the CDs. Without movies one disc is enough for both campaigns. Without
+movies the game simply skips them.
+
+
+Playing
+-------
+
+Double-click !VanillaRA. The keys are the same as in the original game.
+
+Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
+change its options.
+
+Low resolution: for slower machines, the game can run at 320x200, the
+size of the original DOS version, which is about twice as fast on a Risc
+PC. Set VanillaRA$LowRes to 1 in !VanillaRA.!Run to use it
+(Shift-double-click !VanillaRA to open it, then load !Run into a text
+editor). It uses the game's own low-resolution graphics: less of the map
+fits on the screen and the sidebar is smaller.
+
+Saved games are stored in !VanillaRA. They can be moved between RISC OS
+machines but can't be loaded by Vanilla Conquer on other platforms, or
+by the original game.
+
+
+Known issues
+------------
+
+  * Network play is built in but hasn't been tested on RISC OS yet.
+  * Campaign missions have only been tried in part.
+
+
+Problems
+--------
+
+Messages from the game go to !VanillaRA.stderr. If something goes wrong,
+please include that file in a bug report. To also log frame rates and
+timings there:
+
+  *Set VC_FPSLOG 1
+
+
+Licences
+--------
+
+Vanilla Conquer is free software under the GNU General Public License
+version 3, with additional terms from Electronic Arts. See
+!VanillaRA.Licences for the licence texts, including those of the parts
+from other people:
+
+  GPL-3          Vanilla Conquer and this port, including Utils.vcprep
+                 and Utils.ramix
+  Blast          blast.c in Utils.vcprep (Mark Adler, zlib licence)
+  UnixLib        SharedUnixLibrary and the C library in !RunImage
+                 (BSD/LGPL)
+  DRenderer      the DigitalRenderer module (GPL-2)
+
+The GPL means you can have the source code: it's at the GitHub address
+above. The sources of SharedUnixLibrary, DigitalRenderer and SDL 1.2
+(LGPL-2.1, built into !RunImage) are from the GCCSDK project at
+https://www.riscos.info/.
+
+Command & Conquer and Red Alert are trademarks of Electronic Arts. This
+project is not affiliated with or endorsed by Electronic Arts. The game
+data remains the property of Electronic Arts.

@@ -152,7 +152,8 @@ Known issues
   * Typing your name on the high-score table and the colouring-in of the
     campaign map are slow on a real Risc PC.
   * The TV-static effect on the GDI/Nod selection screen is a bit jerky.
-  * Only Tiberian Dawn for now. Red Alert is planned.
+  * Red Alert is a separate application, !VanillaRA. Prepare installs
+    both games' data.
 
 
 Problems

@@ -1,6 +1,10 @@
 | !Run for Vanilla Conquer: Red Alert
 Set VanillaRA$Dir <Obey$Dir>
 IconSprites <VanillaRA$Dir>.!Sprites
+| Low resolution: 1 runs the game at 320x200 (the DOS version's size), about twice
+| as fast, for slower machines; 0 runs it at 640x400. It uses the game's own 320x200
+| graphics, with less of the map on screen and a smaller sidebar.
+Set VanillaRA$LowRes 0
 | SharedUnixLibrary is normally in !System; fall back to the copy shipped here.
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaRA$Dir>.Modules.SharedULib

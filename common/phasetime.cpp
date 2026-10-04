@@ -6,6 +6,11 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+#endif
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -272,6 +277,32 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_MISSION] * per,
             Bench_Us[PHASE_THREAT] * per,
             Bench_Us[PHASE_SIGHT] * per);
+#ifdef __riscos__
+    {
+        // Memory: the application slot, and the heap's dynamic area if it has one.
+        _kernel_swi_regs regs;
+        regs.r[0] = -1;
+        regs.r[1] = -1;
+        unsigned slot = _kernel_swi(Wimp_SlotSize, &regs, &regs) == nullptr ? unsigned(regs.r[0]) : 0;
+        unsigned heap = 0;
+        int area = -1;
+        for (;;) {
+            regs.r[0] = 3;
+            regs.r[1] = area;
+            if (_kernel_swi(OS_DynamicArea, &regs, &regs) != nullptr || regs.r[1] == -1) {
+                break;
+            }
+            area = regs.r[1];
+            regs.r[0] = 2;
+            regs.r[1] = area;
+            if (_kernel_swi(OS_DynamicArea, &regs, &regs) == nullptr && regs.r[8] != 0
+                && strncmp(reinterpret_cast<const char*>(regs.r[8]), "Vanilla", 7) == 0) {
+                heap += unsigned(regs.r[2]);
+            }
+        }
+        fprintf(stderr, "bench memory: slot %u KB, heap dynamic area %u KB\n", slot / 1024, heap / 1024);
+    }
+#endif
     if (Bench_Us[PHASE_X1] + Bench_Us[PHASE_X2] + Bench_Us[PHASE_X3] != 0) {
         fprintf(stderr,
                 "bench spare timers ms/frame: x1 %.2f x2 %.2f x3 %.2f\n",
