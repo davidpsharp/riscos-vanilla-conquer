@@ -321,9 +321,11 @@ bool Start_Scenario(char* name, bool briefing)
     // BG	Theme.Queue_Song(THEME_QUIET);
     Theme.Stop();
     IsTanyaDead = SaveTanya;
+    Phase_Startup("starting the scenario");
     if (!Read_Scenario(name)) {
         return (false);
     }
+    Phase_Startup("scenario read");
 
     /*
     ** This was added in the Sept 16th 2020 update, causes colors to alternate for both in standalone.

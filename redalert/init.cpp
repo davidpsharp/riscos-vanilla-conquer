@@ -192,6 +192,7 @@ bool Init_Game(int, char*[])
     **	handler to function.
     */
     Bootstrap();
+    Phase_Startup("bootstrap mixfiles");
 
     ////////////////////////////////////////
     // The editor needs to not start the mouse up. - 7/22/2019 JAS
@@ -218,6 +219,7 @@ bool Init_Game(int, char*[])
     **	Register and cache any secondary mixfiles.
     */
     Init_Secondary_Mixfiles();
+    Phase_Startup("secondary mixfiles");
 
     /*
     **	This is a special hack to initialize the heaps that must be in place before the
@@ -300,6 +302,7 @@ bool Init_Game(int, char*[])
 #endif
 
     Session.MaxPlayers = Rule.MaxPlayers;
+    Phase_Startup("rules");
 
     /*
     **	Initialize the game object heaps as well as other rules-dependant buffer allocations.
@@ -334,6 +337,7 @@ bool Init_Game(int, char*[])
     /*
     **	Initialize the text remap tables.
     */
+    Phase_Startup("heaps, intro");
     Init_Color_Remaps();
 
     /*
@@ -371,7 +375,9 @@ bool Init_Game(int, char*[])
     **	Initialize the bulk data. This takes the longest time and must be performed once
     **	before the regular game starts.
     */
+    Phase_Startup("title page");
     Init_Bulk_Data();
+    Phase_Startup("bulk data");
 
     /*
     **	Initialize the multiplayer score values

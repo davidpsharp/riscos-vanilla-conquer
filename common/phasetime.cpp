@@ -234,6 +234,18 @@ static const char* Rtti_Name(int rtti)
     return rtti < Rtti_Name_Count ? Rtti_Names[rtti] : "other";
 }
 
+void Phase_Startup(const char* step)
+{
+#ifdef SDL_BUILD
+    if (Phase_Timing) {
+        static unsigned last = 0;
+        unsigned now = unsigned(SDL_GetTicks());
+        fprintf(stderr, "startup: %s at %u ms (+%u)\n", step, now, now - last);
+        last = now;
+    }
+#endif
+}
+
 unsigned Phase_Bench_Started_Us()
 {
     return Bench_Started;
