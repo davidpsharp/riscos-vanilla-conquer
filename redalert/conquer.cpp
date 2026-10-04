@@ -2408,6 +2408,41 @@ extern GraphicBufferClass VQ640;
 
 extern void Play_Movie_GlyphX(const char* movie_name, ThemeType theme, bool immediate);
 
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+/*
+** Movie sound. On a real StrongARM Risc PC under RISC OS 4.39, playing the intro
+** with its sound crashed after about 40 frames: the frame data was corrupted (an
+** LCW unpack then ran off into unmapped memory). Without the movie's sound it plays
+** to the end, and with sound it's fine in RPCEmu and on a Raspberry Pi 4 (RISC OS
+** 5); the cause isn't known yet. So before RISC OS 5, movies play silently.
+** VanillaRA$MovieSound overrides it: 1 for sound, 0 for none.
+*/
+static bool Movie_Sound_Allowed()
+{
+    static int allowed = -1;
+    if (allowed < 0) {
+        const char* setting = getenv("VanillaRA$MovieSound");
+        if (setting != nullptr && *setting != '\0') {
+            allowed = strcmp(setting, "0") != 0;
+        } else {
+            _kernel_swi_regs regs;
+            regs.r[0] = 129; // OS_Byte 129,0,255: which OS
+            regs.r[1] = 0;
+            regs.r[2] = 255;
+            allowed = _kernel_swi(OS_Byte, &regs, &regs) == nullptr && regs.r[1] >= 0xAA; // RISC OS 5 or later
+        }
+    }
+    return allowed != 0;
+}
+#else
+static bool Movie_Sound_Allowed()
+{
+    return true;
+}
+#endif
+
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
 {
     if (Bench_Frames > 0) {
@@ -2497,7 +2532,7 @@ void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
         }
 #endif
 
-        if (!Debug_Quiet && Get_Digi_Handle() != -1) {
+        if (!Debug_Quiet && Get_Digi_Handle() != -1 && Movie_Sound_Allowed()) {
             AnimControl.OptionFlags |= VQAOPTF_AUDIO;
         } else {
             AnimControl.OptionFlags &= ~VQAOPTF_AUDIO;
