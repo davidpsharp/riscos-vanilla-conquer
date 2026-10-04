@@ -77,6 +77,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <chrono>
 
 #include "interpal.h"
 #include "vortex.h"
@@ -3258,6 +3259,15 @@ int VQ_Call_Back(unsigned char*, int)
         Keyboard->Clear();
     }
     Check_VQ_Palette_Set();
+
+    /*
+    **	With VC_FPSLOG set, time each movie frame: the gap between frames and how
+    **	long scaling and presenting take (as in Tiberian Dawn). Printed every 2
+    **	seconds; the clock may only tick in centiseconds, so read the averages.
+    */
+    static const bool trace = getenv("VC_FPSLOG") != nullptr;
+    typedef std::chrono::steady_clock Clock;
+    Clock::time_point t0 = Clock::now();
 #ifdef MOVIE640
     if (IsVQ640) {
         VQ640.Blit(SeenBuff);
@@ -3267,7 +3277,43 @@ int VQ_Call_Back(unsigned char*, int)
 #else
     Interpolate_2X_Scale(&SysMemPage, &SeenBuff, NULL);
 #endif
+    Clock::time_point t1 = Clock::now();
     Frame_Limiter();
+
+    if (trace) {
+        static Clock::time_point last_frame, report_start;
+        static long scale_us = 0, present_us = 0, max_gap_us = 0;
+        static int frames = 0;
+        Clock::time_point t2 = Clock::now();
+        if (frames == 0 && report_start == Clock::time_point()) {
+            report_start = t0;
+        } else {
+            long gap = long(std::chrono::duration_cast<std::chrono::microseconds>(t0 - last_frame).count());
+            if (gap < 3000000 && gap > max_gap_us) { // Longer is the gap between two movies.
+                max_gap_us = gap;
+            }
+        }
+        last_frame = t0;
+        scale_us += long(std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
+        present_us += long(std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+        ++frames;
+        long elapsed = long(std::chrono::duration_cast<std::chrono::microseconds>(t2 - report_start).count());
+        if (elapsed >= 2000000) {
+            fprintf(stderr,
+                    "movie: %d frames in %ldms, longest gap %ldms, scale %.1fms/frame (mode %d%s), present "
+                    "%.1fms/frame\n",
+                    frames,
+                    elapsed / 1000,
+                    max_gap_us / 1000,
+                    scale_us / 1000.0 / frames,
+                    Settings.Video.InterpolationMode,
+                    IsVQ640 ? ", 640 wide" : "",
+                    present_us / 1000.0 / frames);
+            frames = 0;
+            scale_us = present_us = max_gap_us = 0;
+            report_start = t2;
+        }
+    }
 
     if ((BreakoutAllowed || Debug_Flag) && key == KN_ESC) {
         Keyboard->Clear();
