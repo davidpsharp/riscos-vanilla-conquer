@@ -281,3 +281,10 @@ if(BUILD_VANILLARA)
             target_link_options(VanillaRA PUBLIC -fsanitize=address)
     endif()
 endif()
+# ramix (riscos/tools/ramix): lists and copies Red Alert mixfiles; Prepare uses it to
+# install MAIN.MIX without its movies.
+add_executable(ramix ${CMAKE_SOURCE_DIR}/riscos/tools/ramix/ramix.cpp)
+target_link_libraries(ramix common)
+if(RISCOS)
+    riscos_make_aif(ramix)
+endif()

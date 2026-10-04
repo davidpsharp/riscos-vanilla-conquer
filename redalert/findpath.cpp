@@ -63,25 +63,44 @@ static unsigned short PathCacheStamp[MAP_CELL_TOTAL];
 static unsigned char PathCacheMove[MAP_CELL_TOTAL];
 static unsigned short PathCacheGeneration = 0;
 static bool PathCacheOn = false;
+static int PathCacheDepth = 0;
+
+/*
+** Path_Cache_Begin/End bracket a stretch in which the map doesn't change and the same
+** unit looks for paths: one Find_Path, or Basic_Path's tries at rising thresholds
+** (Can_Enter_Cell doesn't depend on the threshold). They nest; only the outermost
+** starts a new generation.
+*/
+void Path_Cache_Begin()
+{
+    static const bool off = getenv("VC_NOPATHCACHE") != nullptr;
+    if (off || PathCacheDepth++ > 0) {
+        return;
+    }
+    if (++PathCacheGeneration == 0) {
+        memset(PathCacheStamp, 0, sizeof(PathCacheStamp));
+        PathCacheGeneration = 1;
+    }
+    PathCacheOn = true;
+}
+
+void Path_Cache_End()
+{
+    if (PathCacheDepth > 0 && --PathCacheDepth == 0) {
+        PathCacheOn = false;
+    }
+}
 
 namespace {
 struct PathCacheScope
 {
     PathCacheScope()
     {
-        static const bool off = getenv("VC_NOPATHCACHE") != nullptr;
-        if (off) {
-            return;
-        }
-        if (++PathCacheGeneration == 0) {
-            memset(PathCacheStamp, 0, sizeof(PathCacheStamp));
-            PathCacheGeneration = 1;
-        }
-        PathCacheOn = true;
+        Path_Cache_Begin();
     }
     ~PathCacheScope()
     {
-        PathCacheOn = false;
+        Path_Cache_End();
     }
 };
 

@@ -5,21 +5,23 @@
 **   ramix copy <mixfile> <new mixfile> [name to leave out ...]
 **   ramix extract <mixfile> <name> <file>
 **
+** A mixfile inside another file, such as a CD image, is given as <file>@<offset>.
+**
 ** Red Alert's MAIN.MIX (455-500 MB) is mostly its movies (MOVIES1.MIX or
 ** MOVIES2.MIX inside it); without them it is a few tens of MB. copy writes a plain
 ** (unencrypted) mixfile, which the game reads as well as the encrypted kind. Names
 ** are matched the way the game does (uppercase, CRCEngine). Entries whose names
 ** aren't known are listed by their hash.
 */
-#include "common/crc.h"
-#include "common/ini.h"
-#include "common/pk.h"
-#include "common/pkstraw.h"
-#include "common/ramfile.h"
-#include "common/rawfile.h"
-#include "common/rndstraw.h"
-#include "common/xstraw.h"
-#include "common/endianness.h"
+#include "crc.h"
+#include "ini.h"
+#include "pk.h"
+#include "pkstraw.h"
+#include "ramfile.h"
+#include "rawfile.h"
+#include "rndstraw.h"
+#include "xstraw.h"
+#include "endianness.h"
 
 #include <algorithm>
 #include <ctype.h>
@@ -30,6 +32,18 @@
 #include <string.h>
 #include <string>
 #include <vector>
+
+#ifdef __riscos__
+// The RISC OS file layer (riscos_fs.cpp) reports timings to phasetime.cpp, which is in
+// the game's video library; ramix doesn't time anything.
+#include "phasetime.h"
+bool Phase_Timing = false;
+unsigned Phase_Counts[COUNT_MAX];
+unsigned Phase_Now_Us()
+{
+    return 0;
+}
+#endif
 
 // Red Alert's public key (redalert/const.cpp), which decrypts mixfile headers.
 static const char Keys[] = "[PublicKey]\n"
@@ -58,12 +72,30 @@ static const char* const Known[] = {"CONQUER.MIX", "GENERAL.MIX", "MOVIES1.MIX",
                                     "SPEECH.MIX",  "EXPAND.MIX",  "EXPAND2.MIX", "HIRES1.MIX",  "REDALERT.INI",
                                     "RULES.INI",   "AUD.MIX",     "SETUP.MIX",   "DESEICNH.MIX", "TEMPICNH.MIX"};
 
-static bool Read_Index(const char* path, std::vector<Entry>& entries, uint32_t& data_start)
+// "<file>@<offset>": a mixfile at that byte offset in the file.
+static std::string Split_Offset(const char* arg, long& offset)
 {
-    RawFileClass file(path);
+    std::string path(arg);
+    offset = 0;
+    size_t at = path.rfind('@');
+    if (at != std::string::npos && at + 1 < path.size()) {
+        offset = strtol(path.c_str() + at + 1, nullptr, 0);
+        path.resize(at);
+    }
+    return path;
+}
+
+static bool Read_Index(const char* arg, std::vector<Entry>& entries, uint32_t& data_start)
+{
+    long offset;
+    std::string path = Split_Offset(arg, offset);
+    RawFileClass file(path.c_str());
     if (!file.Is_Available()) {
-        fprintf(stderr, "ramix: can't open %s\n", path);
+        fprintf(stderr, "ramix: can't open %s\n", path.c_str());
         return false;
+    }
+    if (offset != 0) {
+        file.Bias(int(offset));
     }
     RAMFileClass keyfile((void*)Keys, int(strlen(Keys)));
     INIClass ini;
@@ -143,14 +175,16 @@ int main(int argc, char** argv)
             if (entries[i].CRC != want) {
                 continue;
             }
-            FILE* in = fopen(argv[2], "rb");
+            long base;
+            std::string in_path = Split_Offset(argv[2], base);
+            FILE* in = fopen(in_path.c_str(), "rb");
             FILE* out = fopen(argv[4], "wb");
             if (in == nullptr || out == nullptr) {
                 fprintf(stderr, "ramix: can't open %s\n", in == nullptr ? argv[2] : argv[4]);
                 return 1;
             }
             std::vector<char> data(entries[i].Size);
-            fseek(in, long(data_start + entries[i].Offset), SEEK_SET);
+            fseek(in, base + long(data_start + entries[i].Offset), SEEK_SET);
             bool ok = fread(&data[0], 1, data.size(), in) == data.size() && fwrite(&data[0], 1, data.size(), out) == data.size();
             fclose(in);
             ok = fclose(out) == 0 && ok;
@@ -175,7 +209,9 @@ int main(int argc, char** argv)
             kept.push_back(entries[i]);
         }
     }
-    FILE* in = fopen(argv[2], "rb");
+    long base;
+    std::string in_path = Split_Offset(argv[2], base);
+    FILE* in = fopen(in_path.c_str(), "rb");
     FILE* out = fopen(argv[3], "wb");
     if (in == nullptr || out == nullptr) {
         fprintf(stderr, "ramix: can't open %s\n", in == nullptr ? argv[2] : argv[3]);
@@ -196,7 +232,7 @@ int main(int argc, char** argv)
     }
     std::vector<char> buffer(1 << 20);
     for (size_t i = 0; i < kept.size(); ++i) {
-        fseek(in, long(data_start + kept[i].Offset), SEEK_SET);
+        fseek(in, base + long(data_start + kept[i].Offset), SEEK_SET);
         for (uint32_t left = kept[i].Size; left > 0;) {
             size_t n = left < buffer.size() ? left : buffer.size();
             if (fread(&buffer[0], 1, n, in) != n || fwrite(&buffer[0], 1, n, out) != n) {

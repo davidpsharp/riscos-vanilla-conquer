@@ -398,6 +398,9 @@ bool FootClass::Basic_Path(void)
             **	failure, then try a more severe path method until the
             **	maximum severity is reached.
             */
+            void Path_Cache_Begin(); // findpath.cpp: one cache for all the tries below
+            void Path_Cache_End();
+            Path_Cache_Begin();
             for (;;) {
                 path = Find_Path(cell, &workpath1[0], sizeof(workpath1), PathThreshhold);
                 if (path && path->Cost) {
@@ -415,6 +418,7 @@ bool FootClass::Basic_Path(void)
                 if (PathThreshhold > maxtype)
                     break;
             }
+            Path_Cache_End();
 
 #ifdef NEVER
             /*

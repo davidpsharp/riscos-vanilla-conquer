@@ -25,13 +25,22 @@ if [ "${1:-}" != --no-build ]; then
             -DCMAKE_BUILD_TYPE=Release -DRISCOS_EXTRA_FLAGS=$EXTRA \
             -DBUILD_VANILLATD=OFF -DBUILD_VANILLARA=ON -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=ON >/dev/null &&
         cmake --build $BDIR &&
-        elf2aif $BDIR/vanillara $BDIR/vanillara,ff8"
+        elf2aif $BDIR/vanillara $BDIR/vanillara,ff8 &&
+        cmake -S riscos/tools -B build/riscos-tools -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake -DCMAKE_BUILD_TYPE=Release >/dev/null &&
+        cmake --build build/riscos-tools"
 fi
 
 [ -d "$WORK/hostfs/modules" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
 mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaRA/* "$APP/"
 cp "$ROOT/$BDIR/vanillara,ff8" "$APP/!RunImage,ff8"
+# Prepare sits next to !VanillaRA, as in the release zip; it uses Utils.vcprep and
+# Utils.ramix (MAIN.MIX without movies).
+cp "$ROOT/riscos/app/Prepare,feb" "$APP/../"
+mkdir -p "$APP/Utils"
+cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"
+cp "$ROOT/$BDIR/ramix,ff8" "$APP/Utils/"
 cp "$WORK/hostfs/modules/SharedULib,ffa" "$APP/Modules/"
 cp "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 

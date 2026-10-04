@@ -1,13 +1,18 @@
-| Prepare for Vanilla Conquer: Tiberian Dawn
-| Installs the game data into !VanillaTD from the freeware C&C95 (C&C Gold)
-| CD images in the same directory as this file. Copy it next to the .iso
-| files and double-click it, or from the command line:
+| Prepare for Vanilla Conquer: Tiberian Dawn and Red Alert
+| Installs the game data from the freeware CD images in the same directory as this
+| file: the C&C95 (C&C Gold) GDI and Nod discs into !VanillaTD, and the Red Alert
+| Allied and Soviet discs into !VanillaRA. Copy it next to the .iso files and
+| double-click it, or from the command line:
 |   *Obey <path>.Prepare [<CD image>...] [-nomovies] [-force]
-| -nomovies leaves out the movies (about 430 MB per disc).
+| -nomovies leaves out the movies (about 430 MB per C&C95 disc, 370-415 MB per
+| Red Alert disc).
 | -force rewrites files that are already present.
-If "<VanillaTD$Dir>"="" Then Error Prepare doesn't know where !VanillaTD is yet. Open the directory containing !VanillaTD, then run Prepare again.
+If "<VanillaTD$Dir>"="" AND "<VanillaRA$Dir>"="" Then Error Prepare doesn't know where !VanillaTD or !VanillaRA is yet. Open the directory containing them, then run Prepare again.
+Set Prepare$Dir <VanillaTD$Dir>
+If "<Prepare$Dir>"="" Then Set Prepare$Dir <VanillaRA$Dir>
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
-RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaTD$Dir>.Modules.SharedULib
+RMEnsure SharedUnixLibrary 1.16 RMLoad <Prepare$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Prepare needs SharedUnixLibrary 1.16 or later
-WimpSlot -min 1024K -max 1024K
-Run <VanillaTD$Dir>.Utils.vcprep -app <VanillaTD$Dir> -search <Obey$Dir> %*0
+| vcprep runs Utils.ramix in this slot too, to install Red Alert without its movies.
+WimpSlot -min 6000K -max 6000K
+Run <Prepare$Dir>.Utils.vcprep -search <Obey$Dir> %*0

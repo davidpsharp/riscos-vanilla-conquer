@@ -2082,12 +2082,17 @@ void CellClass::Adjust_Threat(HousesType house, int threat_value)
 
     int region = Map.Cell_Region(Cell_Number());
 
-    for (HousesType lp = HOUSE_FIRST; lp < HOUSE_COUNT; lp++) {
-        if (lp == house)
+    /*
+    ** Every house but this one. Going through the houses that exist, rather than
+    ** looking each of the 20 house types up (this is called for every cell a unit
+    ** moves through), gives the same result: each house only changes its own regions.
+    */
+    for (int index = 0; index < Houses.Count(); index++) {
+        HouseClass* house_ptr = Houses.Ptr(index);
+        if (house_ptr->Class->House == house)
             continue;
 
-        HouseClass* house_ptr = HouseClass::As_Pointer(lp);
-        if (house_ptr && (!house_ptr->IsHuman || !house_ptr->Is_Ally(house))) {
+        if (!house_ptr->IsHuman || !house_ptr->Is_Ally(house)) {
             house_ptr->Adjust_Threat(region, threat_value);
         }
     }

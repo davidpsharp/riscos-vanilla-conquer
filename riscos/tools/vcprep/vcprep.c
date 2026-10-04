@@ -126,10 +126,33 @@ static const struct Side Sides[] = {
      {"MOVIES.MIX", "@" SEP "MIX" SEP "MOVIES", 432535694, 0x7b65d73cUL}},
 };
 
+/*
+** Red Alert (the 1996 Windows 95 discs, freeware since 2008). REDALERT.MIX is the
+** same on both; MAIN.MIX differs only in its movies. With movies, each disc's
+** MAIN.MIX goes in allied or soviet, where the game looks for a disc's files.
+** Without, a copy of MAIN.MIX leaving the movies out (85 MB, the same from either
+** disc) goes in MIX, made by Utils.ramix, which can decrypt its index.
+*/
+static const struct Known RA_Redalert = {"REDALERT.MIX", "MIX" SEP "REDALERT", 25046328, 0xd011d267UL};
+static const struct Known RA_No_Movies = {"MAIN.MIX", "MIX" SEP "MAIN", 85242860, 0x9820857bUL};
+
+struct RA_Disc
+{
+    const char* name;
+    struct Known main;
+};
+
+static const struct RA_Disc RA_Discs[] = {
+    {"Allied", {"MAIN.MIX", "allied" SEP "MIX" SEP "MAIN", 454605294, 0x07a47814UL}},
+    {"Soviet", {"MAIN.MIX", "soviet" SEP "MIX" SEP "MAIN", 500577414, 0x4d4140cbUL}},
+};
+
 /* ---- Options and state ---- */
 
 static FILE* Iso;
 static const char* App_Dir;
+static const char* TD_Dir;
+static const char* RA_Dir;
 static const char* Side_Dir;
 static int Force = 0;
 static int Problems = 0;
@@ -306,6 +329,9 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
         printf("  %-12s NOT FOUND on this disc\n", k->name);
         ++Problems;
         return;
+    }
+    if (k->size > 100000000UL) {
+        printf("  %-12s %lu MB, this takes a while\n", k->name, k->size >> 20);
     }
 
     Make_Dirs(path);
@@ -499,6 +525,78 @@ static void Extract_Archive(const struct Entry* root)
 }
 
 /* Installs from one disc image. Returns 0 if it isn't a C&C95 GDI or Nod disc. */
+/* Checks a file already written, by size and CRC. */
+static void Check_File(const struct Known* k, const char* path)
+{
+    FILE* f = fopen(path, "rb");
+    unsigned long crc = 0, size = 0;
+    size_t n;
+    if (f == NULL) {
+        printf("  %-12s wasn't made\n", k->name);
+        ++Problems;
+        return;
+    }
+    while ((n = fread(Buffer, 1, sizeof(Buffer), f)) > 0) {
+        crc = Crc_Update(crc, Buffer, n);
+        size += n;
+    }
+    fclose(f);
+    Set_Type(path, FILETYPE_DATA);
+    Check(k, size, crc);
+}
+
+static int Install_RA(const char* iso_name, const struct Entry* root, const struct Entry* main_mix, int movies)
+{
+    const struct RA_Disc* disc = NULL;
+    struct Entry install;
+    size_t k;
+
+    for (k = 0; k < sizeof(RA_Discs) / sizeof(RA_Discs[0]); ++k) {
+        if (main_mix->size == RA_Discs[k].main.size) {
+            disc = &RA_Discs[k];
+        }
+    }
+    if (disc == NULL || !Find_In_Dir(root, "INSTALL", &install) || !install.is_dir) {
+        return 0;
+    }
+    if (RA_Dir == NULL) {
+        printf("%s: Red Alert %s disc, but !VanillaRA hasn't been seen (double-click it first)\n",
+               iso_name,
+               disc->name);
+        ++Problems;
+        return 0;
+    }
+    App_Dir = RA_Dir;
+    printf("%s: Red Alert %s disc, installing into %s\n", iso_name, disc->name, App_Dir);
+    Copy_Plain(&install, &RA_Redalert);
+    if (movies) {
+        Copy_Plain(root, &disc->main);
+    } else {
+        /* MAIN.MIX without its movies, straight from the image. */
+        char path[1024], command[3072];
+        Dest_Path(&RA_No_Movies, path, sizeof(path));
+        if (!Already_Present(&RA_No_Movies, path)) {
+            Make_Dirs(path);
+            printf("  %-12s without its movies (-nomovies)\n", RA_No_Movies.name);
+            fflush(stdout);
+            snprintf(command,
+                     sizeof(command),
+                     "%s" SEP "Utils" SEP "ramix copy %s@%lu %s MOVIES1.MIX MOVIES2.MIX",
+                     App_Dir,
+                     iso_name,
+                     main_mix->lba * SECTOR,
+                     path);
+            if (system(command) != 0) {
+                printf("  %-12s Utils.ramix failed\n", RA_No_Movies.name);
+                ++Problems;
+            } else {
+                Check_File(&RA_No_Movies, path);
+            }
+        }
+    }
+    return 1;
+}
+
 static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
 {
     struct Entry root, general;
@@ -520,6 +618,17 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
         return 0;
     }
 
+    /* A Red Alert disc has MAIN.MIX in its root. */
+    if (Find_In_Dir(&root, "MAIN.MIX", &general) && !general.is_dir) {
+        int done = Install_RA(iso_name, &root, &general, movies);
+        fclose(Iso);
+        if (!done && !quiet_if_not_cnc) {
+            printf("%s is not a Red Alert Allied or Soviet disc this was made for\n", iso_name);
+            ++Problems;
+        }
+        return done;
+    }
+
     /* Tell the discs apart by the size of GENERAL.MIX, then check it properly below. */
     if (Find_In_Dir(&root, "GENERAL.MIX", &general)) {
         for (k = 0; k < sizeof(Sides) / sizeof(Sides[0]); ++k) {
@@ -528,8 +637,13 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
             }
         }
     }
-    if (side == NULL) {
+    if (side == NULL || TD_Dir == NULL) {
         fclose(Iso);
+        if (side != NULL) {
+            printf("%s: C&C95 disc, but !VanillaTD hasn't been seen (double-click it first)\n", iso_name);
+            ++Problems;
+            return 0;
+        }
         printf("%s is not the C&C95 (C&C Gold) GDI or Nod disc this was made for%s\n",
                iso_name,
                quiet_if_not_cnc ? ", skipped" : "");
@@ -539,6 +653,7 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
         return 0;
     }
     Side_Dir = side->dir;
+    App_Dir = TD_Dir;
     printf("%s: %s disc, installing into %s\n", iso_name, strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
 
     for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
@@ -629,9 +744,10 @@ static const char* Canonical(const char* path)
 static int Usage(void)
 {
     fprintf(stderr,
-            "usage: vcprep [-nomovies] [-force] [-app <!VanillaTD dir>] [-search <dir>] [<CD image>...]\n"
-            "  Installs from the C&C95 CD images given, or else every one in the -search directory.\n"
-            "  The application directory defaults to <VanillaTD$Dir>.\n");
+            "usage: vcprep [-nomovies] [-force] [-app <!VanillaTD dir>] [-raapp <!VanillaRA dir>] [-search <dir>]\n"
+            "              [<CD image>...]\n"
+            "  Installs from the C&C95 and Red Alert CD images given, or else every one in the -search\n"
+            "  directory. The application directories default to <VanillaTD$Dir> and <VanillaRA$Dir>.\n");
     return 2;
 }
 
@@ -649,7 +765,9 @@ int main(int argc, char** argv)
         } else if (strcmp(argv[i], "-force") == 0) {
             Force = 1;
         } else if (strcmp(argv[i], "-app") == 0 && i + 1 < argc) {
-            App_Dir = argv[++i];
+            TD_Dir = argv[++i];
+        } else if (strcmp(argv[i], "-raapp") == 0 && i + 1 < argc) {
+            RA_Dir = argv[++i];
         } else if (strcmp(argv[i], "-search") == 0 && i + 1 < argc) {
             search = argv[++i];
         } else if (argv[i][0] == '-' || num_images == (int)(sizeof(images) / sizeof(images[0]))) {
@@ -658,13 +776,17 @@ int main(int argc, char** argv)
             images[num_images++] = argv[i];
         }
     }
-    if (App_Dir == NULL) {
-        App_Dir = getenv("VanillaTD$Dir");
+    if (TD_Dir == NULL) {
+        TD_Dir = getenv("VanillaTD$Dir");
     }
-    if (App_Dir == NULL || *App_Dir == '\0' || (num_images == 0 && search == NULL)) {
+    if (RA_Dir == NULL) {
+        RA_Dir = getenv("VanillaRA$Dir");
+    }
+    TD_Dir = TD_Dir != NULL && *TD_Dir != '\0' ? Canonical(TD_Dir) : NULL;
+    RA_Dir = RA_Dir != NULL && *RA_Dir != '\0' ? Canonical(RA_Dir) : NULL;
+    if ((TD_Dir == NULL && RA_Dir == NULL) || (num_images == 0 && search == NULL)) {
         return Usage();
     }
-    App_Dir = Canonical(App_Dir);
 
     Crc_Init();
     if (num_images > 0) {
@@ -684,10 +806,11 @@ int main(int argc, char** argv)
         search = Canonical(search);
         installed = Install_From_Dir(search, movies);
         if (installed == 0 && Problems == 0) {
-            printf("No C&C95 CD images found in %s.\n"
-                   "Put the Windows 95 (C&C Gold) GDI and/or Nod disc image (.iso) there, or\n"
-                   "give its name. The MS-DOS and Mac discs won't work. !VanillaTD.!Help says\n"
-                   "where to download them.\n",
+            printf("No C&C95 or Red Alert CD images found in %s.\n"
+                   "Put the Windows 95 (C&C Gold) GDI and/or Nod disc image (.iso) there, or the\n"
+                   "Red Alert Allied and/or Soviet disc image, or give its name. The MS-DOS and\n"
+                   "Mac discs won't work. !VanillaTD.!Help and !VanillaRA.!Help say where to\n"
+                   "download them.\n",
                    search);
             return 1;
         }
