@@ -259,6 +259,13 @@ void PowerClass::Draw_It(bool complete)
                               WINDOW_MAIN,
                               flags | SHAPE_NORMAL,
                               remap);
+            } else {
+                /*
+                **	Nothing is drawn without the sidebar (and IsToRedraw stays set, so
+                **	this happens every frame). Say so, or a partial present would copy
+                **	the whole screen.
+                */
+                Mark_Written(*LogicPage, 0, 0, 0, 0);
             }
             LogicPage->Unlock();
         }

@@ -2164,6 +2164,12 @@ void DisplayClass::Draw_It(bool forced)
         **	flagged to be redrawn.
         */
         if (HidPage.Lock()) {
+            /*
+            **	Redraw_Icons draws only through routines that mark what they write
+            **	(gbuffer.h), so when no cell needs drawing, this lock leaves nothing to
+            **	copy to the screen. Say so, or a partial present would copy it all.
+            */
+            Mark_Written(HidPage, 0, 0, 0, 0);
             Redraw_Icons();
 
             /*
