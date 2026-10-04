@@ -2207,6 +2207,15 @@ void DisplayClass::Draw_It(bool forced)
             **	Redraw the game objects layer by layer. The layer drawing occurs on the ground layer
             **	first and then followed by all the layers in increasing altitude.
             */
+            /*
+            **	The objects and the shroud are drawn only through routines that mark what
+            **	they write (checked with VC_DIRTYCHECK in Allied and Soviet 1-7), so a
+            **	frame in which none needs drawing leaves nothing to copy. The chronal
+            **	vortex hasn't been checked, so not while it's active.
+            */
+            if (!ChronalVortex.Is_Active()) {
+                Mark_Written(HidPage, 0, 0, 0, 0);
+            }
             BStart(BENCH_OBJECTS);
             for (LayerType layer = LAYER_FIRST; layer < LAYER_COUNT; layer++) {
                 for (int index = 0; index < Layer[layer].Count(); index++) {
