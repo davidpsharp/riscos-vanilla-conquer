@@ -1802,6 +1802,27 @@ ObjectClass* MapClass::Close_Object(COORDINATE coord) const
  *=============================================================================================*/
 void Invalidate_Zone_Boxes(); // below
 
+/*
+** Zone_Span floods each zone a row at a time and asks Is_Clear_To_Move about the
+** same cells again and again: every blocked cell from each span beside it, and from
+** Zone_Reset's loop over the whole map. With no zone given it doesn't depend on the
+** zones being filled in, so within one pass the answer for a cell can't change:
+** remember it (0 not asked yet, 1 clear, 2 not). Zone_Reset runs when a bridge or
+** wall goes; a bridge in Soviet 2 took 178 ms on a StrongARM Risc PC.
+*/
+static unsigned char Zone_Clear_Cache[MAP_CELL_TOTAL];
+
+static inline bool Zone_Clear(CellClass const* cellptr, CELL cell, MZoneType check)
+{
+    unsigned char known = Zone_Clear_Cache[cell];
+    if (known != 0) {
+        return known == 1;
+    }
+    bool clear = cellptr->Is_Clear_To_Move(check == MZONE_WATER ? SPEED_FLOAT : SPEED_TRACK, true, true, -1, check);
+    Zone_Clear_Cache[cell] = clear ? 1 : 2;
+    return clear;
+}
+
 bool MapClass::Zone_Reset(int method)
 {
     Invalidate_Zone_Boxes();
@@ -1828,6 +1849,7 @@ bool MapClass::Zone_Reset(int method)
     */
     if (method & MZONEF_NORMAL) {
         int zone = 1; // Starting zone number.
+        memset(Zone_Clear_Cache, 0, sizeof(Zone_Clear_Cache));
         for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
             if (Zone_Span(cell, zone, MZONE_NORMAL)) {
                 zone++;
@@ -1840,6 +1862,7 @@ bool MapClass::Zone_Reset(int method)
     */
     if (method & MZONEF_CRUSHER) {
         int zone = 1; // Starting zone number.
+        memset(Zone_Clear_Cache, 0, sizeof(Zone_Clear_Cache));
         for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
             if (Zone_Span(cell, zone, MZONE_CRUSHER)) {
                 zone++;
@@ -1852,6 +1875,7 @@ bool MapClass::Zone_Reset(int method)
     */
     if (method & MZONEF_DESTROYER) {
         int zone = 1; // Starting zone number.
+        memset(Zone_Clear_Cache, 0, sizeof(Zone_Clear_Cache));
         for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
             if (Zone_Span(cell, zone, MZONE_DESTROYER)) {
                 zone++;
@@ -1864,6 +1888,7 @@ bool MapClass::Zone_Reset(int method)
     */
     if (method & MZONEF_WATER) {
         int zone = 1; // Starting zone number.
+        memset(Zone_Clear_Cache, 0, sizeof(Zone_Clear_Cache));
         for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
             if (Zone_Span(cell, zone, MZONE_WATER)) {
                 zone++;
@@ -1917,9 +1942,9 @@ int MapClass::Zone_Span(CELL cell, int zone, MZoneType check)
     **	until a boundary is reached.
     */
     for (; xbegin >= MapCellX; xbegin--) {
-        CellClass* cellptr = &(*this)[XY_Cell(xbegin, y)];
-        if (cellptr->Zones[check] != 0
-            || (!cellptr->Is_Clear_To_Move(check == MZONE_WATER ? SPEED_FLOAT : SPEED_TRACK, true, true, -1, check))) {
+        CELL here = XY_Cell(xbegin, y);
+        CellClass* cellptr = &(*this)[here];
+        if (cellptr->Zones[check] != 0 || !Zone_Clear(cellptr, here, check)) {
 
             /*
             **	Special short circuit code to bail from this entire routine if
@@ -1944,9 +1969,9 @@ int MapClass::Zone_Span(CELL cell, int zone, MZoneType check)
     **	extent of the current span.
     */
     for (; xend < MapCellX + MapCellWidth; xend++) {
-        CellClass* cellptr = &(*this)[XY_Cell(xend, y)];
-        if (cellptr->Zones[check] != 0
-            || (!cellptr->Is_Clear_To_Move(check == MZONE_WATER ? SPEED_FLOAT : SPEED_TRACK, true, true, -1, check))) {
+        CELL here = XY_Cell(xend, y);
+        CellClass* cellptr = &(*this)[here];
+        if (cellptr->Zones[check] != 0 || !Zone_Clear(cellptr, here, check)) {
             xend--;
             break;
         }
