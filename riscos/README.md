@@ -1,6 +1,6 @@
 # RISC OS port
 
-Vanilla Conquer for RISC OS. The first target is a StrongARM Risc PC running RISC OS 3.7 or 4.x. The Raspberry Pi on RISC OS 5 comes later.
+Vanilla Conquer for RISC OS: Tiberian Dawn (`!VanillaTD`) and Red Alert (`!VanillaRA`). The first target is a StrongARM Risc PC running RISC OS 3.7 or 4.x. The same binaries also run on a Raspberry Pi 4 with RISC OS 5.30.
 
 ## Layout
 
@@ -166,6 +166,46 @@ The game picks `gdi` or `nod` according to the side being played (`Force_CD_Avai
 - Saving a Nod game, loading a GDI save from it, and loading the Nod save back.
 
 The movies are about 430 MB per side and can be left out on small discs.
+
+## Red Alert
+
+`deploy-ra.sh` builds `!VanillaRA` (`build/riscos-ra`, `-DBUILD_VANILLARA=ON`) with `Utils.vcprep` and `Utils.ramix`, and lays it out in `../vcport-work/hostfs/!VanillaRA`, hard-linking the data from `../vcport-work/ra` (the Allied and Soviet discs extracted to `CD1_ALLIES` and `CD2_Soviet`):
+
+```
+!VanillaRA.MIX.REDALERT          the same on both discs
+!VanillaRA.allied.MIX.MAIN       the Allied disc's MAIN.MIX (455 MB with movies)
+!VanillaRA.soviet.MIX.MAIN       the Soviet disc's (500 MB)
+!VanillaRA.MIX.MAIN              or instead: MAIN.MIX without movies (85 MB, the same from either disc)
+```
+
+The game looks for a disc's files in `allied` or `soviet`, as it would ask for that CD. Without movies, one `MIX.MAIN` serves both campaigns.
+
+**Memory:** the game needs more than RISC OS 3.x's 28 MB WimpSlot limit, so `startup.cpp` gives UnixLib a dynamic area for the heap (`__dynamic_da_name`, "Vanilla RA heap", up to 64 MB). `!Run` sets a 6000K slot. Allied 1 uses 32.7 MB of heap.
+
+**Prepare:** `vcprep` recognises a Red Alert disc image by its `MAIN.MIX` (Allied 454,605,294 bytes, Soviet 500,577,414) and `INSTALL/REDALERT.MIX`, and checks each by CRC-32. With movies it copies `MAIN.MIX` into `allied` or `soviet`. With `-nomovies` it runs `Utils.ramix copy <image>@<offset> <app>.MIX.MAIN MOVIES1.MIX MOVIES2.MIX`, which decrypts the mixfile index (RSA and Blowfish, with the game's public key) and writes a plain mixfile without the movies. The game reads plain mixfiles as well as encrypted ones. `Prepare` works with either app or both (`-app`, `-raapp`, `VanillaTD$Dir`, `VanillaRA$Dir`). **Tested:** on the Mac, and on RO 3.71 (RPCEmu, HostFS) with the Soviet image and `-nomovies`; the game then ran from the prepared app. The Pi 4's SD card lacked the space for a 660 MB image.
+
+**Low resolution:** `REDALERT.MIX` has the DOS version's 320x200 graphics (`LORES.MIX`), so `VanillaRA$LowRes` / `-LOWRES` needs nothing extra. On the Risc PC, Allied 1 took 10.3 ms/frame rather than 24.9.
+
+**Benchmarks:** `BENCH_GAME=ra rorth-bench.sh <frames> <seed>` runs the battle from `bench/make-ra-battle.py` (Allied 1's map with 66 tanks and 66 soldiers a side), and `BENCH_MISSION=A1` (or `S1`) plays the mission itself. Results:
+
+| | Risc PC (StrongARM) | Pi 4 |
+| --- | --- | --- |
+| battle, at the start of the night's work | 123.9 ms/frame | 4.85 |
+| battle, now | 110.2 (logic 66.6, paths 16.9, draw 24.6, present 10.5) | 4.47 |
+| battle with `VC_PARTIALPRESENT=1` | 107.5 (present 6.7) | |
+| Allied 1 | 21.5 | 1.05 |
+| Allied 1 with `VC_PARTIALPRESENT=1` | 13.2 (present 10.4 to 1.9) | |
+
+The Risc PC, the Pi 4 and the Mac end the battle the same way with the same seed. RPCEmu plays it differently, but the same each time.
+
+**Speed-ups so far:**
+- Paths:
+  - A per-search cache of `Can_Enter_Cell`, shared by `Basic_Path`'s tries at rising thresholds.
+  - One byte a cell (16 KB), so a look-up costs at most one cache miss.
+  - `Passable_Cell`'s common case inline.
+- `Nearby_Location` bounded by the map edge and by each zone's bounding box.
+- Region threat kept per owner and added up when a house reads it, rather than written to 19 houses' regions for every cell a unit enters. Checked against the old way for every house and region every frame.
+- `As_Pointer` cached.
 
 ## Network play
 
