@@ -40,6 +40,7 @@
  *   Version_Number -- Determines the version number.                                          *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "loaddlg.h"
 #include "common/gitinfo.h"
@@ -2648,8 +2649,8 @@ void Init_Random(void)
         /*
         ** Set the optional user-specified seed
         */
-        if (getenv("VC_SEED") != nullptr) {
-            Seed = atoi(getenv("VC_SEED")); // the same battle every time, for benchmarks
+        if (Bench_Seed_Set) {
+            Seed = Bench_Seed; // VC_SEED: the same battle every time, for benchmarks
         } else if (CustomSeed != 0) {
             Seed = CustomSeed;
         } else {

@@ -64,6 +64,8 @@ extern bool Phase_Timing;
 ** the first one, print the totals (Phase_Bench_Report) and exit.
 */
 extern int Bench_Frames;
+extern bool Bench_Seed_Set; // VC_SEED: the random seed, for the same battle every time
+extern int Bench_Seed;
 void Phase_Object_AI(int rtti, unsigned us);   // one object's AI, by its RTTI
 void Phase_Path(unsigned us);                  // one Find_Path call
 // Names for the RTTI numbers in reports; Tiberian Dawn's are the default.

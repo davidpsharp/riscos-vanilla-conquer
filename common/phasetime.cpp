@@ -16,6 +16,37 @@
 #endif
 
 int Bench_Frames = getenv("VC_BENCH") ? atoi(getenv("VC_BENCH")) : 0;
+bool Bench_Seed_Set = getenv("VC_SEED") != nullptr;
+int Bench_Seed = getenv("VC_SEED") ? atoi(getenv("VC_SEED")) : 0;
+
+#ifdef __riscos__
+/*
+** VC_BENCH and VC_SEED are for one run (riscos/scripts/rorth-bench.sh sets them, then
+** unsets them afterwards). RISC OS system variables outlive the program, and a script
+** stopped before it could unset them left the next game played on that machine as a
+** benchmark: uncapped, without movies, ending with the report. So, once read, forget them.
+** (UnixLib's unsetenv leaves the system variable, so OS_SetVarVal deletes it.)
+*/
+static void Delete_System_Variable(const char* name)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = (int)name;
+    regs.r[1] = 0;
+    regs.r[2] = -1; // delete
+    regs.r[3] = 0;
+    regs.r[4] = 0;
+    _kernel_swi(OS_SetVarVal, &regs, &regs);
+}
+
+static struct ForgetBenchVariables
+{
+    ForgetBenchVariables()
+    {
+        Delete_System_Variable("VC_BENCH");
+        Delete_System_Variable("VC_SEED");
+    }
+} Forget_Bench_Variables;
+#endif
 bool Phase_Timing = getenv("VC_FPSLOG") != nullptr || Bench_Frames > 0;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
