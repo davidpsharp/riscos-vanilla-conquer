@@ -191,10 +191,19 @@ The game looks for a disc's files in `allied` or `soviet`, as it would ask for t
 | | Risc PC (StrongARM) | Pi 4 |
 | --- | --- | --- |
 | battle, at the start of the night's work | 123.9 ms/frame | 4.85 |
-| battle, now | 110.2 (logic 66.6, paths 16.9, draw 24.6, present 10.5) | 4.47 |
+| battle, now | 109.3 (logic 66.9, paths 16.8, draw 23.7, present 10.6) | 4.33 |
 | battle with `VC_PARTIALPRESENT=1` | 107.5 (present 6.7) | |
-| Allied 1 | 21.5 | 1.05 |
+| Allied 1 | 21.5 | 0.95 |
 | Allied 1 with `VC_PARTIALPRESENT=1` | 13.2 (present 10.4 to 1.9) | |
+| Allied 2 | 28.5 | 1.12 |
+| Allied 2 with `VC_PARTIALPRESENT=1` | 23.5 | |
+| start-up to the first frame | 14.9 s, now 12.8 s | 2.2 s |
+
+**Missions:** Allied and Soviet 1–7 (3000 frames each, or until lost; with no player, Allied 4 and Soviet 7 are lost) run to the end on both machines, with the same outcomes. They take 18–29 ms/frame on the Risc PC. The game was also started normally there, and played through the menus into Allied 1 using the mouse.
+
+**Start-up on the Risc PC:** 9 s of the 12.8 s is reading the cached mixfiles (LOCAL, HIRES, CONQUER, SOUNDS, the side and theater mixfiles: 14 MB) at the IDE disc's 2.4 MB/s. `VC_FPSLOG` logs each step (`Phase_Startup`). Checking their SHA-1 digests took 4.2 s before the SHA engine was unrolled, and now takes 2.0 s.
+
+**Movie sound (known issue):** on the real Risc PC (RISC OS 4.39), playing the intro with its sound crashed after about 40 frames. The frame data was corrupted, and an LCW unpack ran into unmapped memory. Without the movie's sound it plays to the end. With sound it's fine in RPCEmu and on the Pi 4, and Tiberian Dawn's movies have sound on the Risc PC. The cause isn't known yet. Before RISC OS 5, movies are silent; `VanillaRA$MovieSound` (1 or 0) overrides that. The crash only became visible once SDL's parachute was turned off. Before that, UnixLib reported "pthread_yield called with context switching disabled" from `SDL_Quit` inside the signal handler.
 
 The Risc PC, the Pi 4 and the Mac end the battle the same way with the same seed. RPCEmu plays it differently, but the same each time.
 
@@ -204,7 +213,8 @@ The Risc PC, the Pi 4 and the Mac end the battle the same way with the same seed
   - One byte a cell (16 KB), so a look-up costs at most one cache miss.
   - `Passable_Cell`'s common case inline.
 - `Nearby_Location` bounded by the map edge and by each zone's bounding box.
-- Region threat kept per owner and added up when a house reads it, rather than written to 19 houses' regions for every cell a unit enters. Checked against the old way for every house and region every frame.
+- Region threat kept per owner and added up when a house reads it, rather than written to 19 houses' regions for every cell a unit enters. A grand total makes reads quick: the first version summed 20 owners on every read and made roundabout teams' searches take 100 ms in Allied 2. Checked against the old way for every house and region every frame.
+- Partial presents work in every mission: the empty map, objects and power bar passes now mark that they drew nothing (0 tiles missed with `VC_DIRTYCHECK`).
 - `As_Pointer` cached.
 
 ## Network play
