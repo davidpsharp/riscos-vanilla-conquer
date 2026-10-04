@@ -1820,7 +1820,9 @@ bool Main_Loop()
     **	Update the display, unless we're inside a dialog.
     */
     if (!Session.Play) {
-        if (SpecialDialog == SDLG_NONE && GameInFocus) {
+        // The benchmark draws even when the window isn't focused (on the Mac), so it
+        // does the same work everywhere.
+        if (SpecialDialog == SDLG_NONE && (GameInFocus || Bench_Frames > 0)) {
             WWMouse->Erase_Mouse(&HidPage, true);
             Map.Input(input, x, y);
             if (input) {

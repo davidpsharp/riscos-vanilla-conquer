@@ -28,6 +28,7 @@
 #include "pkstraw.h"
 #include "shastraw.h"
 #include "wwstd.h"
+#include "phasetime.h"
 #include "rndstraw.h"
 #include "paths.h"
 
@@ -623,17 +624,6 @@ template <class T, class TCRC> bool MixFileClass<T, TCRC>::Cache(Buffer const* b
         T file(Filename);
 
         FileStraw fstraw(file);
-        Straw* straw = &fstraw;
-
-        /*
-        **	If a message digest is attached, then link a SHA straw segment to the data
-        **	stream so that the actual SHA can be compared with the attached one.
-        */
-        SHAStraw sha;
-        if (IsDigest) {
-            sha.Get_From(fstraw);
-            straw = &sha;
-        }
 
         /*
         **	Bias the file to the actual start of the data. This is necessary because the
@@ -647,8 +637,31 @@ template <class T, class TCRC> bool MixFileClass<T, TCRC>::Cache(Buffer const* b
         /*
         **	Fetch the whole mixfile data in one step. If the number of bytes retrieved
         **	does not equal that requested, then this indicates a serious error.
+        **
+        **	If a message digest is attached, the data is hashed after reading it, rather
+        **	than through a SHA straw as it's read (the same digest), so VC_FPSLOG and
+        **	VC_BENCH can show the two times apart. On a StrongARM Risc PC, reading Red
+        **	Alert's cached mixfiles (14 MB) takes 6.8 s, at the disc's speed, and
+        **	hashing them 2 s.
         */
-        int actual = straw->Get(Data, DataSize);
+        unsigned started = Phase_Timing ? Phase_Now_Us() : 0;
+        int actual = fstraw.Get(Data, DataSize);
+        unsigned read_us = Phase_Timing ? Phase_Now_Us() - started : 0;
+        SHAEngine sha;
+        if (IsDigest && actual > 0) {
+            started = Phase_Timing ? Phase_Now_Us() : 0;
+            sha.Hash(Data, actual);
+            if (Phase_Timing) {
+                fprintf(stderr,
+                        "cache %s: %d bytes, read %u ms, SHA %u ms\n",
+                        Filename,
+                        DataSize,
+                        read_us / 1000,
+                        (Phase_Now_Us() - started) / 1000);
+            }
+        } else if (Phase_Timing) {
+            fprintf(stderr, "cache %s: %d bytes, read %u ms, no digest\n", Filename, DataSize, read_us / 1000);
+        }
         if (actual != DataSize) {
             delete[] static_cast<char*>(Data);
             Data = NULL;
