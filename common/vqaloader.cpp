@@ -120,6 +120,7 @@ int VQA_Load_CBFZ(VQAHandle* handle, unsigned iffsize)
     loader->NumPartialCB = 0;
     curcb->Flags |= 2u;
     curcb->CBOffset = lcwoffset;
+    curcb->CBSize = iffsize;
     loader->FullCB = curcb;
     loader->FullCB->Flags &= (~1);
     loader->CurCB = curcb->Next;
@@ -171,6 +172,7 @@ int VQA_Load_CBPZ(VQAHandle* handle, unsigned iffsize)
     loader->PartialCBSize += (uint16_t)iffsize;
 
     if (handle->Header.Groupsize == ++loader->NumPartialCB) {
+        curcb->CBSize = loader->PartialCBSize;
         loader->NumPartialCB = 0;
         loader->PartialCBSize = 0;
         curcb->Flags |= 2u;

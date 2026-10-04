@@ -173,6 +173,97 @@ int LCW_Uncompress(void const* source, void* dest, unsigned length)
     return (int)(dest_ptr - (unsigned char*)dest);
 }
 
+/*
+** LCW_Uncompress with the length of the source as well: it also stops at the end of
+** the data, and doesn't start an operation whose bytes aren't all there. Otherwise it
+** decodes exactly as above.
+**
+** Red Alert's movies need it: their codebooks have no end code, and are unpacked
+** into a buffer bigger than the result, so the unbounded version went on decoding
+** whatever followed the data, up to the end of the buffer and past it. That was
+** harmless where the memory beyond was readable. On a StrongARM Risc PC under RISC
+** OS 4.39, playing the 640x400 intro with its sound, the codebook buffer ended
+** at the end of the heap's dynamic area, and it crashed.
+*/
+int LCW_Uncompress(void const* source, unsigned source_length, void* dest, unsigned length)
+{
+    unsigned char const* source_ptr = static_cast<unsigned char const*>(source);
+    unsigned char const* source_end = source_ptr + source_length;
+    unsigned char* dest_ptr = static_cast<unsigned char*>(dest);
+    unsigned char* dest_end = dest_ptr + length;
+    unsigned char const* copy_ptr;
+    unsigned count;
+
+    while (dest_ptr < dest_end && source_ptr < source_end) {
+        unsigned op_code = *source_ptr++;
+        unsigned left = unsigned(source_end - source_ptr); // operand bytes there are
+
+        if (!(op_code & 0x80)) {
+            /* Short copy from destination. */
+            if (left < 1) {
+                break;
+            }
+            count = (op_code >> 4) + 3;
+            copy_ptr = dest_ptr - ((unsigned)*source_ptr++ + ((op_code & 0x0f) << 8));
+        } else if (!(op_code & 0x40)) {
+            if (op_code == 0x80) {
+                break; /* The end code. */
+            }
+            /* Medium copy from source. */
+            count = op_code & 0x3f;
+            if (count > left) {
+                count = left;
+            }
+            if (count > (unsigned)(dest_end - dest_ptr)) {
+                count = dest_end - dest_ptr;
+            }
+            while (count--) {
+                *dest_ptr++ = *source_ptr++;
+            }
+            continue;
+        } else if (op_code == 0xfe) {
+            /* Long run. */
+            if (left < 3) {
+                break;
+            }
+            count = source_ptr[0] + ((unsigned)source_ptr[1] << 8);
+            unsigned char value = source_ptr[2];
+            source_ptr += 3;
+            if (count > (unsigned)(dest_end - dest_ptr)) {
+                count = dest_end - dest_ptr;
+            }
+            memset(dest_ptr, value, count);
+            dest_ptr += count;
+            continue;
+        } else if (op_code == 0xff) {
+            /* Long copy from destination. */
+            if (left < 4) {
+                break;
+            }
+            count = source_ptr[0] + ((unsigned)source_ptr[1] << 8);
+            copy_ptr = static_cast<unsigned char*>(dest) + source_ptr[2] + ((unsigned)source_ptr[3] << 8);
+            source_ptr += 4;
+        } else {
+            /* Medium copy from destination. */
+            if (left < 2) {
+                break;
+            }
+            count = (op_code & 0x3f) + 3;
+            copy_ptr = static_cast<unsigned char*>(dest) + source_ptr[0] + ((unsigned)source_ptr[1] << 8);
+            source_ptr += 2;
+        }
+
+        if (count > (unsigned)(dest_end - dest_ptr)) {
+            count = dest_end - dest_ptr;
+        }
+        while (count--) {
+            *dest_ptr++ = *copy_ptr++;
+        }
+    }
+
+    return (int)(dest_ptr - static_cast<unsigned char*>(dest));
+}
+
 int LCW_Comp(const void* src, void* dst, unsigned int bytes)
 {
     if (!bytes) {

@@ -91,6 +91,7 @@ typedef struct _VQACBNode
     struct _VQACBNode* Next;
     unsigned Flags;
     unsigned CBOffset;
+    unsigned CBSize; // bytes of compressed codebook at CBOffset
 } VQACBNode;
 
 typedef struct _VQAFrameNode

@@ -36,6 +36,15 @@ int VQA_DrawFrame_Buffer(VQAHandle* handle)
             return result;
         }
 
+        /*
+        ** VQA_SelectFrame may have skipped frames to catch up, moving the drawer on.
+        ** Drawing the node fetched before it, with its pointers never unpacked, read
+        ** codebook entries far beyond the codebook and then stepped the drawer back. Only
+        ** a machine slow enough to skip frames got there: on a StrongARM Risc PC, Red
+        ** Alert's 640x400 intro, which skips frames when it plays with its sound, crashed.
+        */
+        curframe = drawer->CurFrame;
+
         VQA_PrepareFrame(vqabuf);
     }
 
@@ -296,6 +305,7 @@ int VQA_SelectFrame(VQAHandle* handle)
                     }
                     if (curframe->Flags & 8) {
                         curframe->PaletteSize = LCW_Uncompress((curframe->PalOffset + curframe->Palette),
+                                                               vqabuf->MaxPalSize - curframe->PalOffset,
                                                                curframe->Palette,
                                                                vqabuf->MaxPalSize); // Beta line, was replaced with
                         curframe->Flags &= 0xFFFFFFF7;
@@ -335,18 +345,25 @@ void VQA_PrepareFrame(VQAData* vqabuf)
     VQACBNode* codebook = curframe->Codebook;
 
     if (codebook->Flags & 0x02) {
-        LCW_Uncompress(&codebook->Buffer[codebook->CBOffset], codebook->Buffer, vqabuf->MaxCBSize);
+        // The codebooks have no end code: stop at the end of the data (see lcw.cpp).
+        LCW_Uncompress(&codebook->Buffer[codebook->CBOffset], codebook->CBSize, codebook->Buffer, vqabuf->MaxCBSize);
         codebook->Flags &= ~0x02;
     }
 
     if (curframe->Flags & 0x08) {
         curframe->PaletteSize =
-            LCW_Uncompress(&curframe->Palette[curframe->PalOffset], curframe->Palette, vqabuf->MaxPalSize);
+            LCW_Uncompress(&curframe->Palette[curframe->PalOffset],
+                           vqabuf->MaxPalSize - curframe->PalOffset,
+                           curframe->Palette,
+                           vqabuf->MaxPalSize);
         curframe->Flags &= ~0x08;
     }
 
     if (curframe->Flags & 0x10) {
-        LCW_Uncompress(&curframe->Pointers[curframe->PtrOffset], curframe->Pointers, vqabuf->MaxPtrSize);
+        LCW_Uncompress(&curframe->Pointers[curframe->PtrOffset],
+                       vqabuf->MaxPtrSize - curframe->PtrOffset,
+                       curframe->Pointers,
+                       vqabuf->MaxPtrSize);
         curframe->Flags &= ~0x10;
     }
 }

@@ -36,6 +36,8 @@
 #define LCW_H
 
 int LCW_Uncompress(void const* source, void* dest, unsigned length);
+// The same, but reading no more than source_length bytes of source.
+int LCW_Uncompress(void const* source, unsigned source_length, void* dest, unsigned length);
 int LCW_Comp(void const* source, void* dest, unsigned length);
 
 #endif
