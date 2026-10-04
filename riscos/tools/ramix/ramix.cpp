@@ -85,24 +85,47 @@ static std::string Split_Offset(const char* arg, long& offset)
     return path;
 }
 
+// Reads a file with stdio. RawFileClass would do, but on RISC OS it goes through the
+// game's file layer (riscos_fs), which takes names the game's way rather than native
+// RISC OS ones, such as a CD image's path given to Prepare.
+class StdioStraw : public Straw
+{
+public:
+    explicit StdioStraw(FILE* file)
+        : File(file)
+        , Count(0)
+    {
+    }
+    virtual int Get(void* buffer, int length)
+    {
+        int got = int(fread(buffer, 1, size_t(length), File));
+        Count += uint32_t(got);
+        return got;
+    }
+    uint32_t Count; // bytes read so far
+
+private:
+    FILE* File;
+};
+
 static bool Read_Index(const char* arg, std::vector<Entry>& entries, uint32_t& data_start)
 {
     long offset;
     std::string path = Split_Offset(arg, offset);
-    RawFileClass file(path.c_str());
-    if (!file.Is_Available()) {
+    FILE* file = fopen(path.c_str(), "rb");
+    if (file == nullptr || fseek(file, offset, SEEK_SET) != 0) {
         fprintf(stderr, "ramix: can't open %s\n", path.c_str());
+        if (file != nullptr) {
+            fclose(file);
+        }
         return false;
-    }
-    if (offset != 0) {
-        file.Bias(int(offset));
     }
     RAMFileClass keyfile((void*)Keys, int(strlen(Keys)));
     INIClass ini;
     ini.Load(keyfile);
     PKey key = ini.Get_PKey(true);
 
-    FileStraw fstraw(file);
+    StdioStraw fstraw(file);
     RandomStraw fakernd;
     PKStraw pstraw(PKStraw::DECRYPT, fakernd);
     Straw* straw = &fstraw;
@@ -130,7 +153,8 @@ static bool Read_Index(const char* arg, std::vector<Entry>& entries, uint32_t& d
         entries[i].Offset = le32toh(raw[1]);
         entries[i].Size = le32toh(raw[2]);
     }
-    data_start = uint32_t(file.Seek(0, SEEK_CUR));
+    data_start = fstraw.Count;
+    fclose(file);
     return true;
 }
 
