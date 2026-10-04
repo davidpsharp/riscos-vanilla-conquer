@@ -65,6 +65,7 @@
  *   Is_Aftermath_Installed -- Function to determine the availability of the AM expansion.
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "msgbox.h"
 #include "keyframe.h"
@@ -1359,9 +1360,14 @@ void Call_Back(void)
     /*
     **	Music and speech maintenance
     */
+    PhaseTimer phase_timer(PHASE_CALLBACK);
     if (SampleType) {
         Sound_Callback();
-        Theme.AI();
+        {
+            PhaseTimer theme_timer(PHASE_CB_THEME);
+            Theme.AI();
+        }
+        PhaseTimer speak_timer(PHASE_CB_SPEAK);
         Speak_AI();
     }
 
@@ -1651,12 +1657,25 @@ FacingType KN_To_Facing(int input)
  *   01/04/1995 JLB : Created.                                                                 *
  *   03/06/1995 JLB : Fixed.                                                                   *
  *=============================================================================================*/
+/*
+** How long the frame limiter may sleep before the next game frame is due. FrameTimer
+** counts in 1/60 s ticks, so "one tick left" could be anything up to 17 ms: don't
+** sleep at all then, or a slow machine oversleeps a little on nearly every frame.
+*/
+static int Ms_Before_Next_Frame()
+{
+    int ticks = int(long(FrameTimer));
+    return ticks <= 1 ? 0 : (ticks - 1) * 1000 / TIMER_SECOND;
+}
+
 static void Sync_Delay(void)
 {
     /*
-    ** Slow down with frame limiter first.
+    ** Slow down with frame limiter first; but if the next game frame is already
+    ** due, the game is running behind, so present without waiting.
     */
-    Frame_Limiter();
+    Frame_Limiter(long(FrameTimer) ? FL_FORCE_RENDER : FrameLimitFlags(FL_FORCE_RENDER | FL_NO_SLEEP),
+                  Ms_Before_Next_Frame());
 
     /*
     **	Accumulate the number of 'spare' ticks that are frittered away here.
@@ -1682,7 +1701,8 @@ static void Sync_Delay(void)
             Map.Render();
         }
 
-        Frame_Limiter(FL_NONE);
+        // Wake in time for the next game frame rather than the next present slot.
+        Frame_Limiter(FL_NONE, Ms_Before_Next_Frame());
     }
     Color_Cycle();
     Call_Back();
@@ -1738,6 +1758,7 @@ bool Main_Loop()
     // Initialize our AI processing timer
     //
     Session.ProcessTimer = TickCount;
+    Phase_Frame_Begin();
 
 #if 1
     if (Session.TrapCheckHeap) {
@@ -1791,6 +1812,10 @@ bool Main_Loop()
         }
     }
 
+    if (Bench_Frames > 0) {
+        FrameTimer = 0; // the benchmark runs flat out
+    }
+
     /*
     **	Update the display, unless we're inside a dialog.
     */
@@ -1826,7 +1851,10 @@ bool Main_Loop()
     /*
     **	AI logic operations are performed here.
     */
-    Logic.AI();
+    {
+        PhaseTimer phase_timer(PHASE_LOGIC);
+        Logic.AI();
+    }
     TimeQuake = false;
 #ifdef FIXIT_CSII //	checked - ajw 9/28/98
     if (!PendingTimeQuake) {
@@ -1852,7 +1880,10 @@ bool Main_Loop()
     /*
     **	Process all commands that are ready to be processed.
     */
-    Queue_AI();
+    {
+        PhaseTimer phase_timer(PHASE_QUEUE);
+        Queue_AI();
+    }
 
     /*
     **	Keep track of elapsed time in the game.
@@ -1981,7 +2012,28 @@ bool Main_Loop()
 #endif
     BEnd(BENCH_GAME_FRAME);
 
+    ++Logic_Frame_Count;
     Sync_Delay();
+    Phase_Frame_End();
+    if (Bench_Frames > 0) {
+        static int frames = 0;
+        if (++frames >= Bench_Frames) {
+            Phase_Bench_Report(frames);
+            fprintf(stderr,
+                    "bench objects at the end: units %d infantry %d buildings %d aircraft %d vessels %d bullets %d "
+                    "anims %d\n",
+                    Units.Count(),
+                    Infantry.Count(),
+                    Buildings.Count(),
+                    Aircraft.Count(),
+                    Vessels.Count(),
+                    Bullets.Count(),
+                    Anims.Count());
+            fflush(stderr);
+            Sound_End(); // stop the audio thread first, as the game's own exit does
+            exit(0);
+        }
+    }
     return (!GameActive);
 }
 
@@ -2359,6 +2411,9 @@ extern void Play_Movie_GlyphX(const char* movie_name, ThemeType theme, bool imme
 
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
 {
+    if (Bench_Frames > 0) {
+        return; // the benchmark goes straight to the game
+    }
 #ifdef REMASTER_BUILD
     if (strcmp(name, "x") == 0 || strcmp(name, "X") == 0) {
         return;
@@ -4501,6 +4556,30 @@ void Shake_The_Screen(int shakes, HousesType house)
     }
 #else
     shakes += shakes;
+
+#ifdef SDL1_BUILD
+    /*
+    ** Shaking synchronously froze the game for 6 presents per shake: 200 ms or more
+    ** on a slow machine. Instead queue the offsets for the next presents to show, as
+    ** the Remaster does, and only for the player's own house. The synced random
+    ** numbers are drawn exactly as before, so every machine stays in step.
+    */
+    {
+        void Video_Queue_Shake(int dy);
+        bool mine = house == HOUSE_NONE || (PlayerPtr != nullptr && house == PlayerPtr->Class->House);
+        int oldoff = 0;
+        int newoff = 0;
+        while (shakes--) {
+            do {
+                newoff = Sim_Random_Pick(0, 2) - 1;
+            } while (newoff == oldoff);
+            if (mine) {
+                Video_Queue_Shake(newoff * 2);
+            }
+        }
+        return;
+    }
+#endif
 
     Hide_Mouse();
     SeenPage.Blit(HidPage);

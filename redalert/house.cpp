@@ -228,9 +228,27 @@ fixed HouseClass::Tiberium_Fraction(void) const
  *=============================================================================================*/
 HouseClass* HouseClass::As_Pointer(HousesType house)
 {
+    /*
+    **	This is called a great deal (threat tracking calls it for every cell a unit
+    **	moves through), so remember the last answer for each house type. A remembered
+    **	house is only used while it's still active and still of that type: houses
+    **	live in a fixed heap, so the memory stays readable after they're deleted.
+    */
+    static HouseClass* _last[HOUSE_COUNT];
+    bool cacheable = house >= HOUSE_FIRST && house < HOUSE_COUNT;
+    if (cacheable) {
+        HouseClass* ptr = _last[house];
+        if (ptr != nullptr && ptr->IsActive && ptr->Class->House == house) {
+            return ptr;
+        }
+    }
+
     if (house != HOUSE_NONE) {
         for (int index = 0; index < Houses.Count(); index++) {
             if (Houses.Ptr(index)->Class->House == house) {
+                if (cacheable) {
+                    _last[house] = Houses.Ptr(index);
+                }
                 return (Houses.Ptr(index));
             }
         }

@@ -84,6 +84,13 @@ extern bool bNoMovies;
 **	Function prototypes for this module **
 *****************************************/
 static void Play_Intro(bool sequenced = false);
+
+/*
+** Set by -AUTOSTART=<A|S><n> to skip the menus and start Allied or Soviet campaign
+** mission n, at normal difficulty (benchmarks and testing).
+*/
+static int AutoStartScenario = 0;
+static bool AutoStartSoviet = false;
 static void Init_Color_Remaps(void);
 static void Init_Heaps(void);
 static void Init_Expansion_Files(void);
@@ -595,6 +602,28 @@ bool Select_Game(bool fade)
                     return true;
                     ;
                 }
+            }
+
+            /*
+            **	-AUTOSTART: straight into a campaign mission, as "start new game" does.
+            */
+            if (AutoStartScenario > 0) {
+                Scen.CDifficulty = DIFF_NORMAL;
+                Scen.Difficulty = DIFF_NORMAL;
+                Scen.CarryOverMoney = 0;
+                BuildLevel = 10;
+                IsTanyaDead = false;
+                SaveTanya = false;
+                Whom = HOUSE_GOOD;
+                Force_CD_Available(AutoStartSoviet ? 1 : 0);
+                char name[_MAX_FNAME + _MAX_EXT];
+                sprintf(name, "SC%c%02dEA.INI", AutoStartSoviet ? 'U' : 'G', AutoStartScenario);
+                Scen.Set_Scenario_Name(name);
+                AutoStartScenario = 0;
+                Theme.Fade_Out();
+                Session.Type = GAME_NORMAL;
+                process = false;
+                break;
             }
 
             /*
@@ -1477,6 +1506,13 @@ bool Parse_Command_Line(int argc, char* argv[])
             continue;
         }
 
+        if (strnicmp(string, "-AUTOSTART=", strlen("-AUTOSTART=")) == 0) {
+            const char* arg = string + strlen("-AUTOSTART=");
+            AutoStartSoviet = arg[0] == 'S' || arg[0] == 's' || arg[0] == 'U' || arg[0] == 'u';
+            AutoStartScenario = atoi(arg + 1);
+            continue;
+        }
+
 #ifdef CHEAT_KEYS
         /*
         **	Specify the random number seed (for debugging)
@@ -1827,7 +1863,9 @@ void Init_Random(void)
         /*
         ** Set the optional user-specified seed
         */
-        if (CustomSeed != 0) {
+        if (getenv("VC_SEED") != nullptr) {
+            Seed = atoi(getenv("VC_SEED")); // the same battle every time, for benchmarks
+        } else if (CustomSeed != 0) {
             Seed = CustomSeed;
         } else {
             srand((unsigned)time(NULL));

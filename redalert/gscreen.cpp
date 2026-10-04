@@ -44,6 +44,7 @@
  *   GScreenClass::Render -- General drawing dispatcher an display update function.            *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 
 GadgetClass* GScreenClass::Buttons = 0;
@@ -356,6 +357,7 @@ void GScreenClass::Remove_A_Button(GadgetClass& gadget)
  *=============================================================================================*/
 void GScreenClass::Render(void)
 {
+    PhaseTimer phase_timer(PHASE_RENDER);
     // This is unnessasary surely?	ST - 10/16/96 2:30PM
     // if (Buttons && Buttons->Is_List_To_Redraw()) {
     //	IsToRedraw = true;
@@ -419,8 +421,24 @@ void GScreenClass::Render(void)
  *=============================================================================================*/
 void ModeX_Blit(GraphicBufferClass* source);
 
+#ifdef SDL1_BUILD
+bool Video_Show_Hidden(VideoSurface* hidden);
+#endif
+
 void GScreenClass::Blit_Display(void)
 {
+    ++Phase_Counts[COUNT_BLIT_DISPLAY];
+#ifdef SDL1_BUILD
+    /*
+    ** Rather than copy the whole hidden page to the visible one, let the video code
+    ** present the hidden page directly (see video_sdl1.cpp).
+    */
+    if (HidPage.Get_XPos() == 0 && HidPage.Get_YPos() == 0 && HidPage.Get_Width() == SeenBuff.Get_Width()
+        && HidPage.Get_Height() == SeenBuff.Get_Height()
+        && Video_Show_Hidden(HidPage.Get_Graphic_Buffer()->Get_DD_Surface())) {
+        return;
+    }
+#endif
     BStart(BENCH_BLIT_DISPLAY);
     WWMouse->Draw_Mouse(&HidPage);
     HidPage.Blit(SeenBuff, 0, 0, 0, 0, HidPage.Get_Width(), HidPage.Get_Height(), false);

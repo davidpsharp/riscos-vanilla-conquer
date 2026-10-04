@@ -37,7 +37,9 @@
 #include "function.h"
 #include "language.h"
 #include "settings.h"
+#include "common/gitinfo.h"
 #include "common/paths.h"
+#include <strings.h>
 #include "common/utfargs.h"
 
 #ifdef __riscos__
@@ -288,6 +290,22 @@ int DLL_Startup(const char* command_line_in)
 
 int main(int argc, char* argv[])
 {
+#ifdef __riscos__
+    // Output is usually redirected to a file by !Run; don't lose it on a crash.
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+    if (getenv("VC_FPSLOG") != nullptr) {
+        /*
+        ** Except when logging timings: then every line was a disc write, interleaved
+        ** with the music stream's reads from the same disc. Flushed every 5 seconds
+        ** with the report (Phase_Report), so a crash loses at most that.
+        */
+        static char stderr_buffer[16384];
+        setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
+    }
+    // Record which build wrote this log.
+    fprintf(stderr, "Vanilla Conquer RA %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
+#endif
     UtfArgs args(argc, argv);
     WWDebugString("RA95 - Starting up.\n");
 
@@ -339,8 +357,17 @@ int main(int argc, char* argv[])
         Read_Setup_Options(&cfile);
 
 #ifndef REMASTER_BUILD
-        /* If DOSMode is enabled, adjust resolution accordingly. */
-        if (Settings.Video.DOSMode) {
+        /*
+        ** If DOSMode is enabled, adjust resolution accordingly. -LOWRES, or the variable
+        ** VanillaRA$LowRes (set by !Run on RISC OS), asks for it for this run only,
+        ** leaving REDALERT.INI as it is.
+        */
+        bool low_res_asked = getenv("VanillaRA$LowRes") != nullptr && *getenv("VanillaRA$LowRes") != '\0'
+                             && strcmp(getenv("VanillaRA$LowRes"), "0") != 0;
+        for (int i = 1; i < argc; ++i) {
+            low_res_asked = low_res_asked || strcasecmp(argv[i], "-LOWRES") == 0;
+        }
+        if (Settings.Video.DOSMode || low_res_asked) {
             RESFACTOR = 1;
             ScreenWidth = 320;
             ScreenHeight = 200;
@@ -353,7 +380,8 @@ int main(int argc, char* argv[])
         ** are not using WinMain anymore, we simply pass 0 to it. */
         Create_Main_Window(ProgramInstance, 0, ScreenWidth, ScreenHeight);
 #endif
-        SoundOn = Audio_Init(16, false, 11025 * 2, false);
+        // VC_NOSOUND: no audio at all, e.g. to see how much of a benchmark the mixer takes.
+        SoundOn = getenv("VC_NOSOUND") ? false : Audio_Init(16, false, 11025 * 2, false);
 
         bool video_success = false;
 

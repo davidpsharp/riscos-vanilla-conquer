@@ -48,7 +48,58 @@
  *   Set_Path_Overlap -- Sets the overlap bit for given cell                                   *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
+
+/*
+** While Find_Path works, the game doesn't change, so neither does any cell's
+** Can_Enter_Cell answer (no facing is used); but edge following asks about the
+** same cells over and over, and in a big battle that was the largest part of the
+** game logic on a Risc PC (Tiberian Dawn). So Passable_Cell remembers the answers
+** for the duration of one Find_Path. The stamp array is never cleared, just given
+** a new generation number per search. VC_NOPATHCACHE turns it off, to compare.
+*/
+static unsigned short PathCacheStamp[MAP_CELL_TOTAL];
+static unsigned char PathCacheMove[MAP_CELL_TOTAL];
+static unsigned short PathCacheGeneration = 0;
+static bool PathCacheOn = false;
+
+namespace {
+struct PathCacheScope
+{
+    PathCacheScope()
+    {
+        static const bool off = getenv("VC_NOPATHCACHE") != nullptr;
+        if (off) {
+            return;
+        }
+        if (++PathCacheGeneration == 0) {
+            memset(PathCacheStamp, 0, sizeof(PathCacheStamp));
+            PathCacheGeneration = 1;
+        }
+        PathCacheOn = true;
+    }
+    ~PathCacheScope()
+    {
+        PathCacheOn = false;
+    }
+};
+
+struct PathTimer
+{
+    unsigned Started;
+    PathTimer()
+        : Started(Phase_Timing ? Phase_Now_Us() : 0)
+    {
+    }
+    ~PathTimer()
+    {
+        if (Phase_Timing) {
+            Phase_Path(Phase_Now_Us() - Started);
+        }
+    }
+};
+} // namespace
 //#include	<string.h>
 
 /*
@@ -415,6 +466,8 @@ bool FootClass::Register_Cell(PathType* path, CELL cell, FacingType dir, int cos
  *=============================================================================================*/
 PathType* FootClass::Find_Path(CELL dest, FacingType* final_moves, int maxlen, MoveType threshhold)
 {
+    PathTimer path_timer;            // VC_FPSLOG / VC_BENCH
+    PathCacheScope cache_scope;      // See Passable_Cell.
     CELL source = Coord_Cell(Coord); // Source expressed as cell
     static PathType path;            // Main path control.
     CELL next;                       // Next cell to enter
@@ -1258,12 +1311,25 @@ CELL FootClass::Safety_Point(CELL src, CELL dst, int start, int max)
 
 int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold)
 {
-    MoveType move = Can_Enter_Cell(cell, face);
+    MoveType move;
+    if (PathCacheOn && (unsigned)cell < MAP_CELL_TOTAL) {
+        if (PathCacheStamp[cell] == PathCacheGeneration) {
+            move = MoveType(PathCacheMove[cell]);
+        } else {
+            move = Can_Enter_Cell(cell, face);
+            PathCacheStamp[cell] = PathCacheGeneration;
+            PathCacheMove[cell] = (unsigned char)move;
+        }
+    } else {
+        move = Can_Enter_Cell(cell, face);
+    }
 
-    if (move < MOVE_MOVING_BLOCK && Distance(Cell_Coord(cell)) > 0x0100)
-        threshhold = MOVE_MOVING_BLOCK;
-
-    if (move > threshhold)
+    /*
+    **	Beyond the next cell, a cell that's only blocked by something moving (or less) is
+    **	acceptable whatever the threshold. That only matters when the move would otherwise
+    **	be refused, so only work out the distance then.
+    */
+    if (move > threshhold && !(move < MOVE_MOVING_BLOCK && Distance(Cell_Coord(cell)) > 0x0100))
         return (0);
 
     if (Session.Type == GAME_NORMAL) {

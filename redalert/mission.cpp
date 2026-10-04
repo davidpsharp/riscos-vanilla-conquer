@@ -45,6 +45,7 @@
  *   MissionClass::Is_Recruitable_Mission -- Determines if this mission is recruitable for a te*
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "mission.h"
 
@@ -280,6 +281,7 @@ void MissionClass::AI(void)
     */
     BStart(BENCH_MISSION);
     if (Timer == 0 && Strength > 0) {
+        PhaseTimer timer(PHASE_MISSION);
         switch (Mission) {
         default:
             Timer = Mission_Sleep();

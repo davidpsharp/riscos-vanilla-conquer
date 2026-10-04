@@ -59,6 +59,7 @@
  *   ScenarioClass::Do_Fade_AI -- Process the palette fading effect.                           *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "msgbox.h"
 #include "textbtn.h"
@@ -391,7 +392,9 @@ bool Start_Scenario(char* name, bool briefing)
     if (Scen.BriefMovie != VQ_NONE) {
         sprintf(buffer, "%s.VQA", VQName[Scen.BriefMovie]);
     }
-    if (Session.Type == GAME_NORMAL && (Scen.BriefMovie == VQ_NONE || !CCFileClass(buffer).Is_Available())) {
+    // Not in a benchmark (VC_BENCH), which goes straight into the game.
+    if (Session.Type == GAME_NORMAL && Bench_Frames == 0
+        && (Scen.BriefMovie == VQ_NONE || !CCFileClass(buffer).Is_Available())) {
         /*
         ** Make sure the mouse is visible before showing the restatement.
         */

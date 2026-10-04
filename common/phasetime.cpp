@@ -213,12 +213,20 @@ void Phase_Path(unsigned us)
     Bench_Path_Us += us;
 }
 
-static const char* const Rtti_Names[] = {"none", "infantry", "?", "unit", "?", "aircraft", "?", "building", "?",
-                                         "terrain", "?", "anim", "?", "bullet", "?", "overlay", "?", "smudge"};
+static const char* const TD_Rtti_Names[] = {"none", "infantry", "?", "unit", "?", "aircraft", "?", "building", "?",
+                                            "terrain", "?", "anim", "?", "bullet", "?", "overlay", "?", "smudge"};
+static const char* const* Rtti_Names = TD_Rtti_Names;
+static int Rtti_Name_Count = sizeof(TD_Rtti_Names) / sizeof(TD_Rtti_Names[0]);
+
+void Phase_Set_Rtti_Names(const char* const* names, int count)
+{
+    Rtti_Names = names;
+    Rtti_Name_Count = count;
+}
 
 static const char* Rtti_Name(int rtti)
 {
-    return rtti < int(sizeof(Rtti_Names) / sizeof(Rtti_Names[0])) ? Rtti_Names[rtti] : "other";
+    return rtti < Rtti_Name_Count ? Rtti_Names[rtti] : "other";
 }
 
 unsigned Phase_Bench_Started_Us()

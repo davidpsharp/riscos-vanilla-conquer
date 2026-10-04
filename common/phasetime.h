@@ -62,6 +62,8 @@ extern bool Phase_Timing;
 extern int Bench_Frames;
 void Phase_Object_AI(int rtti, unsigned us);   // one object's AI, by its RTTI
 void Phase_Path(unsigned us);                  // one Find_Path call
+// Names for the RTTI numbers in reports; Tiberian Dawn's are the default.
+void Phase_Set_Rtti_Names(const char* const* names, int count);
 void Phase_Bench_Report(unsigned frames);      // the totals since the first game frame
 unsigned Phase_Bench_Started_Us();
 extern unsigned Phase_Counts[COUNT_MAX];

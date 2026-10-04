@@ -35,6 +35,7 @@
  *   LogicClass::Detach -- Detatch the specified target from the logic system.                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "factory.h"
 #include "logic.h"
@@ -327,9 +328,20 @@ void LogicClass::AI(void)
     /*
     **	Team AI is processed.
     */
+    static bool named = false;
+    if (!named) {
+        static const char* const names[RTTI_COUNT] = {
+            "none",    "aircraft", "?", "anim",   "?", "building", "?", "bullet", "?", "?", "?", "?",
+            "?",       "infantry", "?", "overlay", "?", "smudge", "?", "?",       "?", "?", "?", "?",
+            "terrain", "?",        "?", "?",      "unit", "?",     "vessel"};
+        Phase_Set_Rtti_Names(names, RTTI_COUNT);
+        named = true;
+    }
+    Phase_Timer_Begin(PHASE_LOGIC_TEAMS);
     for (index = 0; index < Teams.Count(); index++) {
         Teams.Ptr(index)->AI();
     }
+    Phase_Timer_Switch(PHASE_LOGIC_OBJECTS);
 
     /*
     ** If there's a time quake, handle it here.
@@ -348,7 +360,14 @@ void LogicClass::AI(void)
         int count = Count();
 
         BStart(BENCH_AI);
-        obj->AI();
+        if (Phase_Timing) {
+            unsigned started = Phase_Now_Us();
+            int rtti = obj->What_Am_I();
+            obj->AI();
+            Phase_Object_AI(rtti, Phase_Now_Us() - started);
+        } else {
+            obj->AI();
+        }
         BEnd(BENCH_AI);
 
         if (TimeQuake && obj != NULL && obj->IsActive && !obj->IsInLimbo && obj->Strength) {
@@ -395,7 +414,9 @@ void LogicClass::AI(void)
     /*
     **	Map related logic is performed.
     */
+    Phase_Timer_Switch(PHASE_LOGIC_MAP);
     Map.Logic();
+    Phase_Timer_Switch(PHASE_LOGIC_FACTORIES);
 
     /*
     **	Factory processing is performed.
@@ -407,6 +428,7 @@ void LogicClass::AI(void)
     /*
     **	House processing is performed.
     */
+    Phase_Timer_Switch(PHASE_LOGIC_HOUSES);
 #ifdef FIXIT_VERSION_3
     if (Session.Type != GAME_NORMAL) {
         for (HousesType house = HOUSE_MULTI1; house < HOUSE_COUNT; house++) {
@@ -443,6 +465,7 @@ void LogicClass::AI(void)
         Scen.AutoSonarTimer = AUTOSONAR_PERIOD;
     }
 #endif
+    Phase_Timer_End();
 }
 
 /***********************************************************************************************
