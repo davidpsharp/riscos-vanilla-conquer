@@ -371,7 +371,8 @@ public:
     int Rescue_Mission(TARGET tarcom);
 
 private:
-    int Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold);
+    inline int Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold); // findpath.cpp
+    int Passable_Cell_Slow(CELL cell, FacingType face, int threat, MoveType threshhold);
     PathType* Find_Path(CELL dest, FacingType* final_moves, int maxlen, MoveType threshhold);
     void Debug_Draw_Map(char const* txt, CELL start, CELL dest, bool pause);
     void Debug_Draw_Path(PathType* path);

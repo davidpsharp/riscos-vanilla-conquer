@@ -56,14 +56,46 @@
 ** Can_Enter_Cell answer (no facing is used); but edge following asks about the
 ** same cells over and over, and in a big battle that was the largest part of the
 ** game logic on a Risc PC (Tiberian Dawn). So Passable_Cell remembers the answers
-** for the duration of one Find_Path. The stamp array is never cleared, just given
-** a new generation number per search. VC_NOPATHCACHE turns it off, to compare.
+** for the duration of one Find_Path. VC_NOPATHCACHE turns it off, to compare.
+**
+** One byte a cell: the answer (a MoveType, below 8) in the low 3 bits and the
+** search's generation number (1-31) above, so the array isn't cleared for each
+** search, only when the generation wraps. The whole cache is 16 KB, which the
+** StrongARM's data cache can hold, where separate stamp and answer arrays (48 KB)
+** cost two cache misses a look-up.
 */
-static unsigned short PathCacheStamp[MAP_CELL_TOTAL];
-static unsigned char PathCacheMove[MAP_CELL_TOTAL];
-static unsigned short PathCacheGeneration = 0;
+static unsigned char PathCache[MAP_CELL_TOTAL];
+static unsigned PathCacheGeneration = 0;
+static const unsigned PATH_CACHE_GENERATIONS = 31;
 static bool PathCacheOn = false;
 static int PathCacheDepth = 0;
+
+// Passable_Cell's answer for each MoveType.
+static const int Passable_Value[MOVE_COUNT] = {
+    1,  //	MOVE_OK
+    1,  //	MOVE_CLOAK
+    3,  //	MOVE_MOVING_BLOCK
+    8,  //	MOVE_DESTROYABLE
+    10, //	MOVE_TEMP
+    0   //	MOVE_NO
+};
+
+/*
+** Edge following calls this about 14,000 times a frame in the battle benchmark, and
+** nearly always the answer is cached and within the threshold, with no threat to
+** check: then it's just the table above. Anything else goes to Passable_Cell_Slow.
+*/
+inline int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold)
+{
+    if (threat == -1 && PathCacheOn && (unsigned)cell < MAP_CELL_TOTAL
+        && (PathCache[cell] >> 3) == PathCacheGeneration) {
+        unsigned move = PathCache[cell] & 7;
+        if (move <= (unsigned)threshhold) {
+            return Passable_Value[move];
+        }
+    }
+    return Passable_Cell_Slow(cell, face, threat, threshhold);
+}
 
 /*
 ** Path_Cache_Begin/End bracket a stretch in which the map doesn't change and the same
@@ -77,8 +109,8 @@ void Path_Cache_Begin()
     if (off || PathCacheDepth++ > 0) {
         return;
     }
-    if (++PathCacheGeneration == 0) {
-        memset(PathCacheStamp, 0, sizeof(PathCacheStamp));
+    if (++PathCacheGeneration > PATH_CACHE_GENERATIONS) {
+        memset(PathCache, 0, sizeof(PathCache));
         PathCacheGeneration = 1;
     }
     PathCacheOn = true;
@@ -1328,16 +1360,15 @@ CELL FootClass::Safety_Point(CELL src, CELL dst, int start, int max)
     return (-1);
 }
 
-int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold)
+int FootClass::Passable_Cell_Slow(CELL cell, FacingType face, int threat, MoveType threshhold)
 {
     MoveType move;
     if (PathCacheOn && (unsigned)cell < MAP_CELL_TOTAL) {
-        if (PathCacheStamp[cell] == PathCacheGeneration) {
-            move = MoveType(PathCacheMove[cell]);
+        if ((PathCache[cell] >> 3) == PathCacheGeneration) {
+            move = MoveType(PathCache[cell] & 7);
         } else {
             move = Can_Enter_Cell(cell, face);
-            PathCacheStamp[cell] = PathCacheGeneration;
-            PathCacheMove[cell] = (unsigned char)move;
+            PathCache[cell] = (unsigned char)(PathCacheGeneration << 3 | move);
         }
     } else {
         move = Can_Enter_Cell(cell, face);
@@ -1361,13 +1392,5 @@ int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType th
         }
     }
 
-    static int _value[MOVE_COUNT] = {
-        1,  //	MOVE_OK
-        1,  //	MOVE_CLOAK
-        3,  //	MOVE_MOVING_BLOCK
-        8,  //	MOVE_DESTROYABLE
-        10, //	MOVE_TEMP
-        0   //	MOVE_NO
-    };
-    return (_value[move]);
+    return (Passable_Value[move]);
 }
