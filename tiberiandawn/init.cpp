@@ -55,6 +55,7 @@
 **	Function prototypes for this module **
 *****************************************/
 static void Play_Intro(bool for_real = false);
+static void Movie_Test();
 
 /*
 ** Set by -AUTOSTART=<G|N><n>[A-D] to skip the menus and start campaign mission
@@ -520,6 +521,7 @@ bool Init_Game(int, char*[])
     CCDebugString("C&C95 - About to play the intro movie\n");
     if (!Special.IsFromInstall && PlayLogo)
         Play_Intro(true);
+    Movie_Test();
 
     /*
     **	Wait for a VSync; during the vertical blank, set the game palette & blit
@@ -1544,6 +1546,58 @@ bool Select_Game(bool fade)
     return (true);
 }
 
+/*
+** Every movie on the two discs, in the order Debug_Flag steps through them in Play_Intro.
+*/
+static const char* const Movie_Names[] = {
+    "INTRO2",   "GDIEND1",  "GDIEND2",  "GDIFINA",  "GDIFINB",  "AIRSTRK",  "AKIRA",    "BANNER",   "BCANYON",
+    "BKGROUND", "BOMBAWAY", "BOMBFLEE", "BURDET1",  "BURDET2",  "CC2TEASE", "CONSYARD", "DESFLEES", "DESKILL",
+    "DESOLAT",  "DESSWEEP", "FLAG",     "FLYY",     "FORESTKL", "GAMEOVER", "GDI1",     "GDI10",    "GDI11",
+    "GDI12",    "GDI13",    "GDI14",    "GDI15",    "GDI2",     "GDI3",     "GDI3LOSE", "GDI4A",    "GDI4B",
+    "GDI5",     "GDI6",     "GDI7",     "GDI8A",    "GDI8B",    "GDI9",     "GDILOSE",  "GUNBOAT",  "HELLVALY",
+    "INSITES",  "KANEPRE",  "LANDING",  "LOGO",     "NAPALM",   "NITEJUMP", "NOD1",     "NOD10A",   "NOD10B",
+    "NOD11",    "NOD12",    "NOD13",    "NOD1PRE",  "NOD2",     "NOD3",     "NOD4A",    "NOD4B",    "NOD5",
+    "NOD6",     "NOD7A",    "NOD7B",    "NOD8",     "NOD9",     "NODEND1",  "NODEND2",  "NODEND3",  "NODEND4",
+    "NODFINAL", "NODFLEES", "NODLOSE",  "NODSWEEP", "NUKE",     "OBEL",     "PARATROP", "PINTLE",   "PLANECRA",
+    "PODIUM",   "REFINT",   "RETRO",    "SABOTAGE", "SAMDIE",   "SAMSITE",  "SEIGE",    "SETHPRE",  "SPYCRASH",
+    "STEALTH",  "SUNDIAL",  "TANKGO",   "TANKKILL", "TBRINFO1", "TBRINFO2", "TBRINFO3", "TIBERFX",  "TRTKIL_D",
+    "TURTKILL", "VISOR",    NULL};
+
+/*
+** VC_MOVIETEST=<seconds>: after start-up, play every movie the game can find, each for
+** that many seconds (0: all of it), logging each one (Play_Movie), then quit. For
+** checking the movies on a machine. VC_MOVIETEST_FROM=<name> starts at that movie.
+*/
+static void Movie_Test()
+{
+    if (Movie_Test_Seconds() < 0) {
+        return;
+    }
+    GameInFocus = true; // play even when the window isn't focused (the Mac)
+    int played = 0, missing = 0;
+    const char* from = getenv("VC_MOVIETEST_FROM");
+    bool started = from == nullptr || *from == '\0';
+    for (int i = 0; Movie_Names[i] != nullptr; i++) {
+        if (!started && strcasecmp(Movie_Names[i], from) != 0) {
+            continue;
+        }
+        started = true;
+        char fullname[_MAX_FNAME + _MAX_EXT];
+        _makepath(fullname, NULL, NULL, Movie_Names[i], ".VQA");
+        if (!CCFileClass(fullname).Is_Available()) {
+            fprintf(stderr, "movie %s: not found\n", Movie_Names[i]);
+            ++missing;
+            continue;
+        }
+        Play_Movie(Movie_Names[i], THEME_NONE);
+        ++played;
+    }
+    fprintf(stderr, "movietest: %d played, %d not found\n", played, missing);
+    fflush(stderr);
+    Sound_End();
+    exit(0);
+}
+
 /***********************************************************************************************
  * Play_Intro -- plays the introduction & logo movies                                          *
  *                                                                                             *
@@ -1569,19 +1623,6 @@ static void Play_Intro(bool for_real)
 #else
     bool playright = !Keyboard->Down(KN_LCTRL) || !Keyboard->Down(KN_RCTRL);
     static int _counter = -1;
-    static const char* _names[] = {
-        "INTRO2",   "GDIEND1",  "GDIEND2",  "GDIFINA",  "GDIFINB",  "AIRSTRK",  "AKIRA",    "BANNER",   "BCANYON",
-        "BKGROUND", "BOMBAWAY", "BOMBFLEE", "BURDET1",  "BURDET2",  "CC2TEASE", "CONSYARD", "DESFLEES", "DESKILL",
-        "DESOLAT",  "DESSWEEP", "FLAG",     "FLYY",     "FORESTKL", "GAMEOVER", "GDI1",     "GDI10",    "GDI11",
-        "GDI12",    "GDI13",    "GDI14",    "GDI15",    "GDI2",     "GDI3",     "GDI3LOSE", "GDI4A",    "GDI4B",
-        "GDI5",     "GDI6",     "GDI7",     "GDI8A",    "GDI8B",    "GDI9",     "GDILOSE",  "GUNBOAT",  "HELLVALY",
-        "INSITES",  "KANEPRE",  "LANDING",  "LOGO",     "NAPALM",   "NITEJUMP", "NOD1",     "NOD10A",   "NOD10B",
-        "NOD11",    "NOD12",    "NOD13",    "NOD1PRE",  "NOD2",     "NOD3",     "NOD4A",    "NOD4B",    "NOD5",
-        "NOD6",     "NOD7A",    "NOD7B",    "NOD8",     "NOD9",     "NODEND1",  "NODEND2",  "NODEND3",  "NODEND4",
-        "NODFINAL", "NODFLEES", "NODLOSE",  "NODSWEEP", "NUKE",     "OBEL",     "PARATROP", "PINTLE",   "PLANECRA",
-        "PODIUM",   "REFINT",   "RETRO",    "SABOTAGE", "SAMDIE",   "SAMSITE",  "SEIGE",    "SETHPRE",  "SPYCRASH",
-        "STEALTH",  "SUNDIAL",  "TANKGO",   "TANKKILL", "TBRINFO1", "TBRINFO2", "TBRINFO3", "TIBERFX",  "TRTKIL_D",
-        "TURTKILL", "VISOR",    NULL};
 
     Keyboard->Clear();
     if (for_real || Is_Demo()) {
@@ -1598,9 +1639,9 @@ static void Play_Intro(bool for_real)
                 _counter = 0;
         }
         Hide_Mouse();
-        Play_Movie(_names[_counter], THEME_NONE);
+        Play_Movie(Movie_Names[_counter], THEME_NONE);
         Show_Mouse();
-        if (!_names[_counter]) {
+        if (!Movie_Names[_counter]) {
             _counter = -1;
         }
     }

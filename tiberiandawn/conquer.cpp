@@ -65,6 +65,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include "common/framelimit.h"
 #include "common/paths.h"
 #include "common/vqatask.h"
@@ -2198,6 +2201,25 @@ extern void Resume_Audio_Thread(void);
 // Play
 extern void Play_Movie_GlyphX(const char* movie_name, ThemeType theme);
 
+extern volatile unsigned VQA_Frames_Skipped;
+static std::chrono::steady_clock::time_point Movie_Started; // VC_MOVIETEST, VC_FPSLOG
+
+static unsigned Movie_Elapsed_Ms()
+{
+    return unsigned(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - Movie_Started).count());
+}
+
+/*
+** VC_MOVIETEST=<seconds>: how long Movie_Test (init.cpp) plays each movie, 0 for all of it;
+** -1 when not testing.
+*/
+int Movie_Test_Seconds()
+{
+    static const int seconds = getenv("VC_MOVIETEST") != nullptr ? atoi(getenv("VC_MOVIETEST")) : -1;
+    return seconds;
+}
+
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn)
 {
     if (Bench_Frames > 0) {
@@ -2316,7 +2338,26 @@ void Play_Movie(char const* name, ThemeType theme, bool clrscrn)
                 // Set_Palette(BlackPalette);
                 SysMemPage.Clear();
                 InMovie = true;
+                unsigned skipped_before = VQA_Frames_Skipped;
+                Movie_Started = std::chrono::steady_clock::now();
                 VQA_Play(vqa, VQAMODE_RUN);
+                static const bool movie_log = getenv("VC_FPSLOG") != nullptr || getenv("VC_MOVIETEST") != nullptr;
+                if (movie_log) {
+                    fprintf(stderr,
+                            "movie %s: %d frames, %d drawn, %u skipped, %u ms%s, heap top %p\n",
+                            name,
+                            int(vqa->Header.Frames),
+                            vqa->VQABuf != nullptr ? vqa->VQABuf->DrawnFrames : -1,
+                            VQA_Frames_Skipped - skipped_before,
+                            Movie_Elapsed_Ms(),
+                            (AnimControl.OptionFlags & VQAOPTF_AUDIO) ? ", with sound" : "",
+#if defined(_WIN32) || defined(__APPLE__)
+                            (void*)nullptr);
+#else
+                            sbrk(0));
+#endif
+                    fflush(stderr);
+                }
                 VQA_Close(vqa);
                 // Resume_Audio_Thread();
                 InMovie = false;
@@ -3070,6 +3111,10 @@ int VQ_Call_Back(unsigned char*, int)
         Keyboard->Clear();
         Brokeout = true;
         return (true);
+    }
+
+    if (Movie_Test_Seconds() > 0 && Movie_Elapsed_Ms() >= unsigned(Movie_Test_Seconds()) * 1000) {
+        return (true); // VC_MOVIETEST: enough of this one
     }
 
     if (!GameInFocus) {

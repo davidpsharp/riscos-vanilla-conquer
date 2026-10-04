@@ -315,6 +315,7 @@ TheaterType Theater_From_Name(char const* name);
 // DirType Rotation_Calc(DirType current, DirType desired, int rate);
 void Main_Game(int argc, char* argv[]);
 int VQ_Call_Back(unsigned char* buffer = NULL, int frame = 0);
+int Movie_Test_Seconds(); // VC_MOVIETEST
 void Call_Back(void);
 char const* Language_Name(char const* basename);
 SourceType Source_From_Name(char const* name);
