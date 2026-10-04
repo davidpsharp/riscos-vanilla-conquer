@@ -2499,6 +2499,7 @@ TeamTypeClass const* HouseClass::Suggested_New_Team(bool alertcheck)
 ** each house's IsHuman and Allies.
 */
 static int Threat_Delta[HOUSE_COUNT][MAP_TOTAL_REGIONS];
+static int Threat_Delta_All[MAP_TOTAL_REGIONS]; // the sum over owners, so most reads are 3 look-ups
 static bool Threat_Pending = false;
 static bool Threat_Sig_Stale = true;
 static bool Threat_Sig_Human[HOUSE_COUNT];
@@ -2561,9 +2562,11 @@ void HouseClass::Owner_Threat(HousesType owner, int region, int threat)
         threat = -threat;
     }
     int* delta = &Threat_Delta[owner][region];
+    int* all = &Threat_Delta_All[region];
     for (int lp = 0; lp < 9; lp++) {
         int value = threat >> _thr[lp];
         delta[_val[lp]] += neg ? -value : value;
+        all[_val[lp]] += neg ? -value : value;
     }
     Threat_Pending = true;
 }
@@ -2589,6 +2592,7 @@ void HouseClass::Threat_Flush(void)
             }
         }
         memset(Threat_Delta, 0, sizeof(Threat_Delta));
+        memset(Threat_Delta_All, 0, sizeof(Threat_Delta_All));
         Threat_Pending = false;
     }
     Threat_Sig_Stale = true;
@@ -2597,6 +2601,7 @@ void HouseClass::Threat_Flush(void)
 void HouseClass::Threat_Clear(void)
 {
     memset(Threat_Delta, 0, sizeof(Threat_Delta));
+    memset(Threat_Delta_All, 0, sizeof(Threat_Delta_All));
     Threat_Pending = false;
     Threat_Sig_Stale = true;
 }
@@ -2609,18 +2614,30 @@ void HouseClass::Threat_Check(void)
     }
 }
 
+/*
+** Path finding for roundabout teams asks this about every cell it considers, so it
+** has to be quick: the totals of every owner but this house (whose own threat doesn't
+** count for it) and, if it's human, its allies. Changes to who counts for whom are
+** caught by Threat_Flush's callers, and Threat_Check once a frame, not here.
+*/
 int HouseClass::Region_Threat(int region)
 {
-    Threat_Check();
-    if (Threat_Sig_Stale) {
-        Threat_Read_Sig();
-    }
     int threat = Regions[region].Threat_Value();
     if (Threat_Pending) {
-        for (HousesType owner = HOUSE_FIRST; owner < HOUSE_COUNT; owner++) {
-            if (Threat_Counts_For(Class->House, owner)) {
-                threat += Threat_Delta[owner][region];
+        if (Threat_Sig_Stale) {
+            Threat_Read_Sig();
+        }
+        HousesType self = Class->House;
+        threat += Threat_Delta_All[region];
+        if (Threat_Sig_Human[self]) {
+            unsigned skip = unsigned(Threat_Sig_Allies[self]) | (1u << self);
+            for (HousesType owner = HOUSE_FIRST; owner < HOUSE_COUNT; owner++) {
+                if (skip & (1u << owner)) {
+                    threat -= Threat_Delta[owner][region];
+                }
             }
+        } else {
+            threat -= Threat_Delta[self][region];
         }
     }
     return threat;
