@@ -858,7 +858,12 @@ public:
     {
         VideoSurfaceSDL1* from = mirror;
         mirror = nullptr;
-        if (from == nullptr) {
+        /*
+        ** At exit, SDL_Quit (registered with atexit after the static surfaces were
+        ** made) has already freed the screen by the time their destructors get here.
+        ** Copying from it then crashed on RISC OS 5.
+        */
+        if (from == nullptr || SDL_WasInit(SDL_INIT_VIDEO) == 0) {
             return;
         }
         if (!mirror_shown) {
