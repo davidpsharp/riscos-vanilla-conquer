@@ -78,6 +78,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #include "interpal.h"
 
@@ -2528,14 +2531,19 @@ void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
                 static const bool movie_log = getenv("VC_FPSLOG") != nullptr || getenv("VC_MOVIETEST") != nullptr;
                 if (movie_log) {
                     fprintf(stderr,
-                            "movie %s: %d frames, %d drawn, %u skipped, %u ms%s%s\n",
+                            "movie %s: %d frames, %d drawn, %u skipped, %u ms%s%s, heap top %p\n",
                             name,
                             int(vqa->Header.Frames),
                             vqa->VQABuf != nullptr ? vqa->VQABuf->DrawnFrames : -1,
                             VQA_Frames_Skipped - skipped_before,
                             unsigned(SDL_GetTicks() - movie_started),
                             IsVQ640 ? ", 640 wide" : "",
-                            (AnimControl.OptionFlags & VQAOPTF_AUDIO) ? ", with sound" : "");
+                            (AnimControl.OptionFlags & VQAOPTF_AUDIO) ? ", with sound" : "",
+#if defined(_WIN32) || defined(__APPLE__)
+                            (void*)nullptr);
+#else
+                            sbrk(0));
+#endif
                     fflush(stderr);
                 }
                 VQA_Close(vqa);
@@ -3285,7 +3293,8 @@ void Bench_Finish(const char* why)
 /*
 ** VC_MOVIETEST=<seconds>: after start-up, play every movie the game can find, each for
 ** that many seconds (0: all of it), logging each one (Play_Movie), then quit. For
-** checking the movies on a machine; see Movie_Test.
+** checking the movies on a machine; see Movie_Test. VC_MOVIETEST_FROM=<name> starts
+** at that movie.
 */
 unsigned Movie_Started_Ms = 0;
 
@@ -3302,7 +3311,13 @@ void Movie_Test()
     }
     GameInFocus = true; // play even when the window isn't focused (the Mac)
     int played = 0, missing = 0;
+    const char* from = getenv("VC_MOVIETEST_FROM"); // start at this movie
+    bool started = from == nullptr || *from == '\0';
     for (VQType movie = VQ_FIRST; movie < VQ_COUNT; movie++) {
+        if (!started && strcasecmp(VQName[movie], from) != 0) {
+            continue;
+        }
+        started = true;
         char fullname[_MAX_FNAME + _MAX_EXT];
         _makepath(fullname, NULL, NULL, VQName[movie], ".VQA");
         if (!CCFileClass(fullname).Is_Available()) {
