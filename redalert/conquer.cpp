@@ -2412,32 +2412,36 @@ extern void Play_Movie_GlyphX(const char* movie_name, ThemeType theme, bool imme
 #include <kernel.h>
 #include <swis.h>
 /*
-** Movie sound. On a real StrongARM Risc PC under RISC OS 4.39, playing the intro
-** with its sound crashed after about 40 frames: the frame data was corrupted (an
-** LCW unpack then ran off into unmapped memory). Without the movie's sound it plays
-** to the end, and with sound it's fine in RPCEmu and on a Raspberry Pi 4 (RISC OS
-** 5); the cause isn't known yet. So before RISC OS 5, movies play silently.
-** VanillaRA$MovieSound overrides it: 1 for sound, 0 for none.
+** Movie sound. On a real StrongARM Risc PC under RISC OS 4.39, playing the 640-wide
+** intro (REDINTRO) with its sound crashed after about 40 frames: the frame data was
+** corrupted (an LCW unpack then ran off into unmapped memory). Without its sound it
+** plays to the end; the usual 320-wide movies (LANDING, the briefings) play with
+** sound there; and the intro with sound is fine in RPCEmu and on a Raspberry Pi 4
+** (RISC OS 5). Locking out the audio thread while frames load and draw didn't help,
+** so it isn't a race; the cause isn't known yet. So before RISC OS 5, 640-wide
+** movies play silently. VanillaRA$MovieSound overrides it for all movies: 1 for
+** sound, 0 for none.
 */
-static bool Movie_Sound_Allowed()
+static bool Movie_Sound_Allowed(bool wide)
 {
-    static int allowed = -1;
-    if (allowed < 0) {
-        const char* setting = getenv("VanillaRA$MovieSound");
-        if (setting != nullptr && *setting != '\0') {
-            allowed = strcmp(setting, "0") != 0;
-        } else {
-            _kernel_swi_regs regs;
-            regs.r[0] = 129; // OS_Byte 129,0,255: which OS
-            regs.r[1] = 0;
-            regs.r[2] = 255;
-            allowed = _kernel_swi(OS_Byte, &regs, &regs) == nullptr && regs.r[1] >= 0xAA; // RISC OS 5 or later
-        }
+    static int setting = -2; // -1 unset, else 0 or 1
+    static bool old_os = false;
+    if (setting == -2) {
+        const char* value = getenv("VanillaRA$MovieSound");
+        setting = value != nullptr && *value != '\0' ? strcmp(value, "0") != 0 : -1;
+        _kernel_swi_regs regs;
+        regs.r[0] = 129; // OS_Byte 129,0,255: which OS
+        regs.r[1] = 0;
+        regs.r[2] = 255;
+        old_os = _kernel_swi(OS_Byte, &regs, &regs) == nullptr && regs.r[1] < 0xAA; // before RISC OS 5
     }
-    return allowed != 0;
+    if (setting >= 0) {
+        return setting != 0;
+    }
+    return !(old_os && wide);
 }
 #else
-static bool Movie_Sound_Allowed()
+static bool Movie_Sound_Allowed(bool)
 {
     return true;
 }
@@ -2532,7 +2536,7 @@ void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
         }
 #endif
 
-        if (!Debug_Quiet && Get_Digi_Handle() != -1 && Movie_Sound_Allowed()) {
+        if (!Debug_Quiet && Get_Digi_Handle() != -1 && Movie_Sound_Allowed(IsVQ640)) {
             AnimControl.OptionFlags |= VQAOPTF_AUDIO;
         } else {
             AnimControl.OptionFlags &= ~VQAOPTF_AUDIO;

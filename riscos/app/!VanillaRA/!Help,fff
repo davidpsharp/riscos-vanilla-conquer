@@ -106,12 +106,13 @@ by the original game.
 Known issues
 ------------
 
-  * On RISC OS 3.x and 4.x the movies play without their sound. With it,
-    the intro crashed on a real StrongARM Risc PC (RISC OS 4.39), though
-    it was fine in RPCEmu and on a Raspberry Pi 4. The game's own sound
-    and music are unaffected. To try movie sound anyway, add
+  * On RISC OS 3.x and 4.x the high-resolution intro (the Red Alert logo)
+    plays without its sound. With it, the intro crashed on a real StrongARM
+    Risc PC (RISC OS 4.39), though it was fine in RPCEmu and on a Raspberry
+    Pi 4. The other movies, and the game's own sound and music, have sound.
+    To try the intro's sound anyway, add
       Set VanillaRA$MovieSound 1
-    to !VanillaRA.!Run (0 turns it off on RISC OS 5 too).
+    to !VanillaRA.!Run (0 makes all movies silent).
   * Network play is built in but hasn't been tested on RISC OS yet.
   * Campaign missions have only been tried in part: Allied and Soviet
     missions 1 to 7 run on the Risc PC and the Pi 4, and Allied 1 has been
