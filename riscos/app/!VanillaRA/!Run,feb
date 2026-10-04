@@ -5,9 +5,6 @@ IconSprites <VanillaRA$Dir>.!Sprites
 | as fast, for slower machines; 0 runs it at 640x400. It uses the game's own 320x200
 | graphics, with less of the map on screen and a smaller sidebar.
 Set VanillaRA$LowRes 0
-| Movie sound: 1 plays all movies with their sound, 0 none. Unset, the 640-wide intro
-| is silent before RISC OS 5, as it crashed with sound on a real Risc PC (see !Help).
-| Set VanillaRA$MovieSound 1
 | SharedUnixLibrary is normally in !System; fall back to the copy shipped here.
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaRA$Dir>.Modules.SharedULib
