@@ -201,7 +201,13 @@ SurfaceMonitorClass& AllSurfaces = AllSurfacesDummy; // List of all direct draw 
  *=============================================================================================*/
 bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 {
-    SDL_Init(SDL_INIT_VIDEO);
+    /*
+    ** No parachute: SDL's handler for fatal signals calls SDL_Quit inside the signal
+    ** handler, which on RISC OS waits for the audio thread and so dies with a UnixLib
+    ** "pthread_yield called with context switching disabled" error, hiding the real
+    ** fault. UnixLib's own handler prints a backtrace instead.
+    */
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
     SDL_ShowCursor(SDL_DISABLE);
     atexit(SDL_Quit);
 
