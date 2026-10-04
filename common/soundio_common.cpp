@@ -807,13 +807,17 @@ bool Audio_Init(int bits_per_sample, bool stereo, int rate, bool reverse_channel
 
 void Sound_End()
 {
-    if (AudioDone) {
+    // Nothing to end if Audio_Init never succeeded (VC_NOSOUND, or no audio device).
+    if (AudioDone || LockedData.DigiHandle == INVALID_AUDIO_HANDLE) {
         return;
     }
 
     for (int i = 0; i < MAX_SAMPLE_TRACKERS; ++i) {
         Stop_Sample(i);
-        SoundImp_Shutdown_Sample(LockedData.SampleTracker[i].Imp);
+        if (LockedData.SampleTracker[i].Imp != nullptr) { // Audio_Init may have stopped part way
+            SoundImp_Shutdown_Sample(LockedData.SampleTracker[i].Imp);
+            LockedData.SampleTracker[i].Imp = nullptr;
+        }
     }
 
     if (FileStreamBuffer != nullptr) {

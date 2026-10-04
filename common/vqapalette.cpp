@@ -72,9 +72,19 @@ void VQA_SetPalette(uint8_t* palette, int numbytes, bool slowpal)
     VQPalettesSkipped = 0;
 
     if (PalettesRead && InterpolationTable) {
-        void* paletteinterpol = (void*)&InterpolationTable->PaletteInterpolationTable;
-        size_t table_size = sizeof(InterpolationTable->PaletteInterpolationTable);
-        memcpy(paletteinterpol, InterpolatedPalettes[PaletteCounter++], table_size);
+        /*
+        ** A movie without its own .VQP gets another movie's (Red Alert uses AAGUN's),
+        ** which can have fewer palettes than it has palette changes. Past the last one,
+        ** keep the table already in use rather than copying from a null pointer (Red
+        ** Alert's ENGLISH movie crashed here).
+        */
+        if (PaletteCounter < sizeof(InterpolatedPalettes) / sizeof(InterpolatedPalettes[0])
+            && InterpolatedPalettes[PaletteCounter] != nullptr) {
+            void* paletteinterpol = (void*)&InterpolationTable->PaletteInterpolationTable;
+            size_t table_size = sizeof(InterpolationTable->PaletteInterpolationTable);
+            memcpy(paletteinterpol, InterpolatedPalettes[PaletteCounter], table_size);
+        }
+        ++PaletteCounter;
     }
 
     Set_Palette(palette);

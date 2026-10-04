@@ -82,6 +82,8 @@
 #include "interpal.h"
 
 void Bench_Finish(const char* why); // VC_BENCH: report and exit
+extern unsigned Movie_Started_Ms;
+extern volatile unsigned VQA_Frames_Skipped;
 extern int Bench_Frames_Done;
 #include "vortex.h"
 #include "common/framelimit.h"
@@ -2519,7 +2521,23 @@ void Play_Movie(char const* name, ThemeType theme, bool clrscrn, bool immediate)
                 // Set_Palette(BlackPalette);
                 SysMemPage.Clear();
                 InMovie = true;
+                unsigned movie_started = SDL_GetTicks();
+                unsigned skipped_before = VQA_Frames_Skipped;
+                Movie_Started_Ms = movie_started;
                 VQA_Play(vqa, VQAMODE_RUN);
+                static const bool movie_log = getenv("VC_FPSLOG") != nullptr || getenv("VC_MOVIETEST") != nullptr;
+                if (movie_log) {
+                    fprintf(stderr,
+                            "movie %s: %d frames, %d drawn, %u skipped, %u ms%s%s\n",
+                            name,
+                            int(vqa->Header.Frames),
+                            vqa->VQABuf != nullptr ? vqa->VQABuf->DrawnFrames : -1,
+                            VQA_Frames_Skipped - skipped_before,
+                            unsigned(SDL_GetTicks() - movie_started),
+                            IsVQ640 ? ", 640 wide" : "",
+                            (AnimControl.OptionFlags & VQAOPTF_AUDIO) ? ", with sound" : "");
+                    fflush(stderr);
+                }
                 VQA_Close(vqa);
                 // Resume_Audio_Thread();
                 InMovie = false;
@@ -3264,6 +3282,43 @@ void Bench_Finish(const char* why)
     exit(0);
 }
 
+/*
+** VC_MOVIETEST=<seconds>: after start-up, play every movie the game can find, each for
+** that many seconds (0: all of it), logging each one (Play_Movie), then quit. For
+** checking the movies on a machine; see Movie_Test.
+*/
+unsigned Movie_Started_Ms = 0;
+
+static int Movie_Test_Seconds()
+{
+    static const int seconds = getenv("VC_MOVIETEST") != nullptr ? atoi(getenv("VC_MOVIETEST")) : -1;
+    return seconds;
+}
+
+void Movie_Test()
+{
+    if (Movie_Test_Seconds() < 0) {
+        return;
+    }
+    GameInFocus = true; // play even when the window isn't focused (the Mac)
+    int played = 0, missing = 0;
+    for (VQType movie = VQ_FIRST; movie < VQ_COUNT; movie++) {
+        char fullname[_MAX_FNAME + _MAX_EXT];
+        _makepath(fullname, NULL, NULL, VQName[movie], ".VQA");
+        if (!CCFileClass(fullname).Is_Available()) {
+            fprintf(stderr, "movie %s: not found\n", VQName[movie]);
+            ++missing;
+            continue;
+        }
+        Play_Movie(movie, THEME_NONE);
+        ++played;
+    }
+    fprintf(stderr, "movietest: %d played, %d not found\n", played, missing);
+    fflush(stderr);
+    Sound_End();
+    exit(0);
+}
+
 int VQ_Call_Back(unsigned char*, int)
 {
 #ifdef REMASTER_BUILD
@@ -3335,6 +3390,10 @@ int VQ_Call_Back(unsigned char*, int)
         Keyboard->Clear();
         Brokeout = true;
         return (true);
+    }
+
+    if (Movie_Test_Seconds() > 0 && SDL_GetTicks() - Movie_Started_Ms >= unsigned(Movie_Test_Seconds()) * 1000) {
+        return (true); // VC_MOVIETEST: enough of this one
     }
 
     if (!GameInFocus) {

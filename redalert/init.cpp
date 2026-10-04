@@ -329,6 +329,8 @@ bool Init_Game(int, char*[])
         VisiblePage.Clear();
         //		Mono_Printf("Playing Intro\n");
         Play_Intro();
+        void Movie_Test(); // conquer.cpp: VC_MOVIETEST
+        Movie_Test();
         memset(CurrentPalette, 0x01, 768);
         WhitePalette.Set();
     } else {
