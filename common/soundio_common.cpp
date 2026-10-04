@@ -197,6 +197,19 @@ struct LockedDataType
 void (*Audio_Focus_Loss_Function)() = nullptr;
 
 static struct LockedDataType LockedData;
+
+/*
+** No audio until Audio_Init succeeds. Without this the handle was 0 when Audio_Init
+** was never called (VC_NOSOUND), so the games took audio to be open: movies queued
+** their sound to a mixer that never played it and waited for ever.
+*/
+static struct LockedDataInit
+{
+    LockedDataInit()
+    {
+        LockedData.DigiHandle = INVALID_AUDIO_HANDLE;
+    }
+} LockedDataInitialiser;
 SFX_Type SoundType;
 Sample_Type SampleType;
 static void* FileStreamBuffer = nullptr;
