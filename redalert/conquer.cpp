@@ -80,6 +80,9 @@
 #include <chrono>
 
 #include "interpal.h"
+
+void Bench_Finish(const char* why); // VC_BENCH: report and exit
+extern int Bench_Frames_Done;
 #include "vortex.h"
 #include "common/framelimit.h"
 #include "common/paths.h"
@@ -2026,22 +2029,8 @@ bool Main_Loop()
         }
     }
     if (Bench_Frames > 0) {
-        static int frames = 0;
-        if (++frames >= Bench_Frames) {
-            Phase_Bench_Report(frames);
-            fprintf(stderr,
-                    "bench objects at the end: units %d infantry %d buildings %d aircraft %d vessels %d bullets %d "
-                    "anims %d\n",
-                    Units.Count(),
-                    Infantry.Count(),
-                    Buildings.Count(),
-                    Aircraft.Count(),
-                    Vessels.Count(),
-                    Bullets.Count(),
-                    Anims.Count());
-            fflush(stderr);
-            Sound_End(); // stop the audio thread first, as the game's own exit does
-            exit(0);
+        if (++Bench_Frames_Done >= Bench_Frames) {
+            Bench_Finish(nullptr);
         }
     }
     return (!GameActive);
@@ -3248,6 +3237,33 @@ void Check_VQ_Palette_Set(void);
 
 extern GraphicBufferClass VQ640;
 extern bool IsVQ640;
+/*
+** VC_BENCH: the report, and exit. The mission can also end before the frames are
+** done (won or lost: Do_Win, Do_Lose), as there's no player.
+*/
+int Bench_Frames_Done = 0;
+
+void Bench_Finish(const char* why)
+{
+    if (why != nullptr) {
+        fprintf(stderr, "bench: mission %s after %d game frames\n", why, Bench_Frames_Done);
+    }
+    Phase_Bench_Report(Bench_Frames_Done > 0 ? Bench_Frames_Done : 1);
+    fprintf(stderr,
+            "bench objects at the end: units %d infantry %d buildings %d aircraft %d vessels %d bullets %d "
+            "anims %d\n",
+            Units.Count(),
+            Infantry.Count(),
+            Buildings.Count(),
+            Aircraft.Count(),
+            Vessels.Count(),
+            Bullets.Count(),
+            Anims.Count());
+    fflush(stderr);
+    Sound_End(); // stop the audio thread first, as the game's own exit does
+    exit(0);
+}
+
 int VQ_Call_Back(unsigned char*, int)
 {
 #ifdef REMASTER_BUILD

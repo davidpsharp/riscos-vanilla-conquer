@@ -19,8 +19,8 @@ Requirements
   * A StrongARM Risc PC (or RPCEmu set up as one), or a Raspberry Pi
     with RISC OS 5. The same !VanillaRA runs on both. ARM610, ARM710 and
     ARM7500 machines (including the A7000) are not supported.
-  * RISC OS 3.7 or later. Tested on RISC OS 3.7 on a real StrongARM Risc
-    PC, RISC OS 3.71 in RPCEmu and RISC OS 5.30 on a Raspberry Pi 4.
+  * RISC OS 3.7 or later. Tested on RISC OS 4.39 on a real StrongARM
+    Risc PC, RISC OS 3.71 in RPCEmu and RISC OS 5.30 on a Raspberry Pi 4.
   * A 640x400 (or 640x480) 256-colour screen mode, or 320x256 for the
     low-resolution option below.
   * About 40 MB of free memory. Most of it is taken by a dynamic area

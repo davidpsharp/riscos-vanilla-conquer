@@ -870,6 +870,10 @@ void Clear_Scenario(void)
  *=============================================================================================*/
 void Do_Win(void)
 {
+    if (Bench_Frames > 0) {
+        void Bench_Finish(const char* why); // conquer.cpp
+        Bench_Finish("won");
+    }
     Map.Set_Default_Mouse(MOUSE_NORMAL);
     Hide_Mouse();
     Theme.Queue_Song(THEME_QUIET);
@@ -1150,6 +1154,10 @@ void Do_Win(void)
  *=============================================================================================*/
 void Do_Lose(void)
 {
+    if (Bench_Frames > 0) {
+        void Bench_Finish(const char* why); // conquer.cpp
+        Bench_Finish("lost");
+    }
     Map.Set_Default_Mouse(MOUSE_NORMAL);
     Hide_Mouse();
 
