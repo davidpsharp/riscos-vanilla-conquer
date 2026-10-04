@@ -18,6 +18,8 @@
 # BENCH_VARS="NAME=value ..." sets more variables for the run (unset afterwards).
 # BENCH_MISSION=G3 (say) plays that campaign mission as it is instead of the battle.
 # BENCH_ARGS adds arguments for the game, e.g. BENCH_ARGS=-LOWRES.
+# Red Alert: BENCH_GAME=ra benchmarks its battle (../vcport-work/bench/RA-SCG01EA-battle.INI,
+# from riscos/bench/make-ra-battle.py) with -AUTOSTART=A1, in VC_APP's !VanillaRA.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
@@ -30,6 +32,12 @@ OUT=${BENCH_OUT:-$WORK/bench/last-$T.txt}
 
 cd "$ROOT" # so the lease is this project's (.ro-run/)
 BATTLE=$WORK/bench/SCG01EA-battle.INI
+BATTLE_MISSION=G1
+if [ "${BENCH_GAME:-td}" = ra ]; then
+    BATTLE=$WORK/bench/RA-SCG01EA-battle.INI
+    BATTLE_MISSION=A1
+    APP=${VC_APP:-'IDEFS::HardDisc4b.$.VanillaConquer.!VanillaRA'}
+fi
 if [ ! -f "$BATTLE" ]; then
     mkdir -p "$WORK/bench"
     python3 "$ROOT/riscos/bench/make-battle.py" "$WORK/tddata/cd/gdi/GENERAL.MIX" "$BATTLE"
@@ -47,11 +55,13 @@ cleanup()
 }
 trap cleanup EXIT
 
-"$RO" -t "$T" put "${BENCH_IMAGE:-build/riscos/vanillatd,ff8}" "$APP.!RunImage" --type ff8 >/dev/null
+DEFAULT_IMAGE=build/riscos/vanillatd,ff8
+[ "${BENCH_GAME:-td}" = ra ] && DEFAULT_IMAGE=build/riscos-ra/vanillara,ff8
+"$RO" -t "$T" put "${BENCH_IMAGE:-$DEFAULT_IMAGE}" "$APP.!RunImage" --type ff8 >/dev/null
 MISSION=${BENCH_MISSION:-}
 if [ -z "$MISSION" ]; then
     "$RO" -t "$T" put "$BATTLE" "$APP.INI.SCG01EA" --type fff >/dev/null
-    MISSION=G1
+    MISSION=$BATTLE_MISSION
 fi
 "$RO" -t "$T" cmd "Set VC_BENCH $FRAMES" >/dev/null
 "$RO" -t "$T" cmd "Set VC_SEED $SEED" >/dev/null

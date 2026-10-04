@@ -1798,8 +1798,11 @@ ObjectClass* MapClass::Close_Object(COORDINATE coord) const
  * HISTORY:                                                                                    *
  *   09/22/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
+void Invalidate_Zone_Boxes(); // below
+
 bool MapClass::Zone_Reset(int method)
 {
+    Invalidate_Zone_Boxes();
     /*
     **	Zero out all zones to a null state.
     */
@@ -1997,6 +2000,48 @@ int MapClass::Zone_Span(CELL cell, int zone, MZoneType check)
  * HISTORY:                                                                                    *
  *   10/05/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** The bounding box of each zone's cells, per zone type, for Nearby_Location: a
+** search for a cell in a given zone need only cover the rings that cross its box.
+** Worked out again (lazily) after Zone_Reset or a saved game's map is loaded.
+*/
+namespace {
+struct ZoneBox
+{
+    short X0, Y0, X1, Y1; // X0 > X1: no cells
+};
+ZoneBox Zone_Boxes[MZONE_COUNT][256];
+bool Zone_Boxes_Valid = false;
+
+void Find_Zone_Boxes()
+{
+    for (int check = MZONE_FIRST; check < MZONE_COUNT; check++) {
+        for (int zone = 0; zone < 256; zone++) {
+            Zone_Boxes[check][zone].X0 = MAP_CELL_W;
+            Zone_Boxes[check][zone].Y0 = MAP_CELL_H;
+            Zone_Boxes[check][zone].X1 = -1;
+            Zone_Boxes[check][zone].Y1 = -1;
+        }
+    }
+    for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
+        short x = short(Cell_X(cell)), y = short(Cell_Y(cell));
+        for (int check = MZONE_FIRST; check < MZONE_COUNT; check++) {
+            ZoneBox& box = Zone_Boxes[check][Map[cell].Zones[check]];
+            box.X0 = x < box.X0 ? x : box.X0;
+            box.Y0 = y < box.Y0 ? y : box.Y0;
+            box.X1 = x > box.X1 ? x : box.X1;
+            box.Y1 = y > box.Y1 ? y : box.Y1;
+        }
+    }
+    Zone_Boxes_Valid = true;
+}
+} // namespace
+
+void Invalidate_Zone_Boxes()
+{
+    Zone_Boxes_Valid = false;
+}
+
 CELL MapClass::Nearby_Location(CELL cell,
                                SpeedType speed,
                                int zone,
@@ -2022,7 +2067,41 @@ CELL MapClass::Nearby_Location(CELL cell,
     **	Radiate outward from the specified location, looking for the closest
     **	location that is generally clear.
     */
-    for (int radius = 0; radius < MAP_CELL_W; radius++) {
+    /*
+    ** Rings further out than the furthest map edge have no map cells on them, so stop
+    ** there: when nothing qualifies, the search used to go on to radius 127 regardless,
+    ** which on a small map was nearly all of its time. The result is the same.
+    */
+    int last_radius = xx - left;
+    last_radius = right - xx > last_radius ? right - xx : last_radius;
+    last_radius = yy - top > last_radius ? yy - top : last_radius;
+    last_radius = bottom - yy > last_radius ? bottom - yy : last_radius;
+
+    /*
+    ** A cell only qualifies if it's in the zone asked for (unless the zone is -1 or
+    ** the unit flies), so only the rings that cross that zone's bounding box can find
+    ** anything: start at the nearest and stop after the furthest. Same result, but a
+    ** unit in a small enclosed zone no longer searches the whole map every time.
+    */
+    int first_radius = 0;
+    if (speed != SPEED_WINGED && zone >= 0 && zone < 256) {
+        if (!Zone_Boxes_Valid) {
+            Find_Zone_Boxes();
+        }
+        ZoneBox const& box = Zone_Boxes[check][zone];
+        if (box.X0 > box.X1) {
+            return (0); // no cell is in that zone
+        }
+        int dx_far = xx - box.X0 > box.X1 - xx ? xx - box.X0 : box.X1 - xx;
+        int dy_far = yy - box.Y0 > box.Y1 - yy ? yy - box.Y0 : box.Y1 - yy;
+        int far = dx_far > dy_far ? dx_far : dy_far;
+        last_radius = far < last_radius ? far : last_radius;
+        int dx_near = xx < box.X0 ? box.X0 - xx : (xx > box.X1 ? xx - box.X1 : 0);
+        int dy_near = yy < box.Y0 ? box.Y0 - yy : (yy > box.Y1 ? yy - box.Y1 : 0);
+        first_radius = dx_near > dy_near ? dx_near : dy_near;
+    }
+
+    for (int radius = first_radius; radius < MAP_CELL_W && radius <= last_radius; radius++) {
         CELL newcell;
         CellClass const* cellptr;
 

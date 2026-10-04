@@ -504,6 +504,8 @@ void MapClass::Code_Pointers(void)
  *=============================================================================================*/
 void MapClass::Decode_Pointers(void)
 {
+    void Invalidate_Zone_Boxes(); // map.cpp: zones came with the saved game
+    Invalidate_Zone_Boxes();
     CellClass* cellptr = &(*this)[(CELL)0];
     for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
         cellptr->Decode_Pointers();

@@ -2015,6 +2015,13 @@ bool Main_Loop()
     ++Logic_Frame_Count;
     Sync_Delay();
     Phase_Frame_End();
+    {
+        // VC_RANDLOG: the synced random seed and unit counts every frame, to compare runs.
+        static const bool randlog = getenv("VC_RANDLOG") != nullptr;
+        if (randlog) {
+            fprintf(stderr, "rand %d %u %d %d\n", Frame, Scen.RandomNumber.Seed, Units.Count(), Infantry.Count());
+        }
+    }
     if (Bench_Frames > 0) {
         static int frames = 0;
         if (++frames >= Bench_Frames) {
