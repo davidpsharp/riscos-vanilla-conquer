@@ -303,6 +303,7 @@ void Explosion_Damage(COORDINATE coord, unsigned strength, TechnoClass* source, 
 */
 void Center_About_Objects(void);
 bool Force_CD_Available(int cd);
+bool Use_Local_Disc(int cd); // VC_MOVIETEST
 void Handle_View(int view, int action = 0);
 void Handle_Team(int team, int action = 0);
 TechnoTypeClass const* Fetch_Techno_Type(RTTIType type, int id);

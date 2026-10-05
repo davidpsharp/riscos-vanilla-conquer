@@ -3760,6 +3760,15 @@ static bool Change_Local_Dir(int cd)
     return false;
 }
 
+/*
+** Switch to the data copied from disc cd (0 GDI, 1 Nod) if it's installed, without asking for
+** the CD. For Movie_Test (init.cpp), which plays each disc's movies in turn.
+*/
+bool Use_Local_Disc(int cd)
+{
+    return Change_Local_Dir(cd);
+}
+
 /***********************************************************************************************
  * Force_CD_Available -- Ensures that specified CD is available.                               *
  *                                                                                             *

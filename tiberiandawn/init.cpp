@@ -1566,7 +1566,8 @@ static const char* const Movie_Names[] = {
 /*
 ** VC_MOVIETEST=<seconds>: after start-up, play every movie the game can find, each for
 ** that many seconds (0: all of it), logging each one (Play_Movie), then quit. For
-** checking the movies on a machine. VC_MOVIETEST_FROM=<name> starts at that movie.
+** checking the movies on a machine. VC_MOVIETEST_FROM=<name> starts at that movie
+** (on the first installed disc).
 */
 static void Movie_Test()
 {
@@ -1574,25 +1575,32 @@ static void Movie_Test()
         return;
     }
     GameInFocus = true; // play even when the window isn't focused (the Mac)
-    int played = 0, missing = 0;
     const char* from = getenv("VC_MOVIETEST_FROM");
     bool started = from == nullptr || *from == '\0';
-    for (int i = 0; Movie_Names[i] != nullptr; i++) {
-        if (!started && strcasecmp(Movie_Names[i], from) != 0) {
+    static const char* const disc_names[] = {"GDI", "Nod"};
+    for (int cd = 0; cd < 2; cd++) { // each installed disc's movies in turn
+        if (!Use_Local_Disc(cd)) {
+            fprintf(stderr, "movietest: %s disc not installed\n", disc_names[cd]);
             continue;
         }
-        started = true;
-        char fullname[_MAX_FNAME + _MAX_EXT];
-        _makepath(fullname, NULL, NULL, Movie_Names[i], ".VQA");
-        if (!CCFileClass(fullname).Is_Available()) {
-            fprintf(stderr, "movie %s: not found\n", Movie_Names[i]);
-            ++missing;
-            continue;
+        int played = 0, missing = 0;
+        for (int i = 0; Movie_Names[i] != nullptr; i++) {
+            if (!started && strcasecmp(Movie_Names[i], from) != 0) {
+                continue;
+            }
+            started = true;
+            char fullname[_MAX_FNAME + _MAX_EXT];
+            _makepath(fullname, NULL, NULL, Movie_Names[i], ".VQA");
+            if (!CCFileClass(fullname).Is_Available()) {
+                fprintf(stderr, "movie %s: not found\n", Movie_Names[i]);
+                ++missing;
+                continue;
+            }
+            Play_Movie(Movie_Names[i], THEME_NONE);
+            ++played;
         }
-        Play_Movie(Movie_Names[i], THEME_NONE);
-        ++played;
+        fprintf(stderr, "movietest: %s disc, %d played, %d not found\n", disc_names[cd], played, missing);
     }
-    fprintf(stderr, "movietest: %d played, %d not found\n", played, missing);
     fflush(stderr);
     Sound_End();
     exit(0);
