@@ -836,6 +836,12 @@ void SidebarClass::Draw_It(bool complete)
                 */
                 int const row = StripClass::OBJECT_HEIGHT * 2;
                 int const extra = MaxVisible - StripClass::MAX_VISIBLE;
+
+                // Below the power bar the artwork is see-through left of the strips (the bar
+                // shows through it), so clear it there first, or help text drawn over it stays.
+                if (SeenBuff.Get_Height() > 400) {
+                    LogicPage->Fill_Rect(SideX, 400, Column[0].X - 1, SeenBuff.Get_Height() - 1, BLACK);
+                }
                 for (int i = 1; i <= extra; i++) {
                     int const top = 158 + 118 + (i - 1) * row;
                     WindowList[WINDOW_CUSTOM][WINDOWX] = SideX;

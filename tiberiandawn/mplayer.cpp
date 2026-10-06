@@ -891,8 +891,8 @@ int Surrender_Dialog(void)
     ........................................................................*/
     int d_dialog_w = 170 * factor;                      // dialog width
     int d_dialog_h = 53 * factor;                       // dialog height
-    int d_dialog_x = ((320 * factor - d_dialog_w) / 2); // centered x-coord
-    int d_dialog_y = ((200 * factor - d_dialog_h) / 2); // centered y-coord
+    int d_dialog_x = ((SeenBuff.Get_Width() - d_dialog_w) / 2);  // centered x-coord (in game: on the
+    int d_dialog_y = ((SeenBuff.Get_Height() - d_dialog_h) / 2); // whole screen, whatever its size)
     int d_dialog_cx = d_dialog_x + (d_dialog_w / 2);    // coord of x-center
 
     int d_txt6_h = 6 * factor + 1; // ht of 6-pt text
