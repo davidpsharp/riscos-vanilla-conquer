@@ -16,8 +16,9 @@ RMEnsure SharedUnixLibrary 1.16 Error Prepare needs SharedUnixLibrary 1.16 or la
 | vcprep runs Utils.ramix in this slot too, to install Red Alert without its movies.
 WimpSlot -min 6000K -max 6000K
 | vcprep can't read the $Dir variables itself (UnixLib's getenv doesn't see them), so
-| Prepare passes the application directories the Filer has seen.
-Set Prepare$Apps ""
-If "<VanillaTD$Dir>"<>"" Then Set Prepare$Apps -app <VanillaTD$Dir>
-If "<VanillaRA$Dir>"<>"" Then Set Prepare$Apps <Prepare$Apps> -raapp <VanillaRA$Dir>
-Run <Prepare$Dir>.Utils.vcprep <Prepare$Apps> -search <Obey$Dir> %*0
+| Prepare passes the application directories the Filer has seen. Each goes on the
+| command line as a variable of its own: UnixLib expands a <variable> into a single
+| argument, so "-app <dir>" can't be built up in one variable.
+If "<VanillaTD$Dir>"<>"" AND "<VanillaRA$Dir>"<>"" Then Run <Prepare$Dir>.Utils.vcprep -app <VanillaTD$Dir> -raapp <VanillaRA$Dir> -search <Obey$Dir> %*0
+If "<VanillaTD$Dir>"<>"" AND "<VanillaRA$Dir>"="" Then Run <Prepare$Dir>.Utils.vcprep -app <VanillaTD$Dir> -search <Obey$Dir> %*0
+If "<VanillaTD$Dir>"="" AND "<VanillaRA$Dir>"<>"" Then Run <Prepare$Dir>.Utils.vcprep -raapp <VanillaRA$Dir> -search <Obey$Dir> %*0
