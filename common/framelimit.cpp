@@ -2,6 +2,7 @@
 #include "wwmouse.h"
 #include "settings.h"
 #include <chrono>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -13,6 +14,46 @@
 extern WWMouseClass* WWMouse;
 
 unsigned Logic_Frame_Count = 0;
+unsigned Present_Count = 0;
+
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+
+/*
+** At 60 frames a second on RISC OS (a fast machine), presents are paced by the screen's vertical
+** sync rather than by sleeping: the clock and sleeps there are in centiseconds, so slept frames
+** came 10 or 20 ms apart and motion juddered. OS_Byte 176 reads the VSync counter (it counts
+** down once per vsync), and OS_Byte 19 waits for the next. VC_NOVSYNC turns this off.
+*/
+static bool VSync_Paced()
+{
+    static const bool off = getenv("VC_NOVSYNC") != nullptr;
+    return !off && Settings.Video.FrameLimit >= 50;
+}
+
+static int VSync_Counter()
+{
+    return _kernel_osbyte(176, 0, 255) & 0xFF;
+}
+
+// True if a vsync has passed since the last present, or else (when allowed to) waits for one.
+static bool VSync_Due(bool wait)
+{
+    static int last = -1;
+    int now = VSync_Counter();
+    if (now == last) {
+        if (!wait) {
+            return false;
+        }
+        PhaseTimer phase_timer(PHASE_SLEEP);
+        _kernel_osbyte(19, 0, 0);
+        now = VSync_Counter();
+    }
+    last = now;
+    return true;
+}
+#endif
 
 #ifdef NEW_VIDEO_BUILD
 void Video_Render_Frame();
@@ -48,9 +89,67 @@ static void Sleep_Updating_Cursor(unsigned us)
 #endif
 }
 
+int Present_Rate()
+{
+#ifdef __riscos__
+    if (VSync_Paced()) {
+        /*
+        ** The screen's refresh rate (75 Hz for some modes), measured once: vsyncs counted
+        ** (OS_Byte 176, which counts down in 8 bits) over at least a second of the centisecond
+        ** clock (OS_ReadMonotonicTime). Until then, 60.
+        */
+        static int rate = 0;
+        static int start_cs = -1, start_count = 0;
+        if (rate > 0) {
+            return rate;
+        }
+        _kernel_swi_regs regs;
+        _kernel_swi(OS_ReadMonotonicTime, &regs, &regs);
+        int const now_cs = regs.r[0];
+        int const count = VSync_Counter();
+        if (start_cs < 0) {
+            start_cs = now_cs;
+            start_count = count;
+        } else if (now_cs - start_cs >= 100) {
+            int const vsyncs = (start_count - count) & 0xFF;
+            int const elapsed = now_cs - start_cs;
+            if (elapsed <= 250) { // under 256 vsyncs even at 100 Hz, so the count hasn't wrapped
+                rate = (vsyncs * 100 + elapsed / 2) / elapsed;
+                if (rate < 40 || rate > 150) {
+                    rate = 60;
+                }
+                return rate;
+            }
+            start_cs = now_cs; // too long between calls to trust the count: measure again
+            start_count = count;
+        }
+        return 60;
+    }
+#endif
+    return Settings.Video.FrameLimit > 0 ? Settings.Video.FrameLimit : 60;
+}
+
 void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
 {
     static auto frame_start = std::chrono::steady_clock::now();
+#if defined(__riscos__) && defined(NEW_VIDEO_BUILD)
+    if (VSync_Paced() && !(flags & FrameLimitFlags::FL_NO_BLOCK)) {
+        // Present at most once per vsync: waiting for one unless the game is behind (or its
+        // next frame is due now, when it presents only if a vsync has already passed).
+        bool may_wait = !(flags & FrameLimitFlags::FL_NO_SLEEP) && max_sleep_ms != 0;
+        if (!VSync_Due(may_wait)) {
+            return;
+        }
+        {
+            PhaseTimer phase_timer(PHASE_PRESENT);
+            Video_Render_Frame();
+        }
+        ++Present_Count;
+        Present_Rate(); // measuring the refresh rate in the first seconds
+        frame_start = std::chrono::steady_clock::now();
+        return;
+    }
+#endif
 #ifdef NEW_VIDEO_BUILD
     static auto render_avg = 0;
 
@@ -86,6 +185,7 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
     // keep up some average so we have an idea if we need to skip a frame or not
     render_avg = (render_avg + render_time) / 2;
 #endif
+    ++Present_Count;
 
     if (Settings.Video.FrameLimit > 0 && !(flags & FrameLimitFlags::FL_NO_BLOCK)) {
 #ifdef NEW_VIDEO_BUILD

@@ -37,8 +37,10 @@
 
 #include "function.h"
 
+#include "common/framelimit.h"
+#include "common/settings.h"
+
 #include <algorithm>
-#include <chrono>
 
 #define SCROLL_DELAY 1
 
@@ -87,24 +89,23 @@ ScrollClass::ScrollClass(void)
 /*
 ** The scroll rates are a distance per game frame, as if this ran once a frame; but it runs each
 ** time the game reads input, many times between frames (and most of them in a burst just before
-** the next), so the map moved in jerks, and on a fast machine too fast. Instead scroll at most
-** once per 60 Hz present, by the distance for the time since the last scroll.
+** the next), so the map moved in jerks. Instead it steps once per frame presented, by a fixed
+** share of the rate (not by measured time: on RISC OS the clock is in centiseconds), so the
+** speed is the same whatever the game speed and the frame rate: the rate per 40 ms, a little
+** quicker than a game frame at the usual speed (4 ticks, 67 ms).
 */
 static bool Scroll_Due(int& distance, int per_frame)
 {
-    using namespace std::chrono;
-    static steady_clock::time_point last;
-    auto const now = steady_clock::now();
-    int ms = int(duration_cast<milliseconds>(now - last).count());
-    if (ms < 12) {
-        return false; // not again this present (they're 16.7 ms apart, but wakes jitter)
+    static unsigned last = 0;
+    unsigned presents = Present_Count - last;
+    if (presents == 0) {
+        return false;
     }
-    last = now;
-    int const frame_ms = std::max(int(Options.GameSpeed), 1) * 1000 / TIMER_SECOND;
-    if (ms > 3 * frame_ms) {
-        ms = frame_ms; // the first step of a new scroll (or after a pause): one frame's worth
+    last = Present_Count;
+    if (presents > 3) {
+        presents = 1; // the first step of a new scroll (or after a pause)
     }
-    distance = std::max(1, per_frame * ms / frame_ms);
+    distance = std::max(1, int(per_frame * presents * 25 / Present_Rate())); // 25 = 1000 / 40 ms
     return true;
 }
 
