@@ -138,6 +138,10 @@ void PowerClass::One_Time(void)
     }
     PowWidth = 8 << factor;
     PowHeight = SeenBuff.Get_Height() - PowY;
+    if (factor && SeenBuff.Get_Height() > 400) {
+        // The bar's artwork is for a 640x400 screen, so on a taller one it keeps that length.
+        PowHeight = 400 - PowY;
+    }
     PowLineSpace = 5 << factor;
     PowLineWidth = PowWidth - 4;
 

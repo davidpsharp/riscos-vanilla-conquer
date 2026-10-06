@@ -105,8 +105,8 @@ static int Mode_Variable(int var)
 
 bool RISCOS_Pointer_Position(int& x, int& y)
 {
-    // Always from the OS pointer: in a mode the size of the surface SDL reports relative
-    // motion and re-centres the pointer, which loses positions set by moving it directly.
+    // Always from the OS pointer, as SDL's positions are off on a centred surface, and to
+    // be the same whether it is centred or not.
     int offx = 0, offy = 0;
     if (window == nullptr) {
         return false;
@@ -121,8 +121,8 @@ bool RISCOS_Pointer_Position(int& x, int& y)
     return true;
 }
 
-// Keep the pointer inside a centred surface (OS_Word 21,1 sets the bounding box),
-// starting in the middle of it (OS_Word 21,3 moves it).
+// Keep the pointer inside the surface, or the menu area on it (OS_Word 21,1 sets the
+// bounding box; OS_Word 21,3 moves the pointer).
 static void Confine_Pointer()
 {
     int offx = 0, offy = 0;
@@ -150,7 +150,14 @@ static void Confine_Pointer()
                               Uint8(top >> 8)};
     _kernel_osword(21, reinterpret_cast<int*>(block));
 
-    int cx = (left + right) / 2, cy = (bottom + top) / 2;
+    // Keep the pointer where it is, if that's inside the box (so a layout change, such as the
+    // end of a movie, doesn't take it away from where the player had it), or else bring it
+    // to the nearest point inside. OS_Word 21,4 reads where it is.
+    unsigned char pos[5] = {4, 0, 0, 0, 0};
+    _kernel_osword(21, reinterpret_cast<int*>(pos));
+    int cx = Sint16(pos[1] | (pos[2] << 8)), cy = Sint16(pos[3] | (pos[4] << 8));
+    cx = cx < left ? left : (cx > right ? right : cx);
+    cy = cy < bottom ? bottom : (cy > top ? top : cy);
     unsigned char move[5] = {3, Uint8(cx), Uint8(cx >> 8), Uint8(cy), Uint8(cy >> 8)};
     _kernel_osword(21, reinterpret_cast<int*>(move));
 }
@@ -260,10 +267,6 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         SDL_SetCursor(blank_cursor);
         SDL_ShowCursor(SDL_ENABLE);
     }
-    // No grab either, which a full screen mode turns on: with it SDL can still fall into
-    // relative mode and re-centre the pointer (as it did in a 1024x768 mode). The pointer is
-    // kept on the game's screen by Confine_Pointer instead.
-    SDL_WM_GrabInput(SDL_GRAB_OFF);
     Confine_Pointer();
     {
         // Which mode SDL chose matters for speed: the screen's refresh shares the memory bus.
