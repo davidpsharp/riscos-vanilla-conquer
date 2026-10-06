@@ -892,9 +892,9 @@ bool Select_Game(bool fade)
 
             /*
             ** Select that side's disc before the scenario name is chosen, as
-            ** winning the previous mission would have done.
+            ** choosing the side, or winning the previous mission, would have done.
             */
-            if (RequiredCD != -2 && Scen.Scenario != 1) {
+            if (RequiredCD != -2) {
                 RequiredCD = AutoStartPlayer == SCEN_PLAYER_NOD ? 1 : 0;
                 Force_CD_Available(RequiredCD);
             }
@@ -1115,6 +1115,16 @@ bool Select_Game(bool fade)
                     if (!Is_Demo()) {
                         Theme.Fade_Out();
                         Choose_Side();
+
+                        /*
+                        ** Switch to the chosen side's disc, as the original asked for
+                        ** that CD, so that the side's briefings and movies are found.
+                        ** If only the other disc is installed, it stays in use.
+                        */
+                        if (RequiredCD != -2) {
+                            RequiredCD = Whom == HOUSE_BAD ? 1 : 0;
+                            Force_CD_Available(RequiredCD);
+                        }
                     }
 
                     /*
