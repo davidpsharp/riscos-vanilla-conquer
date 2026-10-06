@@ -158,6 +158,16 @@ extern bool DLL_Export_Get_Input_Key_State(KeyNumType key);
  * HISTORY:                                                                                    *
  *   12/06/1994 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+**	What Set_View_Dimensions was last asked for (-1 for to the screen's edge), and the area in
+**	pixels that makes; the view itself can be smaller, for a small map. Not members, which
+**	would change what saved games hold.
+*/
+static int ViewRequestW = -1;
+static int ViewRequestH = -1;
+static int ViewAreaW = 0;
+static int ViewAreaH = 0;
+
 DisplayClass::DisplayClass(void)
 {
     TacticalCoord = 0;
@@ -666,14 +676,29 @@ void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
     TacButton.Height = Lepton_To_Pixel(TacLeptonHeight);
 
 #else // CNC code
+    ViewRequestW = width;
+    ViewRequestH = height;
     if (width == -1) {
         width = SeenBuff.Get_Width() - x;
     }
-    TacLeptonWidth = Pixel_To_Lepton(width);
-
     if (height == -1) {
         height = SeenBuff.Get_Height() - y;
     }
+    ViewAreaW = width;
+    ViewAreaH = height;
+
+    /*
+    **	On a big screen a map can be smaller than the view. Then the view is just the map: the
+    **	cells beyond its edges aren't kept up to date (and nothing redraws there), so Draw_It
+    **	keeps the rest of the view's area black instead.
+    */
+    if (MapCellWidth > 0 && width > MapCellWidth * CELL_PIXEL_W) {
+        width = MapCellWidth * CELL_PIXEL_W;
+    }
+    if (MapCellHeight > 0 && height > MapCellHeight * CELL_PIXEL_H) {
+        height = MapCellHeight * CELL_PIXEL_H;
+    }
+    TacLeptonWidth = Pixel_To_Lepton(width);
     TacLeptonHeight = Pixel_To_Lepton(height);
 
     /*
@@ -1285,6 +1310,7 @@ void DisplayClass::Read_INI(CCINIClass& ini)
     int h = ini.Get_Int(name, "Height", MAP_CELL_H - 2);
 
     Set_Map_Dimensions(x, y, w, h);
+    Set_View_Dimensions(TacPixelX, TacPixelY, ViewRequestW, ViewRequestH); // fit the view to this map
 
     /*
     **	The theater is determined at this point. There is specific data that
@@ -2107,6 +2133,22 @@ void DisplayClass::Draw_It(bool forced)
     int x, y; // Working cell index values.
 
     MapClass::Draw_It(forced);
+
+    /*
+    **	The part of the view's area beyond a map smaller than it (see Set_View_Dimensions):
+    **	kept black, which also erases anything drawn over it, such as help text.
+    */
+    int tac_w = Lepton_To_Pixel(TacLeptonWidth), tac_h = Lepton_To_Pixel(TacLeptonHeight);
+    if ((ViewAreaW > tac_w || ViewAreaH > tac_h) && LogicPage->Lock()) {
+        if (ViewAreaW > tac_w) {
+            LogicPage->Fill_Rect(
+                TacPixelX + tac_w, TacPixelY, TacPixelX + ViewAreaW - 1, TacPixelY + ViewAreaH - 1, BLACK);
+        }
+        if (ViewAreaH > tac_h) {
+            LogicPage->Fill_Rect(TacPixelX, TacPixelY + tac_h, TacPixelX + tac_w - 1, TacPixelY + ViewAreaH - 1, BLACK);
+        }
+        LogicPage->Unlock();
+    }
 
     if (IsToRedraw || forced) {
         IsToRedraw = false;

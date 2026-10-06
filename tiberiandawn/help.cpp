@@ -216,6 +216,15 @@ void HelpClass::Help_Text(int text, int x, int y, int color, bool quick, int cos
         */
         if (Text != TXT_NONE) {
             Refresh_Cells(Coord_Cell(TacticalCoord), &OverlapList[0]);
+
+            /*
+            **	A cameo's help text is drawn left of the strip, over the sidebar. Below the
+            **	power bar on a screen taller than 400 nothing else redraws there, so redraw
+            **	the sidebar (rarely needed, so a complete redraw).
+            */
+            if (IsSidebarActive && SeenBuff.Get_Height() > 400 && DrawX + Width + 1 >= SideX) {
+                Flag_To_Redraw(true);
+            }
         }
 
         /*
