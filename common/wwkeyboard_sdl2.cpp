@@ -92,8 +92,14 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 break;
             case SDL_WINDOWEVENT_HIDDEN:
             case SDL_WINDOWEVENT_MINIMIZED:
-            case SDL_WINDOWEVENT_FOCUS_LOST:
                 Focus_Loss();
+                break;
+            case SDL_WINDOWEVENT_FOCUS_LOST:
+#ifndef __APPLE__
+                // On the Mac it keeps running (and playing) behind other windows, so it can be
+                // watched while using something else; minimising or hiding it still pauses it.
+                Focus_Loss();
+#endif
                 break;
             }
             break;
