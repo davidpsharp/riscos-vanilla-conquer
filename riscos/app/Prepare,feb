@@ -15,4 +15,9 @@ RMEnsure SharedUnixLibrary 1.16 RMLoad <Prepare$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Prepare needs SharedUnixLibrary 1.16 or later
 | vcprep runs Utils.ramix in this slot too, to install Red Alert without its movies.
 WimpSlot -min 6000K -max 6000K
-Run <Prepare$Dir>.Utils.vcprep -search <Obey$Dir> %*0
+| vcprep can't read the $Dir variables itself (UnixLib's getenv doesn't see them), so
+| Prepare passes the application directories the Filer has seen.
+Set Prepare$Apps ""
+If "<VanillaTD$Dir>"<>"" Then Set Prepare$Apps -app <VanillaTD$Dir>
+If "<VanillaRA$Dir>"<>"" Then Set Prepare$Apps <Prepare$Apps> -raapp <VanillaRA$Dir>
+Run <Prepare$Dir>.Utils.vcprep <Prepare$Apps> -search <Obey$Dir> %*0
