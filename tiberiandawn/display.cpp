@@ -165,6 +165,8 @@ extern bool DLL_Export_Get_Input_Key_State(KeyNumType key);
 */
 static int ViewRequestW = -1;
 static int ViewRequestH = -1;
+static int ViewAreaX = 0;
+static int ViewAreaY = 0;
 static int ViewAreaW = 0;
 static int ViewAreaH = 0;
 
@@ -684,13 +686,15 @@ void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
     if (height == -1) {
         height = SeenBuff.Get_Height() - y;
     }
+    ViewAreaX = x;
+    ViewAreaY = y;
     ViewAreaW = width;
     ViewAreaH = height;
 
     /*
-    **	On a big screen a map can be smaller than the view. Then the view is just the map: the
-    **	cells beyond its edges aren't kept up to date (and nothing redraws there), so Draw_It
-    **	keeps the rest of the view's area black instead.
+    **	On a big screen a map can be smaller than the view. Then the view is just the map,
+    **	centred in the view's area: the cells beyond its edges aren't kept up to date (and
+    **	nothing redraws there), so Draw_It keeps the rest of the area black instead.
     */
     if (MapCellWidth > 0 && width > MapCellWidth * CELL_PIXEL_W) {
         width = MapCellWidth * CELL_PIXEL_W;
@@ -700,6 +704,8 @@ void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
     }
     TacLeptonWidth = Pixel_To_Lepton(width);
     TacLeptonHeight = Pixel_To_Lepton(height);
+    x += ((ViewAreaW - width) / 2) & ~7; // to a multiple of 8, as window positions were
+    y += (ViewAreaH - height) / 2;
 
     /*
     **	Adjust the tactical cell if it is now in an invalid position
@@ -1310,7 +1316,7 @@ void DisplayClass::Read_INI(CCINIClass& ini)
     int h = ini.Get_Int(name, "Height", MAP_CELL_H - 2);
 
     Set_Map_Dimensions(x, y, w, h);
-    Set_View_Dimensions(TacPixelX, TacPixelY, ViewRequestW, ViewRequestH); // fit the view to this map
+    Set_View_Dimensions(ViewAreaX, ViewAreaY, ViewRequestW, ViewRequestH); // fit the view to this map
 
     /*
     **	The theater is determined at this point. There is specific data that
@@ -2140,12 +2146,18 @@ void DisplayClass::Draw_It(bool forced)
     */
     int tac_w = Lepton_To_Pixel(TacLeptonWidth), tac_h = Lepton_To_Pixel(TacLeptonHeight);
     if ((ViewAreaW > tac_w || ViewAreaH > tac_h) && LogicPage->Lock()) {
-        if (ViewAreaW > tac_w) {
-            LogicPage->Fill_Rect(
-                TacPixelX + tac_w, TacPixelY, TacPixelX + ViewAreaW - 1, TacPixelY + ViewAreaH - 1, BLACK);
+        int const right = ViewAreaX + ViewAreaW - 1, bottom = ViewAreaY + ViewAreaH - 1;
+        if (TacPixelY > ViewAreaY) {
+            LogicPage->Fill_Rect(ViewAreaX, ViewAreaY, right, TacPixelY - 1, BLACK); // above
         }
-        if (ViewAreaH > tac_h) {
-            LogicPage->Fill_Rect(TacPixelX, TacPixelY + tac_h, TacPixelX + tac_w - 1, TacPixelY + ViewAreaH - 1, BLACK);
+        if (TacPixelY + tac_h <= bottom) {
+            LogicPage->Fill_Rect(ViewAreaX, TacPixelY + tac_h, right, bottom, BLACK); // below
+        }
+        if (TacPixelX > ViewAreaX) {
+            LogicPage->Fill_Rect(ViewAreaX, TacPixelY, TacPixelX - 1, TacPixelY + tac_h - 1, BLACK); // left
+        }
+        if (TacPixelX + tac_w <= right) {
+            LogicPage->Fill_Rect(TacPixelX + tac_w, TacPixelY, right, TacPixelY + tac_h - 1, BLACK); // right
         }
         LogicPage->Unlock();
     }

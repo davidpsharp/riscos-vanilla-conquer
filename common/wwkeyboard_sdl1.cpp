@@ -183,7 +183,13 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
         } break;
 
         case SDL_ACTIVEEVENT:
+#ifdef __APPLE__
+            // On the Mac it keeps running (and playing) behind other windows, so it can be
+            // watched while using something else; minimising it still pauses it.
+            if (event.active.state & SDL_APPACTIVE) {
+#else
             if (event.active.state & SDL_APPINPUTFOCUS) {
+#endif
                 if (event.active.gain) {
                     Focus_Restore();
                 } else {
