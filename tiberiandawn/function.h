@@ -322,6 +322,18 @@ public:
 private:
     bool WasGame;
 };
+
+// For setting things up from the screen's size while in the menu layout: the whole screen for
+// its lifetime, but neither cleared nor redrawn, then the menu layout again.
+class FullScreenScope
+{
+public:
+    FullScreenScope();
+    ~FullScreenScope();
+
+private:
+    bool WasMenu;
+};
 bool Use_Local_Disc(int cd); // VC_MOVIETEST
 void Handle_View(int view, int action = 0);
 void Handle_Team(int team, int action = 0);

@@ -532,6 +532,12 @@ bool Init_Game(int, char*[])
     */
     memset(CurrentPalette, 0x01, 768);
 
+    /*
+    ** On a big screen the title and the menus are in the middle of it from the start, rather
+    ** than first in its top left corner until Select_Game.
+    */
+    Use_Menu_Layout();
+
     if (!Special.IsFromInstall) {
         /*
         ** Only load the title screen here; it is shown below once its palette is
@@ -601,6 +607,9 @@ bool Init_Game(int, char*[])
     **	Perform one-time game system initializations.
     */
     Call_Back();
+    {
+    // These size the battlefield, sidebar and dialogs from the whole screen.
+    FullScreenScope full_screen;
     //	malloc(3);
     Map.One_Time();
     //	malloc(4);
@@ -625,6 +634,7 @@ bool Init_Game(int, char*[])
     AnimTypeClass::One_Time();
     AircraftTypeClass::One_Time();
     HouseClass::One_Time();
+    }
 
     /*
     **	Speech holding tank buffer. Since speech does not mix, it can be placed

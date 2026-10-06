@@ -2282,6 +2282,21 @@ MenuLayoutScope::~MenuLayoutScope()
     }
 }
 
+FullScreenScope::FullScreenScope()
+    : WasMenu(!InGameLayout && Is_Large_Screen())
+{
+    if (WasMenu) {
+        Attach_Layout(0, 0, ScreenWidth, ScreenHeight);
+    }
+}
+
+FullScreenScope::~FullScreenScope()
+{
+    if (WasMenu) {
+        Attach_Layout((ScreenWidth - 640) / 2, (ScreenHeight - 400) / 2, 640, 400);
+    }
+}
+
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn)
 {
     if (Bench_Frames > 0) {
