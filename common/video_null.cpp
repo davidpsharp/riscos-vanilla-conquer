@@ -296,3 +296,7 @@ VideoSurface* Video::CreateSurface(int w, int h, GBC_Enum flags)
 {
     return new VideoSurfaceDummy(w, h, flags);
 }
+
+void Set_Video_Mouse_Area(int, int, int, int)
+{
+}

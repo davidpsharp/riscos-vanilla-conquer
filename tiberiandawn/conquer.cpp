@@ -60,6 +60,7 @@
 
 #include "common/phasetime.h"
 #include "function.h"
+#include "common/video.h"
 #include "common/irandom.h"
 #include <chrono>
 #include <stdlib.h>
@@ -2220,11 +2221,69 @@ int Movie_Test_Seconds()
     return seconds;
 }
 
+/*
+** Screen layouts (see function.h).
+*/
+static bool InGameLayout = true;
+
+bool Is_Large_Screen(void)
+{
+    return ScreenWidth > 640 || ScreenHeight > 400;
+}
+
+static void Attach_Layout(int x, int y, int w, int h)
+{
+    SeenBuff.Attach(&VisiblePage, x, y, w, h);
+    HidPage.Attach(&HiddenPage, x, y, w, h);
+    WindowList[0][WINDOWWIDTH] = SeenBuff.Get_Width();
+    WindowList[0][WINDOWHEIGHT] = SeenBuff.Get_Height();
+    Set_Video_Mouse_Area(x, y, w == ScreenWidth && h == ScreenHeight ? 0 : w, h);
+}
+
+void Use_Game_Layout(void)
+{
+    if (!Is_Large_Screen() || InGameLayout) {
+        InGameLayout = true;
+        return;
+    }
+    InGameLayout = true;
+    Attach_Layout(0, 0, ScreenWidth, ScreenHeight);
+    VisiblePage.Clear();
+    HiddenPage.Clear();
+    Map.Flag_To_Redraw(true);
+}
+
+void Use_Menu_Layout(void)
+{
+    if (!Is_Large_Screen() || !InGameLayout) {
+        InGameLayout = false;
+        return;
+    }
+    InGameLayout = false;
+    VisiblePage.Clear();
+    HiddenPage.Clear();
+    Attach_Layout((ScreenWidth - 640) / 2, (ScreenHeight - 400) / 2, 640, 400);
+}
+
+MenuLayoutScope::MenuLayoutScope()
+    : WasGame(InGameLayout)
+{
+    Use_Menu_Layout();
+}
+
+MenuLayoutScope::~MenuLayoutScope()
+{
+    if (WasGame) {
+        Use_Game_Layout();
+    }
+}
+
 void Play_Movie(char const* name, ThemeType theme, bool clrscrn)
 {
     if (Bench_Frames > 0) {
         return; // the benchmark goes straight to the game
     }
+    MenuLayoutScope menu_layout;
 #if REMASTER_BUILD
     if (strcmp(name, "x") == 0 || strcmp(name, "X") == 0) {
         return;

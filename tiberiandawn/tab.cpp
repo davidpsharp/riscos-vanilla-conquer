@@ -127,7 +127,10 @@ void TabClass::Draw_It(bool complete)
 
 void TabClass::Draw_Credits_Tab(void)
 {
-    unsigned x = Get_Resolution_Factor() ? 320 : 160;
+    // Just left of the Sidebar tab, under the credits (CreditClass draws them from the
+    // screen's width too): 320 or 160 on the original screens.
+    int eva_width = 80 * ((SeenBuff.Get_Width() == 320) ? 1 : 2); // as One_Time sets Eva_Width
+    int x = SeenBuff.Get_Width() - 2 * eva_width;
     CC_Draw_Shape(TabShape, 0, x, 0, WINDOW_MAIN, SHAPE_NORMAL);
 }
 

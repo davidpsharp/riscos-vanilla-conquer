@@ -794,6 +794,9 @@ bool Select_Game(bool fade)
         Show_Mouse();
     }
 
+    // The menus are laid out for 640x400 (see Use_Menu_Layout).
+    Use_Menu_Layout();
+
     /*
     **	[Re]set any globals that need it, in preparation for a new scenario
     */
@@ -1532,6 +1535,7 @@ bool Select_Game(bool fade)
     HiddenPage.Clear();
     VisiblePage.Clear();
     Set_Logic_Page(SeenBuff);
+    Use_Game_Layout();
     Map.Flag_To_Redraw();
     Call_Back();
     Map.Render();

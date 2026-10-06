@@ -61,6 +61,11 @@ public:
 extern SurfaceMonitorClass& AllSurfaces; // List of all surfaces
 
 bool Set_Video_Mode(int w, int h, int bits_per_pixel);
+/*
+** Reports the pointer relative to an area of the screen, and keeps it inside it, for a
+** 640x400 menu shown centred on a bigger screen. A width of 0 means the whole screen.
+*/
+void Set_Video_Mouse_Area(int x, int y, int w, int h);
 void Get_Video_Scale(float& x, float& y);
 void Set_Video_Cursor_Clip(bool clipped);
 void Move_Video_Mouse(float xrel, float yrel);

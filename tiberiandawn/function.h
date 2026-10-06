@@ -303,6 +303,25 @@ void Explosion_Damage(COORDINATE coord, unsigned strength, TechnoClass* source, 
 */
 void Center_About_Objects(void);
 bool Force_CD_Available(int cd);
+
+/*
+** A game screen bigger than 640x400 shows more of the battlefield. Menus, dialogs, movies
+** and the score screen were laid out for 640x400, so they are shown in a 640x400 area in
+** the middle of it (the menu layout); the battlefield and sidebar use the whole screen
+** (the game layout). MenuLayoutScope switches to the menu layout for its lifetime.
+*/
+bool Is_Large_Screen(void);
+void Use_Game_Layout(void);
+void Use_Menu_Layout(void);
+class MenuLayoutScope
+{
+public:
+    MenuLayoutScope();
+    ~MenuLayoutScope();
+
+private:
+    bool WasGame;
+};
 bool Use_Local_Disc(int cd); // VC_MOVIETEST
 void Handle_View(int view, int action = 0);
 void Handle_Team(int team, int action = 0);

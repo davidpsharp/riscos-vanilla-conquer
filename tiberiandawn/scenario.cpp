@@ -102,6 +102,9 @@ ScenarioClass::ScenarioClass(void)
  *=============================================================================================*/
 bool Start_Scenario(char* root, bool briefing)
 {
+    // The map's view is sized to the screen it is read for (movies switch away and back).
+    Use_Game_Layout();
+
 
     if (!Read_Scenario(root)) {
         CCDebugString("C&C95 - Failed to read scenario.\n");

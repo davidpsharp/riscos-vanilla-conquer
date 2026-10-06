@@ -416,6 +416,7 @@ const char* GetMapSelString(unsigned int index)
  *=============================================================================================*/
 void Map_Selection(void)
 {
+    MenuLayoutScope menu_layout;
     void *anim, *progress, *oldfont, *greyearth, *greyearth2;
     unsigned char localpalette[768];
     int scenario, lastscenario;

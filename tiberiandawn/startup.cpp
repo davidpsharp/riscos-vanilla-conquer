@@ -333,6 +333,17 @@ int main(int argc, char** argv)
         if (Settings.Video.DOSMode || low_res_asked || Is_Demo() || Is_DOS_Files()) {
             ScreenWidth = 320;
             ScreenHeight = 200;
+        } else {
+            /*
+            ** A bigger screen shows more of the battlefield (see Use_Game_Layout); it must
+            ** hold the 640x400 menus.
+            */
+            int w = 0, h = 0;
+            if (sscanf(Settings.Video.Resolution.c_str(), "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 2048
+                && h <= 2048) {
+                ScreenWidth = w;
+                ScreenHeight = h;
+            }
         }
 #endif
 
@@ -438,8 +449,9 @@ int main(int argc, char** argv)
         }
 #endif
 
-        SeenBuff.Attach(&VisiblePage, 0, 0, GBUFF_INIT_WIDTH, GBUFF_INIT_HEIGHT);
-        HidPage.Attach(&HiddenPage, 0, 0, GBUFF_INIT_WIDTH, GBUFF_INIT_HEIGHT);
+        // The whole screen: the one-time set-up lays the sidebar and radar out for it.
+        SeenBuff.Attach(&VisiblePage, 0, 0, ScreenWidth, ScreenHeight);
+        HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
 
         CCDebugString("C&C95 - Adjusting variables for resolution.\n");
         Options.Adjust_Variables_For_Resolution();

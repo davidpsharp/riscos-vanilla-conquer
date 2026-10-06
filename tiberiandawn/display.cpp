@@ -77,6 +77,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "common/phasetime.h"
 #include "function.h"
+
+#include <algorithm>
 #include "common/fading.h"
 #include "ccini.h"
 
@@ -1354,7 +1356,19 @@ void DisplayClass::Read_INI(CCINIClass& ini)
     if (Scen.Waypoint[WAYPT_HOME] == -1) {
         Scen.Waypoint[WAYPT_HOME] = XY_Cell(MapCellX, MapCellY);
     }
-    Set_Tactical_Position(Coord_Whole(Cell_Coord(Scen.Waypoint[WAYPT_HOME])));
+    COORDINATE home = Coord_Whole(Cell_Coord(Scen.Waypoint[WAYPT_HOME]));
+    if (Is_Large_Screen()) {
+        /*
+        ** The home waypoint is the top left of a 640x400 screen's view (640x384 below the
+        ** tabs). Keep that area in the middle of a bigger view.
+        */
+        int const normal_w = 640 * CELL_LEPTON_W / CELL_PIXEL_W;
+        int const normal_h = 384 * CELL_LEPTON_H / CELL_PIXEL_H;
+        int x = Coord_X(home) - std::max(0, (TacLeptonWidth - normal_w) / 2);
+        int y = Coord_Y(home) - std::max(0, (TacLeptonHeight - normal_h) / 2);
+        home = XY_Coord(std::max(x, 0), std::max(y, 0));
+    }
+    Set_Tactical_Position(home);
     Scen.Views[0] = Scen.Views[1] = Scen.Views[2] = Scen.Views[3] = Scen.Waypoint[WAYPT_HOME];
 
     /*

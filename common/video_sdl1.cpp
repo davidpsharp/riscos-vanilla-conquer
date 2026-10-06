@@ -63,6 +63,14 @@ extern WWKeyboardClass* Keyboard;
 static SDL_Surface* window;
 static unsigned Window_Generation; // a new window holds nothing presented
 
+/*
+** The area of the screen the pointer is reported in (see Set_Video_Mouse_Area).
+*/
+static struct
+{
+    int X, Y, W, H;
+} MouseArea = {0, 0, 0, 0};
+
 #ifdef __riscos__
 #include <kernel.h>
 #include <swis.h>
@@ -97,10 +105,13 @@ static int Mode_Variable(int var)
 
 bool RISCOS_Pointer_Position(int& x, int& y)
 {
-    int offx, offy;
-    if (!Centred_Surface(offx, offy)) {
+    // Always from the OS pointer: in a mode the size of the surface SDL reports relative
+    // motion and re-centres the pointer, which loses positions set by moving it directly.
+    int offx = 0, offy = 0;
+    if (window == nullptr) {
         return false;
     }
+    Centred_Surface(offx, offy);
     _kernel_swi_regs regs;
     _kernel_swi(OS_Mouse, &regs, &regs);
     x = (regs.r[0] >> Mode_Variable(4)) - offx;                     // XEigFactor
@@ -114,13 +125,20 @@ bool RISCOS_Pointer_Position(int& x, int& y)
 // starting in the middle of it (OS_Word 21,3 moves it).
 static void Confine_Pointer()
 {
-    int offx, offy;
-    if (!Centred_Surface(offx, offy)) {
+    int offx = 0, offy = 0;
+    bool const centred = Centred_Surface(offx, offy);
+    bool const area = MouseArea.W > 0 && MouseArea.H > 0;
+    if (window == nullptr) {
         return;
     }
+    // Without a centred surface or an area this still sets the box, to the whole surface,
+    // to undo an area's box (the game layout after a menu).
+    // Within the surface, the menu area if there is one, or else the whole surface.
+    int x0 = offx + (area ? MouseArea.X : 0), y0 = offy + (area ? MouseArea.Y : 0);
+    int w = area ? MouseArea.W : window->w, h = area ? MouseArea.H : window->h;
     int xeig = Mode_Variable(4), yeig = Mode_Variable(5), ymax = Mode_Variable(12);
-    int left = offx << xeig, right = (offx + window->w - 1) << xeig;
-    int bottom = (ymax - (offy + window->h - 1)) << yeig, top = (ymax - offy) << yeig;
+    int left = x0 << xeig, right = (x0 + w - 1) << xeig;
+    int bottom = (ymax - (y0 + h - 1)) << yeig, top = (ymax - y0) << yeig;
     unsigned char block[9] = {1,
                               Uint8(left),
                               Uint8(left >> 8),
@@ -242,6 +260,10 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         SDL_SetCursor(blank_cursor);
         SDL_ShowCursor(SDL_ENABLE);
     }
+    // No grab either, which a full screen mode turns on: with it SDL can still fall into
+    // relative mode and re-centre the pointer (as it did in a 1024x768 mode). The pointer is
+    // kept on the game's screen by Confine_Pointer instead.
+    SDL_WM_GrabInput(SDL_GRAB_OFF);
     Confine_Pointer();
     {
         // Which mode SDL chose matters for speed: the screen's refresh shares the memory bus.
@@ -361,7 +383,18 @@ void Move_Video_Mouse(float xrel, float yrel)
     }
 }
 
-void Get_Video_Mouse(int& x, int& y)
+static void Apply_Mouse_Area(int& x, int& y)
+{
+    if (MouseArea.W <= 0 || MouseArea.H <= 0) {
+        return;
+    }
+    x -= MouseArea.X;
+    y -= MouseArea.Y;
+    x = x < 0 ? 0 : (x >= MouseArea.W ? MouseArea.W - 1 : x);
+    y = y < 0 ? 0 : (y >= MouseArea.H ? MouseArea.H - 1 : y);
+}
+
+static void Get_Screen_Mouse(int& x, int& y)
 {
 #ifdef __riscos__
     // A centred surface: SDL's positions are off (see RISCOS_Pointer_Position), raw or not.
@@ -375,6 +408,33 @@ void Get_Video_Mouse(int& x, int& y)
     } else {
         SDL_GetMouseState(&x, &y);
     }
+}
+
+void Get_Video_Mouse(int& x, int& y)
+{
+    Get_Screen_Mouse(x, y);
+    Apply_Mouse_Area(x, y);
+}
+
+// Where the cursor goes on the screen: the game's position, back inside the mouse area.
+static void Get_Cursor_Position(int& x, int& y)
+{
+    Get_Video_Mouse(x, y);
+    if (MouseArea.W > 0 && MouseArea.H > 0) {
+        x += MouseArea.X;
+        y += MouseArea.Y;
+    }
+}
+
+void Set_Video_Mouse_Area(int x, int y, int w, int h)
+{
+    MouseArea.X = x;
+    MouseArea.Y = y;
+    MouseArea.W = w;
+    MouseArea.H = h;
+#ifdef __riscos__
+    Confine_Pointer();
+#endif
 }
 
 /***********************************************************************************************
@@ -890,7 +950,7 @@ public:
 
         if (cursor) {
             int x, y;
-            Get_Video_Mouse(x, y);
+            Get_Cursor_Position(x, y);
             area = Make_SDL_Rect(x - hwcursor.HotX, y - hwcursor.HotY, hwcursor.Surface->w, hwcursor.Surface->h);
         }
 

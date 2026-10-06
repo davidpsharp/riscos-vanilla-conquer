@@ -46,6 +46,7 @@ SettingsClass::SettingsClass()
     Video.Height = 0;
     Video.Boxing = true;
     Video.BoxingAspectRatio = "16:10";
+    Video.Resolution = "640x400";
 #ifdef __riscos__
     if (RISCOS_Is_Fast_Machine()) {
         // A Pi or similar copies a frame in well under a millisecond, so present at 60
@@ -98,6 +99,7 @@ void SettingsClass::Load(INIClass& ini)
     Video.Windowed = ini.Get_Bool("Video", "Windowed", Video.Windowed);
     Video.Boxing = ini.Get_Bool("Video", "Boxing", Video.Boxing);
     Video.BoxingAspectRatio = ini.Get_String("Video", "BoxingAspectRatio", Video.BoxingAspectRatio);
+    Video.Resolution = ini.Get_String("Video", "Resolution", Video.Resolution);
     Video.Width = ini.Get_Int("Video", "Width", Video.Width);
     Video.Height = ini.Get_Int("Video", "Height", Video.Height);
     Video.FrameLimit = ini.Get_Int("Video", "FrameLimit", Video.FrameLimit);
@@ -161,6 +163,7 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     ini.Put_Bool("Video", "DOSMode", Video.DOSMode);
     ini.Put_String("Video", "Scaler", Video.Scaler);
+    ini.Put_String("Video", "Resolution", Video.Resolution);
     ini.Put_String("Video", "Driver", Video.Driver);
     ini.Put_String("Video", "PixelFormat", Video.PixelFormat);
 

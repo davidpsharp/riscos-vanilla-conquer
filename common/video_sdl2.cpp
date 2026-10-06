@@ -445,7 +445,26 @@ void Move_Video_Mouse(float xrel, float yrel)
     }
 }
 
-void Get_Video_Mouse(int& x, int& y)
+/*
+** The area of the screen the pointer is reported in (see Set_Video_Mouse_Area).
+*/
+static struct
+{
+    int X, Y, W, H;
+} MouseArea = {0, 0, 0, 0};
+
+static void Apply_Mouse_Area(int& x, int& y)
+{
+    if (MouseArea.W <= 0 || MouseArea.H <= 0) {
+        return;
+    }
+    x -= MouseArea.X;
+    y -= MouseArea.Y;
+    x = x < 0 ? 0 : (x >= MouseArea.W ? MouseArea.W - 1 : x);
+    y = y < 0 ? 0 : (y >= MouseArea.H ? MouseArea.H - 1 : y);
+}
+
+static void Get_Screen_Mouse(int& x, int& y)
 {
     if (Keyboard->Is_Gamepad_Active() || (Settings.Mouse.RawInput && (hwcursor.Clip || !Settings.Video.Windowed))) {
         x = hwcursor.X;
@@ -457,6 +476,30 @@ void Get_Video_Mouse(int& x, int& y)
         x /= scale_x;
         y /= scale_y;
     }
+}
+
+void Get_Video_Mouse(int& x, int& y)
+{
+    Get_Screen_Mouse(x, y);
+    Apply_Mouse_Area(x, y);
+}
+
+// Where the cursor goes on the screen: the game's position, back inside the mouse area.
+static void Get_Cursor_Position(int& x, int& y)
+{
+    Get_Video_Mouse(x, y);
+    if (MouseArea.W > 0 && MouseArea.H > 0) {
+        x += MouseArea.X;
+        y += MouseArea.Y;
+    }
+}
+
+void Set_Video_Mouse_Area(int x, int y, int w, int h)
+{
+    MouseArea.X = x;
+    MouseArea.Y = y;
+    MouseArea.W = w;
+    MouseArea.H = h;
 }
 
 /***********************************************************************************************
@@ -827,7 +870,7 @@ public:
             int x, y;
             SDL_Rect dst;
 
-            Get_Video_Mouse(x, y);
+            Get_Cursor_Position(x, y);
 
             dst.x = x - hwcursor.HotX;
             dst.y = y - hwcursor.HotY;

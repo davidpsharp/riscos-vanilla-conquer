@@ -27,6 +27,8 @@ public:
         bool Windowed;
         bool Boxing;
         std::string BoxingAspectRatio;
+        // The game screen, e.g. "1024x768"; menus and movies stay 640x400, centred in it.
+        std::string Resolution;
         int Width;
         int Height;
         int FrameLimit;
