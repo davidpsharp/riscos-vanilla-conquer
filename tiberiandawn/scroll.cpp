@@ -37,6 +37,9 @@
 
 #include "function.h"
 
+#include <algorithm>
+#include <chrono>
+
 #define SCROLL_DELAY 1
 
 CountDownTimerClass ScrollClass::Counter;
@@ -81,6 +84,30 @@ ScrollClass::ScrollClass(void)
  *   08/10/1995 JLB : Revamped for free smooth scrolling.                                      *
  *   08/25/1995 JLB : Handles new scrolling option.                                            *
  *=============================================================================================*/
+/*
+** The scroll rates are a distance per game frame, as if this ran once a frame; but it runs each
+** time the game reads input, many times between frames (and most of them in a burst just before
+** the next), so the map moved in jerks, and on a fast machine too fast. Instead scroll at most
+** once per 60 Hz present, by the distance for the time since the last scroll.
+*/
+static bool Scroll_Due(int& distance, int per_frame)
+{
+    using namespace std::chrono;
+    static steady_clock::time_point last;
+    auto const now = steady_clock::now();
+    int ms = int(duration_cast<milliseconds>(now - last).count());
+    if (ms < 12) {
+        return false; // not again this present (they're 16.7 ms apart, but wakes jitter)
+    }
+    last = now;
+    int const frame_ms = std::max(int(Options.GameSpeed), 1) * 1000 / TIMER_SECOND;
+    if (ms > 3 * frame_ms) {
+        ms = frame_ms; // the first step of a new scroll (or after a pause): one frame's worth
+    }
+    distance = std::max(1, per_frame * ms / frame_ms);
+    return true;
+}
+
 #define EVA_WIDTH 80
 void ScrollClass::AI(KeyNumType& input, int x, int y)
 {
@@ -200,8 +227,7 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
 					**	If the mouse button is pressed or auto scrolling is active, then scroll
 					**	the map if the delay counter indicates.
 					*/
-                    if (Keyboard->Down(KN_LMOUSE) || IsAutoScroll) {
-                        distance = _rate[rate];
+                    if ((Keyboard->Down(KN_LMOUSE) || IsAutoScroll) && Scroll_Due(distance, _rate[rate])) {
                         Scroll_Map(direction, distance, true);
 
                         if (Counter.Time() == 0 && player_scrolled) {
