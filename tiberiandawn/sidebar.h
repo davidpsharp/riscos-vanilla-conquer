@@ -402,6 +402,9 @@ public:
 
     bool Scroll(bool up, int column);
 
+    // Which column of buildables the screen point is over: 0, 1, or -1 for neither.
+    int Column_At(int x, int y) const;
+
     /*
     **	Pointer to the shape data for the sidebar
     */

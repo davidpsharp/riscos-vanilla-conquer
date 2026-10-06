@@ -8,4 +8,9 @@ public:
 
     virtual void Fill_Buffer_From_System(void);
     virtual KeyASCIIType To_ASCII(unsigned short key);
+
+private:
+#ifdef __riscos__
+    void Poll_RISCOS_Wheel(void);
+#endif
 };

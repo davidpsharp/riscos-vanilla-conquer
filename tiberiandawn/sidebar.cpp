@@ -752,6 +752,25 @@ bool SidebarClass::Scroll(bool up, int column)
     return (false);
 }
 
+/*
+** Which column of buildables the screen point is over, for the mouse wheel to scroll just that
+** one: 0, 1, or -1 for neither (or when the sidebar is closed).
+*/
+int SidebarClass::Column_At(int x, int y) const
+{
+    if (!IsSidebarActive) {
+        return -1;
+    }
+    for (int column = 0; column < COLUMNS; column++) {
+        StripClass const& strip = Column[column];
+        if (x >= strip.X && x < strip.X + strip.ObjectWidth && y >= strip.Y
+            && y < strip.Y + MaxVisible * strip.ObjectHeight) {
+            return column;
+        }
+    }
+    return -1;
+}
+
 /***********************************************************************************************
  * SidebarClass::Draw_It -- Renders the sidebar display.                                       *
  *                                                                                             *

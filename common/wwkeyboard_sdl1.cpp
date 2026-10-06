@@ -21,6 +21,7 @@
 #include <SDL.h>
 #ifdef __riscos__
 #include <kernel.h>
+#include <swis.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -99,6 +100,46 @@ static void Log_Key(const SDL_Event& event)
     }
 }
 
+#ifdef __riscos__
+/*
+** The mouse wheel. SDL's RISC OS driver reads only the pointer and buttons, so the wheel is
+** read from the totals RISC OS 5 keeps (OS_Pointer 2), and each notch becomes a wheel key.
+** A RISC OS without the call (such as 4 on a Risc PC) gives an error once, and then it's off.
+*/
+void WWKeyboardClassSDL1::Poll_RISCOS_Wheel(void)
+{
+    static bool started = false, failed = false;
+    static int last_y = 0;
+    static int logged = 0;
+    if (failed) {
+        return;
+    }
+    _kernel_swi_regs regs;
+    regs.r[0] = 2;
+    if (_kernel_swi(OS_Pointer, &regs, &regs) != nullptr) {
+        failed = true;
+        return;
+    }
+    int const y = regs.r[1];
+    if (!started) {
+        started = true;
+        last_y = y;
+        return;
+    }
+    int change = y - last_y;
+    last_y = y;
+    if (change != 0 && logged < 10 && getenv("VC_FPSLOG") != nullptr) {
+        logged++;
+        fprintf(stderr, "wheel: total %d, change %d\n", y, change);
+    }
+    // Positive is away from the user, as SDL's wheel up. A few notches at most per poll.
+    for (int i = 0; i < 4 && change != 0 && !Is_Buffer_Full(); i++) {
+        Put_Key_Message(change > 0 ? VK_MOUSEWHEEL_UP : VK_MOUSEWHEEL_DOWN, false);
+        change += change > 0 ? -1 : 1;
+    }
+}
+#endif
+
 void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 {
 #ifdef NETWORKING
@@ -112,6 +153,9 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
     ** event on each pump, which would keep this loop from ever finishing.
     */
     SDL_PumpEvents();
+#ifdef __riscos__
+    Poll_RISCOS_Wheel();
+#endif
     while (!Is_Buffer_Full() && SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_ALLEVENTS) > 0) {
         unsigned short key;
         switch (event.type) {

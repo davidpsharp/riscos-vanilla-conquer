@@ -710,7 +710,9 @@ void Keyboard_Process(KeyNumType& input)
     */
     if (key != 0
         && (key == Options.KeySidebarUp || (Settings.Options.MouseWheelScrolling && key == KN_MOUSEWHEEL_UP))) {
-        Map.SidebarClass::Scroll(true, -1);
+        // The wheel over one column scrolls just that column; elsewhere (and the key), both.
+        int column = key == KN_MOUSEWHEEL_UP ? Map.Column_At(Get_Mouse_X(), Get_Mouse_Y()) : -1;
+        Map.SidebarClass::Scroll(true, column);
         input = KN_NONE;
     }
 
@@ -719,7 +721,9 @@ void Keyboard_Process(KeyNumType& input)
     */
     if (key != 0
         && (key == Options.KeySidebarDown || (Settings.Options.MouseWheelScrolling && key == KN_MOUSEWHEEL_DOWN))) {
-        Map.SidebarClass::Scroll(false, -1);
+        // The wheel over one column scrolls just that column; elsewhere (and the key), both.
+        int column = key == KN_MOUSEWHEEL_DOWN ? Map.Column_At(Get_Mouse_X(), Get_Mouse_Y()) : -1;
+        Map.SidebarClass::Scroll(false, column);
         input = KN_NONE;
     }
 
