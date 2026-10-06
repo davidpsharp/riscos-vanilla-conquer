@@ -3,6 +3,26 @@
 #include "ini.h"
 #include "miscasm.h"
 
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+
+/*
+** Whether this is a machine newer than the Risc PC and A7000. OS_ReadSysInfo 8 gives the
+** platform class: 1 to 3 are their IOMD hardware (and RPCEmu's), 4 and above the Iyonix,
+** the Raspberry Pi and other ARMv7 boards. An OS without the call is old enough to be slow.
+*/
+static bool RISCOS_Is_Fast_Machine()
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = 8;
+    if (_kernel_swi(OS_ReadSysInfo, &regs, &regs) != NULL) {
+        return false;
+    }
+    return regs.r[0] >= 4;
+}
+#endif
+
 SettingsClass Settings;
 
 SettingsClass::SettingsClass()
@@ -27,18 +47,23 @@ SettingsClass::SettingsClass()
     Video.Boxing = true;
     Video.BoxingAspectRatio = "16:10";
 #ifdef __riscos__
-    // Each presented frame is a full 640x400 copy to screen memory, which a Risc PC's
-    // memory bus can't sustain at 120 per second. Game logic runs at 15 fps anyway.
-    Video.FrameLimit = 30;
+    if (RISCOS_Is_Fast_Machine()) {
+        // A Pi or similar copies a frame in well under a millisecond, so present at 60
+        // for a smoother pointer and scrolling (game logic still runs at 15 fps), and
+        // blend movies both ways.
+        Video.FrameLimit = 60;
+        Video.InterpolationMode = 2;
+    } else {
+        // Each presented frame is a full 640x400 copy to screen memory, which a Risc PC's
+        // memory bus can't sustain at 120 per second. Game logic runs at 15 fps anyway.
+        Video.FrameLimit = 30;
+        // Blend horizontally, double lines: a third of mode 2's table lookups. On a real
+        // StrongARM Risc PC mode 2 couldn't keep up with detailed movies such as the GDI 1
+        // briefing (the 64 KB table is 4x the data cache); mode 1 plays them smoothly.
+        Video.InterpolationMode = 1;
+    }
 #else
     Video.FrameLimit = 120;
-#endif
-#ifdef __riscos__
-    // Blend horizontally, double lines: a third of mode 2's table lookups. On a real
-    // StrongARM Risc PC mode 2 couldn't keep up with detailed movies such as the GDI 1
-    // briefing (the 64 KB table is 4x the data cache); mode 1 plays them smoothly.
-    Video.InterpolationMode = 1;
-#else
     Video.InterpolationMode = 2;
 #endif
     Video.HardwareCursor = false;
@@ -106,6 +131,7 @@ void SettingsClass::Load(INIClass& ini)
 
 void SettingsClass::Save(INIClass& ini)
 {
+    const SettingsClass Defaults;
     /*
     ** Mouse settings
     */
@@ -125,7 +151,13 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_String("Video", "BoxingAspectRatio", Video.BoxingAspectRatio);
     ini.Put_Int("Video", "Width", Video.Width);
     ini.Put_Int("Video", "Height", Video.Height);
-    ini.Put_Int("Video", "FrameLimit", Video.FrameLimit);
+    // Left out when it is this machine's default, so that a copy moved between a Risc PC
+    // and a faster machine takes the right one there.
+    if (Video.FrameLimit == Defaults.Video.FrameLimit) {
+        ini.Clear("Video", "FrameLimit");
+    } else {
+        ini.Put_Int("Video", "FrameLimit", Video.FrameLimit);
+    }
     ini.Put_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     ini.Put_Bool("Video", "DOSMode", Video.DOSMode);
     ini.Put_String("Video", "Scaler", Video.Scaler);
@@ -135,7 +167,13 @@ void SettingsClass::Save(INIClass& ini)
     /*
     ** VQA and WSA interpolation mode 0 = scanlines, 1 = vertical doubling, 2 = linear
     */
-    ini.Put_Int("Video", "InterpolationMode", Video.InterpolationMode);
+    // Left out when it is this machine's default, so that a copy moved between a Risc PC
+    // and a faster machine takes the right one there.
+    if (Video.InterpolationMode == Defaults.Video.InterpolationMode) {
+        ini.Clear("Video", "InterpolationMode");
+    } else {
+        ini.Put_Int("Video", "InterpolationMode", Video.InterpolationMode);
+    }
 
     ini.Put_String(
         "Video", "ButtonStyle", Video.ButtonStyle == -1 ? "Default" : (Video.ButtonStyle == 1 ? "Gold" : "Classic"));
