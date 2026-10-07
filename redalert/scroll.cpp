@@ -135,7 +135,14 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
 #endif
 
         if (!noscroll) {
-            bool at_screen_edge = (y == 0 || x == 0 || x >= SeenBuff.Get_Width() - 1 || y >= SeenBuff.Get_Height() - 1);
+            /*
+            **	Treat the outermost two pixels as the scroll region rather than only the
+            **	last one; some pointer sources (e.g. emulators following the host mouse)
+            **	can't quite reach the final row or column (as in Tiberian Dawn).
+            */
+            const int edge = 2;
+            bool at_screen_edge =
+                (y < edge || x < edge || x >= SeenBuff.Get_Width() - edge || y >= SeenBuff.Get_Height() - edge);
 
             /*
 			**	Verify that the mouse is over a scroll region.
