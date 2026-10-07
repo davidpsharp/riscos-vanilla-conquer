@@ -1,5 +1,7 @@
 #include "wwstd.h"
 #include "settings.h"
+
+#include <string>
 #include "ini.h"
 #include "miscasm.h"
 
@@ -20,6 +22,32 @@ static bool RISCOS_Is_Fast_Machine()
         return false;
     }
     return regs.r[0] >= 4;
+}
+
+/*
+** The game's screen on a fast machine: the shape of the desktop, so it fills the monitor the
+** same way, at most 1280 wide (units stay a sensible size, and the copy to the screen cheap):
+** 1280x800 on a 1680x1050 desktop, 1280x720 on 1920x1080. At least 640x400.
+*/
+static std::string RISCOS_Default_Resolution()
+{
+    _kernel_swi_regs regs;
+    int size[2];
+    for (int i = 0; i < 2; ++i) {
+        regs.r[0] = -1;
+        regs.r[1] = 11 + i; // XWindLimit, YWindLimit: the desktop's size, less one
+        _kernel_swi(OS_ReadModeVariable, &regs, &regs);
+        size[i] = regs.r[2] + 1;
+    }
+    int w = size[0], h = size[1];
+    if (w > 1280) {
+        h = (h * 1280 / w) & ~1;
+        w = 1280;
+    }
+    if (w < 640 || h < 400) {
+        return "640x400";
+    }
+    return std::to_string(w) + "x" + std::to_string(h);
 }
 #endif
 
@@ -54,6 +82,8 @@ SettingsClass::SettingsClass()
         // blend movies both ways.
         Video.FrameLimit = 60;
         Video.InterpolationMode = 2;
+        // And a bigger battlefield (see Use_Game_Layout).
+        Video.Resolution = RISCOS_Default_Resolution();
     } else {
         // Each presented frame is a full 640x400 copy to screen memory, which a Risc PC's
         // memory bus can't sustain at 120 per second. Game logic runs at 15 fps anyway.
@@ -163,7 +193,12 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     ini.Put_Bool("Video", "DOSMode", Video.DOSMode);
     ini.Put_String("Video", "Scaler", Video.Scaler);
-    ini.Put_String("Video", "Resolution", Video.Resolution);
+    // Left out when it is this machine's default too, likewise.
+    if (Video.Resolution == Defaults.Video.Resolution) {
+        ini.Clear("Video", "Resolution");
+    } else {
+        ini.Put_String("Video", "Resolution", Video.Resolution);
+    }
     ini.Put_String("Video", "Driver", Video.Driver);
     ini.Put_String("Video", "PixelFormat", Video.PixelFormat);
 

@@ -65,6 +65,85 @@ static SDL_Surface* window;
 static unsigned Window_Generation; // a new window holds nothing presented
 
 /*
+** Low resolution on a machine with no screen mode near 320x200 (a Pi, whose 8 bpp modes start
+** around 640x400): the game's surface (window) is then a plain one in memory, and what's shown of
+** it is copied, each pixel doubled, to a mode twice its size (Screen), which fills the screen as
+** 640x400 does. Scale is 2 then; otherwise 1, and window is the screen.
+*/
+static SDL_Surface* Screen = nullptr;
+static int Scale = 1;
+
+// The surface that is the screen.
+static SDL_Surface* Shown(void)
+{
+    return Screen != nullptr ? Screen : window;
+}
+
+// Copies part of the game's surface to the screen, each pixel doubled.
+static void Scale_Rect(SDL_Rect r)
+{
+    if (r.x < 0 || r.y < 0 || r.w <= 0 || r.h <= 0) {
+        return;
+    }
+    if (r.x + r.w > window->w) {
+        r.w = window->w - r.x;
+    }
+    if (r.y + r.h > window->h) {
+        r.h = window->h - r.y;
+    }
+    SDL_LockSurface(window);
+    SDL_LockSurface(Screen);
+    for (int y = r.y; y < r.y + r.h; ++y) {
+        const Uint8* from = static_cast<const Uint8*>(window->pixels) + y * window->pitch + r.x;
+        Uint8* to = static_cast<Uint8*>(Screen->pixels) + (2 * y) * Screen->pitch + 2 * r.x;
+        for (int x = 0; x < r.w; ++x) {
+            to[2 * x] = to[2 * x + 1] = from[x];
+        }
+        memcpy(to + Screen->pitch, to, size_t(2 * r.w));
+    }
+    SDL_UnlockSurface(Screen);
+    SDL_UnlockSurface(window);
+}
+
+// SDL_UpdateRects and SDL_Flip for the game's surface, through the doubling if there is any.
+static void Show_Rects(int count, SDL_Rect* rects)
+{
+    if (Screen == nullptr) {
+        SDL_UpdateRects(window, count, rects);
+        return;
+    }
+    std::vector<SDL_Rect> big(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        Scale_Rect(rects[i]);
+        big[i].x = Sint16(rects[i].x * 2);
+        big[i].y = Sint16(rects[i].y * 2);
+        big[i].w = Uint16(rects[i].w * 2);
+        big[i].h = Uint16(rects[i].h * 2);
+    }
+    SDL_UpdateRects(Screen, count, big.data());
+}
+
+static void Show_All(void)
+{
+    if (Screen == nullptr) {
+        SDL_Flip(window);
+        return;
+    }
+    SDL_Rect all = {0, 0, Uint16(window->w), Uint16(window->h)};
+    Scale_Rect(all);
+    SDL_Flip(Screen);
+}
+
+// SDL_SetPalette for the game's surface, and the screen behind it if that's another.
+static void Set_Palette_Both(int flags, SDL_Color* colours)
+{
+    SDL_SetPalette(window, flags, colours, 0, 256);
+    if (Screen != nullptr) {
+        SDL_SetPalette(Screen, flags, colours, 0, 256);
+    }
+}
+
+/*
 ** The area of the screen the pointer is reported in (see Set_Video_Mouse_Area).
 */
 static struct
@@ -87,11 +166,12 @@ static struct
 */
 static bool Centred_Surface(int& offx, int& offy)
 {
-    if (window == nullptr || window->offset == 0 || window->pitch <= 0) {
+    SDL_Surface* const shown = Shown();
+    if (shown == nullptr || shown->offset == 0 || shown->pitch <= 0) {
         return false;
     }
-    offx = window->offset % window->pitch;
-    offy = window->offset / window->pitch;
+    offx = shown->offset % shown->pitch;
+    offy = shown->offset / shown->pitch;
     return true;
 }
 
@@ -115,8 +195,8 @@ bool RISCOS_Pointer_Position(int& x, int& y)
     Centred_Surface(offx, offy);
     _kernel_swi_regs regs;
     _kernel_swi(OS_Mouse, &regs, &regs);
-    x = (regs.r[0] >> Mode_Variable(4)) - offx;                     // XEigFactor
-    y = Mode_Variable(12) - (regs.r[1] >> Mode_Variable(5)) - offy; // YWindLimit, YEigFactor
+    x = ((regs.r[0] >> Mode_Variable(4)) - offx) / Scale;                     // XEigFactor
+    y = (Mode_Variable(12) - (regs.r[1] >> Mode_Variable(5)) - offy) / Scale; // YWindLimit, YEigFactor
     x = x < 0 ? 0 : (x >= window->w ? window->w - 1 : x);
     y = y < 0 ? 0 : (y >= window->h ? window->h - 1 : y);
     return true;
@@ -135,8 +215,8 @@ static void Confine_Pointer()
     // Without a centred surface or an area this still sets the box, to the whole surface,
     // to undo an area's box (the game layout after a menu).
     // Within the surface, the menu area if there is one, or else the whole surface.
-    int x0 = offx + (area ? MouseArea.X : 0), y0 = offy + (area ? MouseArea.Y : 0);
-    int w = area ? MouseArea.W : window->w, h = area ? MouseArea.H : window->h;
+    int x0 = offx + (area ? MouseArea.X : 0) * Scale, y0 = offy + (area ? MouseArea.Y : 0) * Scale;
+    int w = (area ? MouseArea.W : window->w) * Scale, h = (area ? MouseArea.H : window->h) * Scale;
     int xeig = Mode_Variable(4), yeig = Mode_Variable(5), ymax = Mode_Variable(12);
     int left = x0 << xeig, right = (x0 + w - 1) << xeig;
     int bottom = (ymax - (y0 + h - 1)) << yeig, top = (ymax - y0) << yeig;
@@ -225,6 +305,33 @@ SurfaceMonitorClass& AllSurfaces = AllSurfacesDummy; // List of all direct draw 
  * HISTORY:                                                                                    *
  *   09/26/1995 PWG : Created.                                                                 *
  *=============================================================================================*/
+#ifdef __riscos__
+/*
+** True if no 8 bpp screen mode is near w x h, the nearest that holds it being at least twice as
+** big each way (a Pi has nothing like 320x200; a Risc PC has 320x256). VC_NODOUBLE turns it off.
+*/
+static bool Wants_Doubling(int w, int h)
+{
+    if (getenv("VC_NODOUBLE") != nullptr || w > 400 || h > 300) {
+        return false;
+    }
+    SDL_PixelFormat format;
+    memset(&format, 0, sizeof(format));
+    format.BitsPerPixel = 8;
+    format.BytesPerPixel = 1;
+    SDL_Rect** modes = SDL_ListModes(&format, SDL_FULLSCREEN | SDL_HWSURFACE);
+    if (modes == nullptr || modes == reinterpret_cast<SDL_Rect**>(-1)) {
+        return false;
+    }
+    for (int i = 0; modes[i] != nullptr; ++i) {
+        if (modes[i]->w >= w && modes[i]->h >= h && modes[i]->w < 2 * w && modes[i]->h < 2 * h) {
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
 bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 {
     /*
@@ -253,7 +360,15 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 #endif
 
     Video_Settle_Front();
-    window = SDL_SetVideoMode(w, h, 8, win_flags);
+#ifdef __riscos__
+    if ((win_flags & SDL_FULLSCREEN) && Wants_Doubling(w, h)) {
+        Screen = SDL_SetVideoMode(w * 2, h * 2, 8, win_flags);
+        window = Screen != nullptr ? SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 8, 0, 0, 0, 0) : nullptr;
+        Scale = 2;
+        fprintf(stderr, "video: %dx%d doubled to fill the screen\n", w, h);
+    } else
+#endif
+        window = SDL_SetVideoMode(w, h, 8, win_flags);
     ++Window_Generation;
     if (window == nullptr) {
         DBG_ERROR("SDL_SetVideoMode failed: %s", SDL_GetError());
@@ -294,12 +409,12 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
                 1 << Mode_Variable(9),
                 rate,
                 unsigned(regs.r[1]) >= 256 ? "selector" : "number",
-                window->pitch ? window->offset % window->pitch : 0,
-                window->pitch ? window->offset / window->pitch : 0);
+                Shown()->pitch ? Shown()->offset % Shown()->pitch : 0,
+                Shown()->pitch ? Shown()->offset / Shown()->pitch : 0);
     }
 #endif
 
-    SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
+    Set_Palette_Both(SDL_LOGPAL, logpal);
     SDL_WM_SetCaption("Vanilla Conquer", NULL);
 
     DBG_INFO("Created SDL1 %s window in %dx%d@%dbpp",
@@ -340,7 +455,7 @@ extern "C" void WIMP_RestoreWimpCursor(void);
 */
 void Video_Leave_For_Desktop(void)
 {
-    if (window == nullptr || !(window->flags & SDL_FULLSCREEN)) {
+    if (window == nullptr || !(Shown()->flags & SDL_FULLSCREEN)) {
         return;
     }
     RISCOS_RestoreWimpMode();
@@ -349,19 +464,24 @@ void Video_Leave_For_Desktop(void)
 
 void Video_Return_From_Desktop(void)
 {
-    if (window == nullptr || !(window->flags & SDL_FULLSCREEN)) {
+    if (window == nullptr || !(Shown()->flags & SDL_FULLSCREEN)) {
         return;
     }
     Video_Settle_Front();
-    SDL_Surface* new_window = SDL_SetVideoMode(window->w, window->h, 8, SDL_HWSURFACE | SDL_HWPALETTE | SDL_FULLSCREEN);
-    if (new_window == nullptr) {
+    SDL_Surface* const shown = Shown();
+    SDL_Surface* new_shown = SDL_SetVideoMode(shown->w, shown->h, 8, SDL_HWSURFACE | SDL_HWPALETTE | SDL_FULLSCREEN);
+    if (new_shown == nullptr) {
         DBG_ERROR("SDL_SetVideoMode back from the desktop failed: %s", SDL_GetError());
         exit(1);
     }
-    window = new_window;
+    if (Screen != nullptr) {
+        Screen = new_shown; // the game's own surface stays as it is
+    } else {
+        window = new_shown;
+    }
     ++Window_Generation;
-    SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
-    SDL_SetPalette(window, SDL_PHYSPAL, physpal, 0, 256);
+    Set_Palette_Both(SDL_LOGPAL, logpal);
+    Set_Palette_Both(SDL_PHYSPAL, physpal);
     SDL_SetCursor(SDL_GetCursor()); // define the (transparent) pointer shape again
     Confine_Pointer();
 }
@@ -509,6 +629,8 @@ void Reset_Video_Mode(void)
         SDL_FreeSurface(window);
         window = nullptr;
     }
+    Screen = nullptr; // SDL's own, like a window that is the screen
+    Scale = 1;
 }
 
 static void Update_HWCursor()
@@ -621,7 +743,7 @@ void Set_DD_Palette(void* rpalette)
         physpal[i].b = (unsigned char)rcolors[i * 3 + 2] << 2;
     }
 
-    SDL_SetPalette(window, SDL_PHYSPAL, physpal, 0, 256);
+    Set_Palette_Both(SDL_PHYSPAL, physpal);
 
     /*
     ** Cursor needs to be updated when palette changes.
@@ -1098,11 +1220,11 @@ public:
         }
 
         if (full && !spans.empty()) {
-            SDL_UpdateRects(window, int(spans.size()), &spans[0]);
+            Show_Rects(int(spans.size()), &spans[0]);
         } else if (full) {
-            SDL_Flip(window);
+            Show_All();
         } else if (dirty.w > 0 && dirty.h > 0) {
-            SDL_UpdateRects(window, 1, &dirty);
+            Show_Rects(1, &dirty);
         }
 
         changed = false;
@@ -1143,7 +1265,7 @@ private:
         }
         SDL_UnlockSurface(window);
         SDL_UnlockSurface(frame);
-        SDL_Flip(window);
+        Show_All();
         if (mirror != nullptr && mirror_shown) {
             // The frame was only on the screen, which is now shifted: keep a copy first.
             Raw_Copy(mirror->surface, surface);

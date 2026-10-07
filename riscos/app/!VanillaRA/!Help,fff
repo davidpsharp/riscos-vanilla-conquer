@@ -95,17 +95,18 @@ menu has Info and Quit.
 Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
 change its options.
 
-Bigger screens: on a fast machine such as a Raspberry Pi, the game can
-use a bigger screen to show more of the battlefield, with a taller
-sidebar. Add this to !VanillaRA.INI.REDALERT (a text file; create it if
-it isn't there):
+Bigger screens: on a fast machine such as a Raspberry Pi, the game uses
+a bigger screen to show more of the battlefield, with a taller sidebar:
+the shape of the desktop, at most 1280 wide (1280x800 on a 1680x1050
+desktop). To choose another size, set it in !VanillaRA.INI.REDALERT (a
+text file; create it if it isn't there), for example:
 
   [Video]
-  Resolution=1280x800
+  Resolution=1024x768
 
-Any size from 640x400 up to 2048x2048 works; a size the shape of your
-monitor (1280x800 or 1680x1050 for a 16:10 one) looks best. The menus,
-movies and briefings stay 640x400, in the middle of the screen.
+Any size from 640x400 up to 2048x2048 works; 640x400 gives the original
+view. The menus, movies and briefings stay 640x400, in the middle of the
+screen. A Risc PC uses 640x400.
 
 Low resolution: for slower machines, the game can run at 320x200, the
 size of the original DOS version, which is about twice as fast on a Risc
