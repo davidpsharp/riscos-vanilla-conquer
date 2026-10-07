@@ -86,7 +86,11 @@ movies the game simply skips them.
 Playing
 -------
 
-Double-click !VanillaRA. The keys are the same as in the original game.
+Double-click !VanillaRA to put its icon on the icon bar, then click the
+icon to start the game. The keys are the same as in the original game.
+Shift+F12 in the game goes back to the desktop, with the game paused
+where it was (sound too); click the icon again to carry on. The icon's
+menu has Info and Quit.
 
 Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
 change its options.

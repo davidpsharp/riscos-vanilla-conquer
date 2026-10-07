@@ -35,6 +35,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "common/riscos_desktop.h"
 #include "language.h"
 #include "settings.h"
 #include "common/gitinfo.h"
@@ -290,6 +291,18 @@ int DLL_Startup(const char* command_line_in)
 
 int main(int argc, char* argv[])
 {
+#ifdef __riscos__
+    {
+        // The icon bar icon and its Info window; any -AUTOSTART goes straight into the game.
+        static const RISCOSDesktopApp app = {"!vanillara", "Vanilla RA", "C&C: Red Alert", "Electronic Arts; Vanilla Conquer"};
+        RISCOS_Desktop_Set_App(app);
+        for (int i = 1; i < argc; i++) {
+            if (strncasecmp(argv[i], "-AUTOSTART", 10) == 0) {
+                RISCOS_Desktop_Click_To_Start = false;
+            }
+        }
+    }
+#endif
 #ifdef __riscos__
     // Output is usually redirected to a file by !Run; don't lose it on a crash.
     setvbuf(stdout, nullptr, _IONBF, 0);

@@ -84,6 +84,7 @@ set(COMMON_SRC
     readline.cpp
     rect.cpp
     rgb.cpp
+    riscos_desktop.cpp
     riscos_fs.cpp
     rndstraw.cpp
     settings.cpp

@@ -18,6 +18,7 @@
 #include "wwkeyboard_sdl1.h"
 #include "video.h"
 #include "settings.h"
+#include "riscos_desktop.h"
 #include <SDL.h>
 #ifdef __riscos__
 #include <kernel.h>
@@ -164,6 +165,12 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             break;
         case SDL_KEYDOWN:
             Log_Key(event);
+#ifdef __riscos__
+            if (RISCOS_Desktop_Is_Leave_Key(event.key.keysym.sym, event.key.keysym.mod)) {
+                RISCOS_Desktop_Suspend(); // Shift+F12: to the desktop, paused, until the icon is clicked
+                break;
+            }
+#endif
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 /* Switching to full screen is handled in the key up event */
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
@@ -172,6 +179,11 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             break;
         case SDL_KEYUP:
             Log_Key(event);
+#ifdef __riscos__
+            if (RISCOS_Desktop_Is_Leave_Key(event.key.keysym.sym, event.key.keysym.mod)) {
+                break; // its key down was the desktop's, not the game's
+            }
+#endif
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 Toggle_Video_Fullscreen();
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {

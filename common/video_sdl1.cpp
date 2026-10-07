@@ -45,6 +45,7 @@
 #include "gbuffer.h"
 #include "palette.h"
 #include "video.h"
+#include "riscos_desktop.h"
 #include "wwkeyboard.h"
 #include "wwmouse.h"
 #include "settings.h"
@@ -244,6 +245,13 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         win_flags |= SDL_FULLSCREEN;
     }
 
+#ifdef __riscos__
+    // The icon on the icon bar, and (at the start) waiting there for a click to start the game.
+    if (win_flags & SDL_FULLSCREEN) {
+        RISCOS_Desktop_Start();
+    }
+#endif
+
     Video_Settle_Front();
     window = SDL_SetVideoMode(w, h, 8, win_flags);
     ++Window_Generation;
@@ -320,6 +328,44 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 
     return true;
 }
+
+#ifdef __riscos__
+extern "C" void RISCOS_RestoreWimpMode(void);
+extern "C" void WIMP_RestoreWimpCursor(void);
+
+/*
+** For the desktop while the game is paused (riscos_desktop.cpp): its screen mode back (SDL keeps
+** it) with the Wimp's pointer; then the game's mode again, which SDL sets up afresh, with the
+** palette, pointer and pointer box, and a full present of the frame the game still holds.
+*/
+void Video_Leave_For_Desktop(void)
+{
+    if (window == nullptr || !(window->flags & SDL_FULLSCREEN)) {
+        return;
+    }
+    RISCOS_RestoreWimpMode();
+    WIMP_RestoreWimpCursor();
+}
+
+void Video_Return_From_Desktop(void)
+{
+    if (window == nullptr || !(window->flags & SDL_FULLSCREEN)) {
+        return;
+    }
+    Video_Settle_Front();
+    SDL_Surface* new_window = SDL_SetVideoMode(window->w, window->h, 8, SDL_HWSURFACE | SDL_HWPALETTE | SDL_FULLSCREEN);
+    if (new_window == nullptr) {
+        DBG_ERROR("SDL_SetVideoMode back from the desktop failed: %s", SDL_GetError());
+        exit(1);
+    }
+    window = new_window;
+    ++Window_Generation;
+    SDL_SetPalette(window, SDL_LOGPAL, logpal, 0, 256);
+    SDL_SetPalette(window, SDL_PHYSPAL, physpal, 0, 256);
+    SDL_SetCursor(SDL_GetCursor()); // define the (transparent) pointer shape again
+    Confine_Pointer();
+}
+#endif
 
 void Toggle_Video_Fullscreen()
 {

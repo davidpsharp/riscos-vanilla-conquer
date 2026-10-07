@@ -99,6 +99,11 @@ plays the intro and goes straight to choosing a side; after that it
 starts at the main menu. Esc skips movies. The keys are the same as in
 the original game; F9 to F12 are map bookmarks (Ctrl+F9 to set one).
 
+Double-clicking !VanillaTD puts its icon on the icon bar; click the icon
+to start the game. Shift+F12 in the game goes back to the desktop, with
+the game paused where it was (sound too); click the icon again to carry
+on. The icon's menu has Info and Quit.
+
 Settings are in !VanillaTD.INI.CONQUER, which the game creates the first
 time it runs. Settings that may be useful on RISC OS:
 
