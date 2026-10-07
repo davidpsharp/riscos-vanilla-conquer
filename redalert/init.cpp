@@ -205,6 +205,12 @@ bool Init_Game(int, char*[])
         Init_Mouse();
     }
     /*
+    ** On a big screen the title, prompts and menus are in the middle of it from the start,
+    ** rather than first in its top left corner.
+    */
+    Use_Menu_Layout();
+
+    /*
     **	Initialize access to the CD-ROM and ensure that the CD is inserted. This can, and
     **	most likely will, result in a visible prompt.
     */
@@ -446,6 +452,9 @@ bool Init_Game(int, char*[])
  *=============================================================================================*/
 bool Select_Game(bool fade)
 {
+    // The menus are laid out for 640x400 (see Use_Menu_Layout).
+    Use_Menu_Layout();
+
     //	Enums in Select_Game() must match order of buttons in Main_Menu().
 #ifdef FIXIT_VERSION_3
     enum
@@ -1210,6 +1219,8 @@ bool Select_Game(bool fade)
     VisiblePage.Clear();
     Show_Mouse();
 
+    // The game has the whole screen again.
+    Use_Game_Layout();
     Set_Logic_Page(SeenBuff);
     /*
     ** Sidebar is always active in hi-res.
@@ -2189,6 +2200,8 @@ static void Init_Expansion_Files(void)
  *=============================================================================================*/
 static void Init_One_Time_Systems(void)
 {
+    // These size the battlefield, sidebar and dialogs from the whole screen.
+    FullScreenScope full_screen;
     Call_Back();
     Map.One_Time();
     Logic.One_Time();

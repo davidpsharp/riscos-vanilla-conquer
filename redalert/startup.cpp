@@ -384,6 +384,17 @@ int main(int argc, char* argv[])
             RESFACTOR = 1;
             ScreenWidth = 320;
             ScreenHeight = 200;
+        } else {
+            /*
+            ** A bigger screen shows more of the battlefield (see Use_Game_Layout); it must
+            ** hold the 640x400 menus.
+            */
+            int w = 0, h = 0;
+            if (sscanf(Settings.Video.Resolution.c_str(), "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 2048
+                && h <= 2048) {
+                ScreenWidth = w;
+                ScreenHeight = h;
+            }
         }
 #endif
         Set_Resfactor_Globals(RESFACTOR);

@@ -332,6 +332,7 @@ static unsigned char const _yellowpal[] =
     {0x0, 0x0, 0xEC, 0x0, 0xEB, 0x0, 0xEA, 0x0, 0xE9, 0x0, 0x0, 0x0, 0x0, 0x0, 0xED, 0x0};
 void ScoreClass::Presentation(void)
 {
+    MenuLayoutScope menu_layout; // laid out for 640x400
 #ifndef REMASTER_BUILD
     static int const _casuax[2] = {144, 150};
     static int const _casuay[2] = {78, 78};

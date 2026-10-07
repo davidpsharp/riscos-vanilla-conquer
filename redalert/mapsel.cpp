@@ -98,6 +98,7 @@ struct point
 extern bool StreamLowImpact;
 char const* Map_Selection(void)
 {
+    MenuLayoutScope menu_layout; // laid out for 640x400
 #ifdef REMASTER_BUILD
     return NULL;
 #else

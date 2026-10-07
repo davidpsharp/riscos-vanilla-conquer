@@ -314,6 +314,7 @@ bool ScenarioClass::Set_Global_To(int global, bool value)
  *=============================================================================================*/
 bool Start_Scenario(char* name, bool briefing)
 {
+    Use_Game_Layout(); // a scenario is played on the whole screen
     if (Session.Type != GAME_NORMAL) {
         briefing = false;
     }
@@ -1377,6 +1378,8 @@ void Do_Restart(void)
 bool Restate_Mission(char const* name, int button1, int button2)
 {
     if (name) {
+        // The briefing's background picture is laid out for 640x400.
+        MenuLayoutScope menu_layout;
 
         bool brief = true;
         char buffer[25];

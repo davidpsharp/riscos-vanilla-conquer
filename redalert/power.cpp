@@ -184,7 +184,7 @@ void PowerClass::Draw_It(bool complete)
                 //LTGREY);
                 CC_Draw_Shape(PowerBarShape,
                               0,
-                              240 * RESFACTOR,
+                              240 * RESFACTOR + Sidebar_X_Shift(),
                               88 * RESFACTOR,
                               WINDOW_MAIN,
                               flags | SHAPE_NORMAL | SHAPE_WIN_REL,
@@ -196,7 +196,7 @@ void PowerClass::Draw_It(bool complete)
                     */
                     CC_Draw_Shape(PowerBarShape,
                                   1,
-                                  240 * RESFACTOR,
+                                  240 * RESFACTOR + Sidebar_X_Shift(),
                                   (88 * RESFACTOR) + (56 * RESFACTOR),
                                   WINDOW_MAIN,
                                   flags | SHAPE_NORMAL | SHAPE_WIN_REL,

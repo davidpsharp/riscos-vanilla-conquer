@@ -210,6 +210,43 @@ bool Is_Aftermath_Installed(void);
 #define ALWAYS_RELOAD_CD 1000
 
 void Center_About_Objects(void);
+
+// How far right of its place on a 640x400 screen the sidebar sits (with the radar, power bar
+// and Sidebar tab): the screen's extra width. Zero at 640x400 and 320x200.
+int Sidebar_X_Shift(void);
+
+// The rows of buildables each sidebar strip shows: 4, or more on a screen taller than 400.
+int Sidebar_Rows(void);
+/*
+** A game screen bigger than 640x400 shows more of the battlefield. Menus, dialogs, movies
+** and the score screen were laid out for 640x400, so they are shown in a 640x400 area in
+** the middle of it (the menu layout); the battlefield and sidebar use the whole screen
+** (the game layout). MenuLayoutScope switches to the menu layout for its lifetime.
+*/
+bool Is_Large_Screen(void);
+void Use_Game_Layout(void);
+void Use_Menu_Layout(void);
+class MenuLayoutScope
+{
+public:
+    MenuLayoutScope();
+    ~MenuLayoutScope();
+
+private:
+    bool WasGame;
+};
+
+// For setting things up from the screen's size while in the menu layout: the whole screen for
+// its lifetime, but neither cleared nor redrawn, then the menu layout again.
+class FullScreenScope
+{
+public:
+    FullScreenScope();
+    ~FullScreenScope();
+
+private:
+    bool WasMenu;
+};
 bool Force_CD_Available(int cd);
 void Handle_View(int view, int action = 0);
 void Handle_Team(int team, int action = 0);

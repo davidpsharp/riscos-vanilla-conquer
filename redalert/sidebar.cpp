@@ -112,7 +112,7 @@ ShapeButtonClass SidebarClass::Upgrade;
 ShapeButtonClass SidebarClass::Zoom;
 ShapeButtonClass SidebarClass::StripClass::UpButton[COLUMNS];
 ShapeButtonClass SidebarClass::StripClass::DownButton[COLUMNS];
-SidebarClass::StripClass::SelectClass SidebarClass::StripClass::SelectButton[COLUMNS][MAX_VISIBLE];
+SidebarClass::StripClass::SelectClass SidebarClass::StripClass::SelectButton[COLUMNS][MAX_SLOTS];
 
 /*
 ** Shape data pointers
@@ -151,7 +151,7 @@ SidebarClass::SidebarClass(void)
     WindowList[WINDOW_SIDEBAR][WINDOWX] = (SIDE_X + 8);
     WindowList[WINDOW_SIDEBAR][WINDOWY] = SIDE_Y + 1 + TOP_HEIGHT;
     WindowList[WINDOW_SIDEBAR][WINDOWWIDTH] = SIDE_WIDTH;
-    WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = StripClass::MAX_VISIBLE * StripClass::OBJECT_HEIGHT;
+    WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = Sidebar_Rows() * StripClass::OBJECT_HEIGHT;
     //	WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = StripClass::MAX_VISIBLE * StripClass::OBJECT_HEIGHT-1;
 
     /*
@@ -207,13 +207,33 @@ SidebarClass::SidebarClass(NoInitClass const& x)
  * HISTORY:                                                                                    *
  *   10/28/94   JLB : Created.                                                                 *
  *=============================================================================================*/
+int Sidebar_X_Shift(void)
+{
+    return ScreenWidth - 320 * RESFACTOR;
+}
+
+int Sidebar_Rows(void)
+{
+    int rows = SidebarClass::StripClass::MAX_VISIBLE;
+    if (RESFACTOR == 2 && ScreenHeight > 400) {
+        // One more for each slot's height (48 pixels) of the sidebar's artwork beyond 400.
+        rows += (ScreenHeight - 400) / (SidebarClass::StripClass::OBJECT_HEIGHT * 2);
+        if (rows > SidebarClass::StripClass::MAX_SLOTS) {
+            rows = SidebarClass::StripClass::MAX_SLOTS;
+        }
+    }
+    return rows;
+}
+
 void SidebarClass::One_Time(void)
 {
     /* Set RESFACTOR positions.  */
-    SidebarClass::Background.X = (int)((int)SIDE_X + 8) * RESFACTOR;
+    SidebarClass::Background.X = (int)((int)SIDE_X + 8) * RESFACTOR + Sidebar_X_Shift();
     SidebarClass::Background.Y = (int)SIDE_Y * RESFACTOR;
     SidebarClass::Background.Width = (int)((int)SIDE_WIDTH - 1) * RESFACTOR - 1;
-    SidebarClass::Background.Height = (int)((int)SIDE_HEIGHT - 1) * RESFACTOR;
+    SidebarClass::Background.Height =
+        (int)((int)SIDE_HEIGHT - 1) * RESFACTOR
+        + (Sidebar_Rows() - StripClass::MAX_VISIBLE) * StripClass::OBJECT_HEIGHT * RESFACTOR;
 
     PowerClass::One_Time();
 
@@ -222,10 +242,10 @@ void SidebarClass::One_Time(void)
     **	code so that as the sidebar buildable buttons scroll, they get properly
     **	clipped at the top and bottom edges.
     */
-    WindowList[WINDOW_SIDEBAR][WINDOWX] = ((SIDE_X + 8)) * RESFACTOR;
+    WindowList[WINDOW_SIDEBAR][WINDOWX] = ((SIDE_X + 8)) * RESFACTOR + Sidebar_X_Shift();
     WindowList[WINDOW_SIDEBAR][WINDOWY] = (SIDE_Y + 1 + TOP_HEIGHT) * RESFACTOR;
     WindowList[WINDOW_SIDEBAR][WINDOWWIDTH] = (SIDE_WIDTH)*RESFACTOR;
-    WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = (StripClass::MAX_VISIBLE * StripClass::OBJECT_HEIGHT) * RESFACTOR;
+    WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = (Sidebar_Rows() * StripClass::OBJECT_HEIGHT) * RESFACTOR;
     //	WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT] = (StripClass::MAX_VISIBLE * StripClass::OBJECT_HEIGHT-1) * RESFACTOR;
 
     /*
@@ -237,9 +257,9 @@ void SidebarClass::One_Time(void)
     **	Set up the coordinates for the sidebar strips. These coordinates are for
     **	the upper left corner.
     */
-    Column[0].X = COLUMN_ONE_X * RESFACTOR;
+    Column[0].X = COLUMN_ONE_X * RESFACTOR + Sidebar_X_Shift();
     Column[0].Y = COLUMN_ONE_Y * RESFACTOR;
-    Column[1].X = COLUMN_TWO_X * RESFACTOR;
+    Column[1].X = COLUMN_TWO_X * RESFACTOR + Sidebar_X_Shift();
     Column[1].Y = COLUMN_TWO_Y * RESFACTOR;
     Column[0].One_Time(0);
     Column[1].One_Time(1);
@@ -302,7 +322,7 @@ void SidebarClass::Init_IO(void)
 
         Repair.IsSticky = true;
         Repair.ID = BUTTON_REPAIR;
-        Repair.X = (0x1f2 / 2) * RESFACTOR;
+        Repair.X = (0x1f2 / 2) * RESFACTOR + Sidebar_X_Shift();
         Repair.Y = (0x96 / 2) * RESFACTOR;
         Repair.IsPressed = false;
         Repair.IsToggleType = true;
@@ -311,7 +331,7 @@ void SidebarClass::Init_IO(void)
 
         Upgrade.IsSticky = true;
         Upgrade.ID = BUTTON_UPGRADE;
-        Upgrade.X = (RESFACTOR == 1) ? 271 : 0x21f;
+        Upgrade.X = ((RESFACTOR == 1) ? 271 : 0x21f) + Sidebar_X_Shift();
         Upgrade.Y = (0x96 / 2) * RESFACTOR;
         Upgrade.IsPressed = false;
         Upgrade.IsToggleType = true;
@@ -320,7 +340,7 @@ void SidebarClass::Init_IO(void)
 
         Zoom.IsSticky = true;
         Zoom.ID = BUTTON_ZOOM;
-        Zoom.X = (0x24c / 2) * RESFACTOR;
+        Zoom.X = (0x24c / 2) * RESFACTOR + Sidebar_X_Shift();
         Zoom.Y = (0x96 / 2) * RESFACTOR;
         Zoom.IsPressed = false;
         Zoom.Set_Shape(MFCD::Retrieve("MAP.SHP"));
@@ -758,11 +778,40 @@ void SidebarClass::Draw_It(bool complete)
             /*
             ** The sidebar shape is too big in 640x400 so it needs to be drawn in three chunks.
             */
-            CC_Draw_Shape(SidebarShape, 0, SIDE_X * RESFACTOR, 8 * RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
-            CC_Draw_Shape(
-                SidebarMiddleShape, shape, SIDE_X * RESFACTOR, (8 + 80) * RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
-            CC_Draw_Shape(
-                SidebarBottomShape, shape, SIDE_X * RESFACTOR, (8 + 80 + 50) * RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
+            int const side_x = SIDE_X * RESFACTOR + Sidebar_X_Shift();
+            int const extra = Sidebar_Rows() - StripClass::MAX_VISIBLE;
+            int const row = StripClass::OBJECT_HEIGHT * RESFACTOR;
+            int const middle_y = (8 + 80) * RESFACTOR;
+            int const bottom_y = (8 + 80 + 50) * RESFACTOR + extra * row;
+
+            // On a taller screen, first clear what's below the artwork's usual end: some of it
+            // is see-through (the power bar shows through), and help text could stay there.
+            if (SeenBuff.Get_Height() > 400) {
+                LogicPage->Fill_Rect(side_x, 400, SeenBuff.Get_Width() - 1, SeenBuff.Get_Height() - 1, BLACK);
+            }
+            CC_Draw_Shape(SidebarShape, 0, side_x, 8 * RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
+            CC_Draw_Shape(SidebarMiddleShape, shape, side_x, middle_y, WINDOW_MAIN, SHAPE_WIN_REL);
+
+            /*
+            ** Extra rows on a taller screen: the middle piece's last row of slots (the 48 pixels
+            ** above its bottom edge) is repeated for each, and the bottom piece, with the scroll
+            ** arrows, goes below them.
+            */
+            for (int i = 0; i < extra; i++) {
+                int const top = (8 + 80 + 50) * RESFACTOR + i * row;
+                WindowList[WINDOW_CUSTOM][WINDOWX] = side_x;
+                WindowList[WINDOW_CUSTOM][WINDOWY] = top;
+                WindowList[WINDOW_CUSTOM][WINDOWWIDTH] = SIDE_WIDTH * RESFACTOR;
+                WindowList[WINDOW_CUSTOM][WINDOWHEIGHT] = row;
+                // The piece is 50 * RESFACTOR high: its last row's band at the window's top.
+                CC_Draw_Shape(SidebarMiddleShape, shape, 0, row - 50 * RESFACTOR, WINDOW_CUSTOM, SHAPE_WIN_REL);
+            }
+            CC_Draw_Shape(SidebarBottomShape, shape, side_x, bottom_y, WINDOW_MAIN, SHAPE_WIN_REL);
+            if (SeenBuff.Get_Height() > 400) {
+                // The clearing above went over the strips too, so they're drawn again below.
+                Column[0].IsToRedraw = true;
+                Column[1].IsToRedraw = true;
+            }
 
             Repair.Draw_Me(true);
             Upgrade.Draw_Me(true);
@@ -984,7 +1033,10 @@ bool SidebarClass::Activate(int control)
         **	activate it on the left side of the screen.
         */
         if (IsSidebarActive /*&& X*/) {
-            Set_View_Dimensions(0, 8 * RESFACTOR, ((320 - SIDE_WIDTH) / ICON_PIXEL_W) * RESFACTOR);
+            // As many whole cells as fit left of the sidebar (20 on a 640x400 screen).
+            Set_View_Dimensions(0,
+                                8 * RESFACTOR,
+                                ((320 - SIDE_WIDTH) / ICON_PIXEL_W) * RESFACTOR + Sidebar_X_Shift() / ICON_PIXEL_W);
             IsToRedraw = true;
             Help_Text(TXT_NONE);
             Repair.Zap();
@@ -1169,7 +1221,7 @@ void SidebarClass::StripClass::Init_IO(int id)
     UpButton[ID].IsSticky = true;
     UpButton[ID].ID = BUTTON_UP + id;
     UpButton[ID].X = X + (UP_X_OFFSET * RESFACTOR);
-    UpButton[ID].Y = Y + (UP_Y_OFFSET * RESFACTOR);
+    UpButton[ID].Y = Y + ((Sidebar_Rows() * OBJECT_HEIGHT + 1) * RESFACTOR); // UP_Y_OFFSET, for any rows
 
 #if (FRENCH)
     UpButton[ID].Set_Shape(MFCD::Retrieve("STRIPUP.SHP"));
@@ -1180,7 +1232,7 @@ void SidebarClass::StripClass::Init_IO(int id)
     DownButton[ID].IsSticky = true;
     DownButton[ID].ID = BUTTON_DOWN + id;
     DownButton[ID].X = X + (DOWN_X_OFFSET * RESFACTOR);
-    DownButton[ID].Y = Y + (DOWN_Y_OFFSET * RESFACTOR);
+    DownButton[ID].Y = Y + ((Sidebar_Rows() * OBJECT_HEIGHT + 1) * RESFACTOR); // DOWN_Y_OFFSET
 
     /*
     ** Buttons are in a slightly different position in the new sidebar
@@ -1190,7 +1242,7 @@ void SidebarClass::StripClass::Init_IO(int id)
 
     DownButton[ID].Set_Shape(MFCD::Retrieve("STRIPDN.SHP"));
 
-    for (int index = 0; index < MAX_VISIBLE; index++) {
+    for (int index = 0; index < Sidebar_Rows(); index++) {
         SelectClass& g = SelectButton[ID][index];
         g.ID = BUTTON_SELECT;
         g.X = X;
@@ -1297,7 +1349,7 @@ void SidebarClass::StripClass::Activate(void)
     DownButton[ID].Zap();
     Map.Add_A_Button(DownButton[ID]);
 
-    for (int index = 0; index < MAX_VISIBLE; index++) {
+    for (int index = 0; index < Sidebar_Rows(); index++) {
         SelectButton[ID][index].Zap();
         Map.Add_A_Button(SelectButton[ID][index]);
     }
@@ -1322,7 +1374,7 @@ void SidebarClass::StripClass::Deactivate(void)
 {
     Map.Remove_A_Button(UpButton[ID]);
     Map.Remove_A_Button(DownButton[ID]);
-    for (int index = 0; index < MAX_VISIBLE; index++) {
+    for (int index = 0; index < Sidebar_Rows(); index++) {
         Map.Remove_A_Button(SelectButton[ID][index]);
     }
 }
@@ -1391,7 +1443,7 @@ bool SidebarClass::StripClass::Scroll(bool up)
             return (false);
         Scroller--;
     } else {
-        if (TopIndex + MAX_VISIBLE >= BuildableCount)
+        if (TopIndex + Sidebar_Rows() >= BuildableCount)
             return (false);
         Scroller++;
     }
@@ -1467,7 +1519,7 @@ bool SidebarClass::StripClass::AI(KeyNumType& input, int, int)
     **	logic handler. This might result in up or down scrolling.
     */
     if (!IsScrolling && Scroller) {
-        if (BuildableCount <= MAX_VISIBLE) {
+        if (BuildableCount <= Sidebar_Rows()) {
             Scroller = 0;
         } else {
 
@@ -1488,7 +1540,7 @@ bool SidebarClass::StripClass::AI(KeyNumType& input, int, int)
                 }
 
             } else {
-                if (TopIndex + MAX_VISIBLE >= BuildableCount) {
+                if (TopIndex + Sidebar_Rows() >= BuildableCount) {
                     Scroller = 0;
                 } else {
                     Scroller--;
@@ -1632,8 +1684,23 @@ void SidebarClass::StripClass::Draw_It(bool complete)
         /*
         ** New sidebar needs to be drawn not filled
         */
-        if (BuildableCount < MAX_VISIBLE) {
+        if (BuildableCount < Sidebar_Rows()) {
             CC_Draw_Shape(LogoShapes, ID, X + (2 * RESFACTOR), Y, WINDOW_MAIN, SHAPE_WIN_REL | SHAPE_NORMAL, 0);
+
+            // The shape has MAX_VISIBLE rows; a taller sidebar repeats its last row below it.
+            for (int row = MAX_VISIBLE; row < Sidebar_Rows(); row++) {
+                WindowList[WINDOW_CUSTOM][WINDOWX] = X + (2 * RESFACTOR);
+                WindowList[WINDOW_CUSTOM][WINDOWY] = Y + row * OBJECT_HEIGHT * RESFACTOR;
+                WindowList[WINDOW_CUSTOM][WINDOWWIDTH] = OBJECT_WIDTH * RESFACTOR;
+                WindowList[WINDOW_CUSTOM][WINDOWHEIGHT] = OBJECT_HEIGHT * RESFACTOR;
+                CC_Draw_Shape(LogoShapes,
+                              ID,
+                              0,
+                              -(MAX_VISIBLE - 1) * OBJECT_HEIGHT * RESFACTOR,
+                              WINDOW_CUSTOM,
+                              SHAPE_WIN_REL | SHAPE_NORMAL,
+                              0);
+            }
         }
 
         /*
@@ -1646,7 +1713,7 @@ void SidebarClass::StripClass::Draw_It(bool complete)
         **	Loop through all the buildable objects that are visible in the strip and render
         **	them. Their Y offset may be adjusted if the strip is in the process of scrolling.
         */
-        for (int i = 0; i < MAX_VISIBLE + (IsScrolling ? 1 : 0); i++) {
+        for (int i = 0; i < Sidebar_Rows() + (IsScrolling ? 1 : 0); i++) {
             bool production;
             bool completed;
             int stage;

@@ -36,8 +36,36 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "common/framelimit.h"
+#include "common/settings.h"
+
+#include <algorithm>
 
 #define SCROLL_DELAY 1
+
+/*
+** The scroll rates are a distance per game frame, as if this ran once a frame; but it runs each
+** time the game reads input, many times between frames (and most of them in a burst just before
+** the next), so the map moved in jerks. Instead it steps once per frame presented, by a fixed
+** share of the rate (not by measured time: on RISC OS the clock is in centiseconds), so the
+** speed is the same whatever the game speed and the frame rate: the rate per 40 ms, a little
+** quicker than a game frame at the usual speed (4 ticks, 67 ms).
+*/
+static bool Scroll_Due(int& distance, int per_frame)
+{
+    static unsigned last = 0;
+    unsigned presents = Present_Count - last;
+    if (presents == 0) {
+        return false;
+    }
+    last = Present_Count;
+    if (presents > 3) {
+        presents = 1; // the first step of a new scroll (or after a pause)
+    }
+    distance = std::max(1, int(per_frame * presents * 25 / Present_Rate())); // 25 = 1000 / 40 ms
+    return true;
+}
+
 
 CDTimerClass<SystemTimerClass> ScrollClass::Counter;
 
@@ -121,26 +149,28 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
 					**	Adjust the mouse coordinates to emphasize the
 					**	cardinal directions over the diagonals.
 					*/
+                    // (From the screen's size, which can be bigger than 320x200 or 640x400.)
+                    int const w = SeenBuff.Get_Width(), h = SeenBuff.Get_Height();
                     int altx = x;
                     if (altx < 50 * RESFACTOR)
                         altx -= ((50 * RESFACTOR) - altx);
                     altx = max(altx, 0);
-                    if (altx > ((320 - 50) * RESFACTOR))
-                        altx += altx - ((320 - 50) * RESFACTOR);
-                    altx = min(altx, (320 * RESFACTOR));
-                    if (altx > (50 * RESFACTOR) && altx < ((320 - 50) * RESFACTOR)) {
-                        altx += (((320 / 2) * RESFACTOR) - altx) / 2;
+                    if (altx > w - 50 * RESFACTOR)
+                        altx += altx - (w - 50 * RESFACTOR);
+                    altx = min(altx, w);
+                    if (altx > (50 * RESFACTOR) && altx < w - 50 * RESFACTOR) {
+                        altx += (w / 2 - altx) / 2;
                     }
 
                     int alty = y;
                     if (alty < (50 * RESFACTOR))
                         alty -= (50 * RESFACTOR) - alty;
                     alty = max(alty, 0);
-                    if (alty > (150 * RESFACTOR))
-                        alty += alty - (150 * RESFACTOR);
-                    alty = min(alty, 200 * RESFACTOR);
+                    if (alty > h - 50 * RESFACTOR)
+                        alty += alty - (h - 50 * RESFACTOR);
+                    alty = min(alty, h);
 
-                    direction = (DirType)Desired_Facing256((320 / 2) * RESFACTOR, (200 / 2) * RESFACTOR, altx, alty);
+                    direction = (DirType)Desired_Facing256(w / 2, h / 2, altx, alty);
                 }
 
                 int control = Dir_Facing(direction);
@@ -203,8 +233,7 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
                         if (Debug_Map) {
                             Scroll_Map(direction, distance, true);
                             Counter = SCROLL_DELAY;
-                        } else {
-                            distance = _rate[rate];
+                        } else if (Scroll_Due(distance, _rate[rate])) {
                             Scroll_Map(direction, distance, true);
 
                             if (Counter == 0 && player_scrolled) {

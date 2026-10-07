@@ -160,6 +160,19 @@ extern bool DLL_Export_Get_Input_Key_State(KeyNumType key);
  * HISTORY:                                                                                    *
  *   12/06/1994 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** What Set_View_Dimensions was last asked for, and the area in pixels that makes; the view
+** itself can be smaller, for a small map. Not members, which would change what saved games hold.
+*/
+static int ViewRequestX = 0;
+static int ViewRequestY = 0;
+static int ViewRequestW = -1;
+static int ViewRequestH = -1;
+static int ViewAreaX = 0;
+static int ViewAreaY = 0;
+static int ViewAreaW = 0;
+static int ViewAreaH = 0;
+
 DisplayClass::DisplayClass(void)
     : TacticalCoord(0)
     , TacLeptonWidth(0)
@@ -543,23 +556,44 @@ short const* DisplayClass::Text_Overlap_List(char const* text, int x, int y) con
  *=============================================================================================*/
 void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
 {
-    if (width == -1) {
-        TacLeptonWidth = Pixel_To_Lepton(SeenBuff.Get_Width() - x);
-    } else {
-        TacLeptonWidth = width * CELL_LEPTON_W;
+    ViewRequestX = x;
+    ViewRequestY = y;
+    ViewRequestW = width;
+    ViewRequestH = height;
+
+    /*
+    **	The view's area, in pixels: the screen right of x and below y, or with a width in cells
+    **	(the sidebar's call), everything left of the sidebar, whole cells or not.
+    */
+    int area_w = (width == -1) ? SeenBuff.Get_Width() - x : SeenBuff.Get_Width() - x - SIDEBAR_WID * RESFACTOR;
+    int area_h = (height == -1) ? SeenBuff.Get_Height() - y : height * CELL_PIXEL_H;
+    int pixels_w = (width == -1) ? area_w : width * CELL_PIXEL_W;
+    int pixels_h = area_h;
+    if (pixels_w > area_w) {
+        pixels_w = area_w;
     }
 
-    // ST - 3/1/2019 12:05PM
-    // Made the below code more consistent with the width calculation. This is needed if we aren't going to draw the
-    // tabs at the top of the screen
-    //
-    if (height == -1) {
-        TacLeptonHeight = Pixel_To_Lepton(SeenBuff.Get_Height() - y);
-        // height = (SeenBuff.Get_Height()-y) / CELL_PIXEL_H;
-    } else {
-        TacLeptonHeight = height * CELL_LEPTON_H;
+    /*
+    **	On a big screen a map can be smaller than the view. Then the view is just the map,
+    **	centred in the view's area: the cells beyond its edges aren't kept up to date (and
+    **	nothing redraws there), so Draw_It keeps the rest of the area black instead.
+    */
+    if (MapCellWidth > 0 && pixels_w > MapCellWidth * CELL_PIXEL_W) {
+        pixels_w = MapCellWidth * CELL_PIXEL_W;
     }
-    // TacLeptonHeight = height * CELL_LEPTON_H;
+    if (MapCellHeight > 0 && pixels_h > MapCellHeight * CELL_PIXEL_H) {
+        pixels_h = MapCellHeight * CELL_PIXEL_H;
+    }
+    ViewAreaX = x;
+    ViewAreaY = y;
+    ViewAreaW = area_w;
+    ViewAreaH = area_h;
+    TacLeptonWidth = Pixel_To_Lepton(pixels_w);
+    TacLeptonHeight = Pixel_To_Lepton(pixels_h);
+    if (Is_Large_Screen()) {
+        x += ((area_w - pixels_w) / 2) & ~7; // to a multiple of 8, as window positions were
+        y += (area_h - pixels_h) / 2;
+    }
 
     /*
     **	Adjust the tactical cell if it is now in an invalid position
@@ -1892,6 +1926,29 @@ void DisplayClass::Draw_It(bool forced)
     int x, y; // Working cell index values.
 
     MapClass::Draw_It(forced);
+
+    /*
+    **	The part of the view's area beyond a map smaller than it (see Set_View_Dimensions), and
+    **	any strip left between the view's whole cells and the sidebar: kept black, which also
+    **	erases anything drawn over it, such as help text.
+    */
+    int const tac_w = Lepton_To_Pixel(TacLeptonWidth), tac_h = Lepton_To_Pixel(TacLeptonHeight);
+    if ((ViewAreaW > tac_w || ViewAreaH > tac_h) && LogicPage->Lock()) {
+        int const right = ViewAreaX + ViewAreaW - 1, bottom = ViewAreaY + ViewAreaH - 1;
+        if (TacPixelY > ViewAreaY) {
+            LogicPage->Fill_Rect(ViewAreaX, ViewAreaY, right, TacPixelY - 1, BLACK); // above
+        }
+        if (TacPixelY + tac_h <= bottom) {
+            LogicPage->Fill_Rect(ViewAreaX, TacPixelY + tac_h, right, bottom, BLACK); // below
+        }
+        if (TacPixelX > ViewAreaX) {
+            LogicPage->Fill_Rect(ViewAreaX, TacPixelY, TacPixelX - 1, TacPixelY + tac_h - 1, BLACK); // left
+        }
+        if (TacPixelX + tac_w <= right) {
+            LogicPage->Fill_Rect(TacPixelX + tac_w, TacPixelY, right, TacPixelY + tac_h - 1, BLACK); // right
+        }
+        LogicPage->Unlock();
+    }
 
     if (IsToRedraw || forced) {
         BStart(BENCH_TACTICAL);
@@ -4728,6 +4785,7 @@ void DisplayClass::Read_INI(CCINIClass& ini)
 #endif //	!FIXIT_VERSION_3
 
     Set_Map_Dimensions(x, y, w, h);
+    Set_View_Dimensions(ViewRequestX, ViewRequestY, ViewRequestW, ViewRequestH); // fit the view to this map
 
     /*
     **	The theater is determined at this point. There is specific data that
@@ -4788,7 +4846,13 @@ void DisplayClass::Read_INI(CCINIClass& ini)
     }
 
     Scen.Views[0] = Scen.Views[1] = Scen.Views[2] = Scen.Views[3] = Scen.Waypoint[WAYPT_HOME];
-    Set_Tactical_Position(Cell_Coord((Scen.Waypoint[WAYPT_HOME] - (MAP_CELL_W * 4 * RESFACTOR)) - (5 * RESFACTOR)));
+    if (Is_Large_Screen()) {
+        // The home waypoint in the middle of the view, however big (as on a 640x400 screen).
+        int const half_w = Lepton_To_Cell(TacLeptonWidth) / 2, half_h = Lepton_To_Cell(TacLeptonHeight) / 2;
+        Set_Tactical_Position(Cell_Coord((Scen.Waypoint[WAYPT_HOME] - (MAP_CELL_W * half_h)) - half_w));
+    } else {
+        Set_Tactical_Position(Cell_Coord((Scen.Waypoint[WAYPT_HOME] - (MAP_CELL_W * 4 * RESFACTOR)) - (5 * RESFACTOR)));
+    }
 
     /*
     **	Loop through all CellTrigger entries.

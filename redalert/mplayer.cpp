@@ -614,8 +614,8 @@ int Surrender_Dialog(int text)
 
     int D_DIALOG_W = 240 * RESFACTOR;                      // dialog width
     int D_DIALOG_H = 63 * RESFACTOR;                       // dialog height
-    int D_DIALOG_X = ((320 * RESFACTOR - D_DIALOG_W) / 2); // centered x-coord
-    int D_DIALOG_Y = ((200 * RESFACTOR - D_DIALOG_H) / 2); // centered y-coord
+    int D_DIALOG_X = ((SeenBuff.Get_Width() - D_DIALOG_W) / 2);  // centered x-coord (in game: on the
+    int D_DIALOG_Y = ((SeenBuff.Get_Height() - D_DIALOG_H) / 2); // whole screen, whatever its size)
     int D_DIALOG_CX = D_DIALOG_X + (D_DIALOG_W / 2);       // coord of x-center
 
     int D_TXT6_H = 7 * RESFACTOR;     // ht of 6-pt text
@@ -817,8 +817,8 @@ int Abort_Dialog(void)
 
     int D_DIALOG_W = 170 * RESFACTOR;                      // dialog width
     int D_DIALOG_H = 63 * RESFACTOR;                       // dialog height
-    int D_DIALOG_X = ((320 * RESFACTOR - D_DIALOG_W) / 2); // centered x-coord
-    int D_DIALOG_Y = ((200 * RESFACTOR - D_DIALOG_H) / 2); // centered y-coord
+    int D_DIALOG_X = ((SeenBuff.Get_Width() - D_DIALOG_W) / 2);  // centered x-coord (in game: on the
+    int D_DIALOG_Y = ((SeenBuff.Get_Height() - D_DIALOG_H) / 2); // whole screen, whatever its size)
     int D_DIALOG_CX = D_DIALOG_X + (D_DIALOG_W / 2);       // coord of x-center
 
     int D_TXT6_H = 7 * RESFACTOR;     // ht of 6-pt text

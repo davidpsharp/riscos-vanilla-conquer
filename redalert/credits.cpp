@@ -150,7 +150,8 @@ void CreditClass::Graphic_Logic(bool forced)
             }
 #endif
 #ifndef REMASTER_BUILD
-            int text_x = Options.ToggleSidebar ? 120 * RESFACTOR : 200 * RESFACTOR;
+            // In the middle of the timer's tab, which is placed from the right of the screen.
+            int text_x = SeenBuff.Get_Width() - (Options.ToggleSidebar ? 200 : 120) * RESFACTOR;
 
             if (hours) {
                 Fancy_Text_Print(TXT_TIME_FORMAT_HOURS,
