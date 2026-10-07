@@ -42,6 +42,9 @@
 #include <stdlib.h>
 
 #include "wwmem.h"
+#ifdef __riscos__
+#include <unixlib/local.h>
+#endif
 
 size_t Largest_Mem_Block(void);
 
@@ -100,6 +103,9 @@ void* Alloc(size_t bytes_to_alloc, MemoryFlagType flags)
 
     if (!mem_ptr && Memory_Error) {
         fprintf(stderr, "Alloc: %lu bytes not available\n", (unsigned long)bytes_to_alloc);
+#ifdef __riscos__
+        __write_backtrace(0); // who asked, in the log
+#endif
         Memory_Error();
     }
 
