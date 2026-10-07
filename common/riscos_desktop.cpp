@@ -104,7 +104,7 @@ static void Indirected(Icon& icon, int x0, int y0, int x1, int y1, unsigned flag
 
 /*
 ** "About this program", laid out as Edit's progInfo template: right-aligned labels (Name,
-** Purpose, Author, Version) beside sunken display fields.
+** Purpose, Author, Ported by, Version) beside sunken display fields.
 */
 static void Create_Info_Window(void)
 {
@@ -130,7 +130,7 @@ static void Create_Info_Window(void)
             int length;
         } title;
         int icon_count;
-        Icon icons[8];
+        Icon icons[10];
     } block;
 
     static const char title[] = "About this program";
@@ -139,8 +139,8 @@ static void Create_Info_Window(void)
     memset(&block, 0, sizeof(block));
     block.visible[0] = 392;
     block.visible[1] = 628;
-    block.visible[2] = 392 + 638;
-    block.visible[3] = 628 + 248;
+    block.visible[2] = 392 + 668;
+    block.visible[3] = 628 + 308;
     block.behind = -1;
     // Moveable, auto-redraw, title bar, new format (as Edit's), but kept on the screen: opened
     // from the icon bar's right-hand end, it would otherwise run off it.
@@ -148,8 +148,8 @@ static void Create_Info_Window(void)
     const unsigned char colours[8] = {7, 2, 7, 1, 12, 14, 12, 0};
     memcpy(block.colours, colours, sizeof(colours));
     block.extent[0] = 0;
-    block.extent[1] = -248;
-    block.extent[2] = 638;
+    block.extent[1] = -308;
+    block.extent[2] = 668;
     block.extent[3] = 0;
     block.title_flags = 0x0000013D; // text, border, centred, filled, indirected
     block.sprite_area = 1;
@@ -157,15 +157,15 @@ static void Create_Info_Window(void)
     block.title.validation = reinterpret_cast<const char*>(-1);
     block.title.length = sizeof(title);
 
-    const char* labels[4] = {"Name", "Purpose", "Author", "Version"};
-    const char* values[4] = {App.name, App.purpose, App.author, version};
-    const int label_x0[4] = {62, 14, 30, 14};
-    for (int row = 0; row < 4; row++) {
+    // Edit's rows and fields, with a wider label column for "Ported by".
+    const char* labels[5] = {"Name", "Purpose", "Author", "Ported by", "Version"};
+    const char* values[5] = {App.name, App.purpose, App.author, "David Sharp", version};
+    for (int row = 0; row < 5; row++) {
         int const top = -4 - 60 * row;
-        Indirected(block.icons[row], 154, top - 52, 630, top, 0x1700613D, values[row], field_valid);
-        Plain_Text(block.icons[4 + row], label_x0[row], top - 48, 154, top - 8, 0x17000211, labels[row]);
+        Indirected(block.icons[row], 184, top - 52, 660, top, 0x1700613D, values[row], field_valid);
+        Plain_Text(block.icons[5 + row], 8, top - 48, 184, top - 8, 0x17000211, labels[row]);
     }
-    block.icon_count = 8;
+    block.icon_count = 10;
 
     _kernel_swi_regs regs;
     regs.r[1] = reinterpret_cast<int>(&block);
