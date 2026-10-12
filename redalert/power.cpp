@@ -245,8 +245,16 @@ void PowerClass::Draw_It(bool complete)
                     }
                     bottom = (175 * RESFACTOR) + 1;
 
-                    LogicPage->Fill_Rect(245 * RESFACTOR, bottom - power_height, 245 * RESFACTOR + 1, bottom, color2);
-                    LogicPage->Fill_Rect(246 * RESFACTOR, bottom - power_height, 246 * RESFACTOR + 1, bottom, color1);
+                    LogicPage->Fill_Rect(245 * RESFACTOR + Sidebar_X_Shift(),
+                                         bottom - power_height,
+                                         245 * RESFACTOR + 1 + Sidebar_X_Shift(),
+                                         bottom,
+                                         color2);
+                    LogicPage->Fill_Rect(246 * RESFACTOR + Sidebar_X_Shift(),
+                                         bottom - power_height,
+                                         246 * RESFACTOR + 1 + Sidebar_X_Shift(),
+                                         bottom,
+                                         color1);
                 }
 
                 /*
@@ -254,7 +262,7 @@ void PowerClass::Draw_It(bool complete)
                 */
                 CC_Draw_Shape(PowerShape,
                               0,
-                              (POWER_X * RESFACTOR) + RESFACTOR,
+                              (POWER_X * RESFACTOR) + RESFACTOR + Sidebar_X_Shift(),
                               bottom - (drain_height + (2 * RESFACTOR)),
                               WINDOW_MAIN,
                               flags | SHAPE_NORMAL,

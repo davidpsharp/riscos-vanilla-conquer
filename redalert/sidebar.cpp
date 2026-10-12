@@ -1052,6 +1052,7 @@ bool SidebarClass::Activate(int control)
             Map.RadarButton.Zap();
             Add_A_Button(Map.RadarButton);
             Map.PowerButton.Zap();
+            Map.PowerButton.X = Map.POWER_X * RESFACTOR + Sidebar_X_Shift();
             Add_A_Button(Map.PowerButton);
         } else {
             Help_Text(TXT_NONE);
