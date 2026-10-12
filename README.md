@@ -1,3 +1,13 @@
+> ## RISC OS port
+>
+> This fork runs **Tiberian Dawn** (`!VanillaTD`) and **Red Alert** (`!VanillaRA`) on **RISC OS**: a Raspberry Pi with RISC OS 5.30, and a StrongARM Risc PC with RISC OS 4.
+> Ported by David Sharp, with the help of an AI assistant (Claude).
+>
+> - **[RISC OS port README](riscos/README.md)**: how it is built and tested, and what is different from upstream.
+> - **Playing it**: each game's `!Help` file (in `riscos/app/!VanillaTD` and `riscos/app/!VanillaRA`) explains installing and running it. You need your own copy of the game data; the games' `Prepare` step installs it from the freeware CD images.
+> - **Downloads**: the zips are on the [Releases page](../../releases).
+> - Everything below is the upstream Vanilla Conquer README.
+
 # Vanilla Conquer
 Vanilla Conquer is a fully portable version of the first generation C&C engine and is capable of running both Tiberian Dawn and Red Alert on multiple platforms. It can also be used for mod development for the Remastered Collection.
 
