@@ -73,6 +73,10 @@
  *   Print_Framesync_Values -- displays frame-sync variables               *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "function.h"
+#include "common/paths.h"
+#include <errno.h>
+#include <stdio.h>
+#include <string>
 #include "common/framelimit.h"
 
 /********************************** Defines *********************************/
@@ -687,9 +691,17 @@ static void Queue_AI_Multiplayer(void)
     //------------------------------------------------------------------------
     Compute_Game_CRC();
     CRC[Frame & 0x001f] = GameCRC;
-    // unsigned int save_crc = GameCRC;
-    // Print_CRCs((EventClass *)NULL);
-    // GameCRC = save_crc;
+
+    /*
+    **	VC_CRCDUMP=<frame> writes the out-of-sync log at that frame, so that the machines in a
+    **	network game can be compared at the same moment, before anything is noticed.
+    */
+    static const int dump_frame = getenv("VC_CRCDUMP") != nullptr ? atoi(getenv("VC_CRCDUMP")) : -1;
+    if (Frame == dump_frame) {
+        unsigned int save_crc = GameCRC;
+        Print_CRCs((EventClass*)NULL);
+        GameCRC = save_crc;
+    }
 
     //------------------------------------------------------------------------
     // Only process every 'FrameSendRate' frames
@@ -3347,9 +3359,40 @@ void Print_CRCs(EventClass* ev)
     char filename[80];
     sprintf(filename, "CRC%02d.TXT", Frame & 0x1f);
 
-    CDFileClass fc;
-    fc.Open(filename, WRITE);
-    if (!fc.Is_Available()) {
+    /*
+    **	Written with stdio, into the user directory or, failing that, the program directory,
+    **	and the log says where (or why not): with the other machine's copy, this is what
+    **	shows which object went out of sync.
+    */
+    struct CrcFileClass
+    {
+        FILE* Handle;
+        explicit CrcFileClass(const char* name)
+            : Handle(nullptr)
+        {
+            const char* dirs[] = {Paths.User_Path(), Paths.Program_Path()};
+            for (const char* dir : dirs) {
+                std::string path = Paths.Concatenate_Paths(dir, name);
+                Handle = fopen(path.c_str(), "w");
+                if (Handle != nullptr) {
+                    fprintf(stderr, "sync: frame %d, CRC log in %s\n", Frame, path.c_str());
+                    return;
+                }
+                fprintf(stderr, "sync: can't write %s: %s\n", path.c_str(), strerror(errno));
+            }
+        }
+        ~CrcFileClass()
+        {
+            if (Handle != nullptr) {
+                fclose(Handle);
+            }
+        }
+        void Write(const char* data, size_t length)
+        {
+            fwrite(data, 1, length, Handle);
+        }
+    } fc(filename);
+    if (fc.Handle == nullptr) {
         return;
     }
 
@@ -3575,6 +3618,9 @@ void Print_CRCs(EventClass* ev)
     snprintf(buffer, sizeof(buffer), "My Frame:%d\n", Frame);
     fc.Write(buffer, strlen(buffer));
 
+    if (ev == NULL) {
+        return;
+    }
     snprintf(buffer, sizeof(buffer), "\n");
     fc.Write(buffer, strlen(buffer));
     snprintf(buffer, sizeof(buffer), "Offending event:\n");
