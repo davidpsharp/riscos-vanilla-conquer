@@ -58,6 +58,7 @@
 
 #include "common/phasetime.h"
 #include "function.h"
+#include "common/riscos_desktop.h"
 #include "language.h"
 #include "msgbox.h"
 #include "loaddlg.h"
@@ -1054,7 +1055,20 @@ bool Select_Game(bool fade)
             case SEL_EXIT:
                 Theme.Fade_Out();
                 BlackPalette.Set(FADE_PALETTE_SLOW);
+#ifdef __riscos__
+                /*
+                **	On the desktop the game stays on the icon bar: clicking the icon comes back to
+                **	this menu, and the icon's Quit ends it.
+                */
+                RISCOS_Desktop_Suspend();
+                Theme.Queue_Song(THEME_CRUS);
+                display = true;
+                fade = true;
+                selection = SEL_NONE;
+                break;
+#else
                 return (false);
+#endif
 
             /*
             **	Display the hall of fame.
