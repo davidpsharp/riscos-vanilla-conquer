@@ -254,6 +254,40 @@ static void Quit_Game(void)
 }
 
 /*
+** While the game waits on the desktop its memory is paged out, but the event handler UnixLib
+** installed stays: an enabled event (a key or mouse button press, event 11) then ran whatever
+** another task had at that address, in SVC mode, and could corrupt the system heap. Around
+** Wimp_Poll the handler is the OS's default, and the game's is put back after.
+*/
+struct EventHandlerType
+{
+    int Address;
+    int Workspace;
+    int Buffer;
+};
+
+static EventHandlerType Use_Event_Handler(const EventHandlerType& handler)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = 10; // the event handler
+    regs.r[1] = handler.Address;
+    regs.r[2] = handler.Workspace;
+    regs.r[3] = handler.Buffer;
+    _kernel_swi(OS_ChangeEnvironment, &regs, &regs);
+    EventHandlerType previous = {regs.r[1], regs.r[2], regs.r[3]};
+    return previous;
+}
+
+static EventHandlerType Default_Event_Handler(void)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = 10;
+    _kernel_swi(OS_ReadDefaultHandler, &regs, &regs);
+    EventHandlerType handler = {regs.r[1], regs.r[2], regs.r[3]};
+    return handler;
+}
+
+/*
 ** Polls the Wimp until the icon is clicked with Select or Adjust (true), handling the icon's
 ** menu, the Info window and the desktop quitting.
 */
@@ -265,7 +299,9 @@ static void Wait_For_Icon_Click(void)
         _kernel_swi_regs regs;
         regs.r[0] = 1; // no null events: sleep until something happens
         regs.r[1] = reinterpret_cast<int>(block);
+        EventHandlerType game_handler = Use_Event_Handler(Default_Event_Handler());
         _kernel_oserror* error = _kernel_swi(Wimp_Poll, &regs, &regs);
+        Use_Event_Handler(game_handler);
         __pthread_start_ticker();
         if (error != nullptr) {
             fprintf(stderr, "desktop: Wimp_Poll: %s\n", error->errmess);
