@@ -12,5 +12,5 @@ RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaTD$Dir>.Modules.DRenderer
-WimpSlot -min 20000K -max 20000K
+WimpSlot -min 4000K -max 4000K
 Run <VanillaTD$Dir>.!RunImage %*0 >/<VanillaTD$Dir>/stdout 2>/<VanillaTD$Dir>/stderr

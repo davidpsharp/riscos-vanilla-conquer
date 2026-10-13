@@ -180,7 +180,7 @@ The movies are about 430 MB per side and can be left out on small discs.
 
 The game looks for a disc's files in `allied` or `soviet`, as it would ask for that CD. Without movies, one `MIX.MAIN` serves both campaigns.
 
-**Memory:** the game needs more than RISC OS 3.x's 28 MB WimpSlot limit, so `startup.cpp` gives UnixLib a dynamic area for the heap (`__dynamic_da_name`, "Vanilla RA heap", up to 64 MB). `!Run` sets a 6000K slot. Allied 1 uses 32.7 MB of heap.
+**Memory:** the game needs more than RISC OS 3.x's 28 MB WimpSlot limit, so `startup.cpp` gives UnixLib a dynamic area for the heap (`__dynamic_da_name`, "VanillaRA heap", up to 64 MB). `!Run` sets a 6000K slot. Allied 1 uses 32.7 MB of heap.
 
 **Prepare:** `vcprep` recognises a Red Alert disc image by its `MAIN.MIX` (Allied 454,605,294 bytes, Soviet 500,577,414) and `INSTALL/REDALERT.MIX`, and checks each by CRC-32. With movies it copies `MAIN.MIX` into `allied` or `soviet`. With `-nomovies` it runs `Utils.ramix copy <image>@<offset> <app>.MIX.MAIN MOVIES1.MIX MOVIES2.MIX`, which decrypts the mixfile index (RSA and Blowfish, with the game's public key) and writes a plain mixfile without the movies. The game reads plain mixfiles as well as encrypted ones. `Prepare` works with either app or both (`-app`, `-raapp`, `VanillaTD$Dir`, `VanillaRA$Dir`). **Tested:** on the Mac, and on RO 3.71 (RPCEmu, HostFS) with the Soviet image and `-nomovies`; the game then ran from the prepared app. The Pi 4's SD card lacked the space for a 660 MB image.
 

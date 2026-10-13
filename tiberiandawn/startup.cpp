@@ -55,6 +55,18 @@ HINSTANCE ProgramInstance;
 #include <unistd.h>
 #endif
 
+#ifdef __riscos__
+/*
+** UnixLib puts the heap in a dynamic area of its own, which grows only as far as the game needs,
+** so !Run's WimpSlot only has to hold the program. The areas UnixLib makes for big allocations
+** have the same name, so all of them show as "VanillaTD heap" in the Task Manager.
+*/
+#include <errno.h>
+#include <features.h>
+extern const char* const __dynamic_da_name = "VanillaTD heap"; // extern: a const would be file local
+int __dynamic_da_max_size = 64 * 1024 * 1024;
+#endif
+
 extern int ReadyToQuit;
 void Read_Setup_Options(RawFileClass* config_file);
 
