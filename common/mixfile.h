@@ -19,6 +19,8 @@
 #define MIXFILE_H
 
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include "listnode.h"
 #include "pk.h"
@@ -302,6 +304,8 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename)
     **	whether this is an extended mixfile format or the plain format. An
     **	extended format may have extra options or data layout.
     */
+    memset(&fileheader, 0, sizeof(fileheader));
+    memset(&alternate, 0, sizeof(alternate));
     int got = straw->Get(&alternate, sizeof(alternate));
     int16_t alternate_first = le16toh(alternate.First);
     int16_t alternate_second = le16toh(alternate.Second);
@@ -314,14 +318,29 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename)
     if (alternate_first == 0) {
         IsDigest = ((alternate_second & 0x01) != 0);
         IsEncrypted = ((alternate_second & 0x02) != 0);
-        straw->Get(&fileheader, sizeof(fileheader));
+        got = straw->Get(&fileheader, sizeof(fileheader));
     } else {
         memmove(&fileheader, &alternate, sizeof(alternate));
-        straw->Get(((char*)&fileheader) + sizeof(alternate), sizeof(fileheader) - sizeof(alternate));
+        got += straw->Get(((char*)&fileheader) + sizeof(alternate), sizeof(fileheader) - sizeof(alternate));
     }
 
     fileheader.count = le16toh(fileheader.count);
     fileheader.size = le32toh(fileheader.size);
+
+    /*
+    **	A header that couldn't be read whole, or that makes no sense, leaves an empty mixfile
+    **	(and says so) rather than allocating from whatever happened to be in the buffer.
+    */
+    if (got < (int)sizeof(fileheader) || fileheader.count < 0) {
+        fprintf(stderr,
+                "mixfile: %s: unreadable header (%d of %d bytes, count %d)\n",
+                Filename != NULL ? Filename : "?",
+                got,
+                (int)sizeof(fileheader),
+                (int)fileheader.count);
+        fileheader.count = 0;
+        fileheader.size = 0;
+    }
 
     Count = fileheader.count;
     DataSize = fileheader.size;
@@ -427,6 +446,8 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename, PKey const* key)
     **	whether this is an extended mixfile format or the plain format. An
     **	extended format may have extra options or data layout.
     */
+    memset(&fileheader, 0, sizeof(fileheader));
+    memset(&alternate, 0, sizeof(alternate));
     int got = straw->Get(&alternate, sizeof(alternate));
     int16_t alternate_first = le16toh(alternate.First);
     int16_t alternate_second = le16toh(alternate.Second);
@@ -445,15 +466,30 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename, PKey const* key)
             pstraw.Get_From(&fstraw);
             straw = &pstraw;
         }
-        straw->Get(&fileheader, sizeof(fileheader));
+        got = straw->Get(&fileheader, sizeof(fileheader));
 
     } else {
         memmove(&fileheader, &alternate, sizeof(alternate));
-        straw->Get(((char*)&fileheader) + sizeof(alternate), sizeof(fileheader) - sizeof(alternate));
+        got += straw->Get(((char*)&fileheader) + sizeof(alternate), sizeof(fileheader) - sizeof(alternate));
     }
 
     fileheader.count = le16toh(fileheader.count);
     fileheader.size = le32toh(fileheader.size);
+
+    /*
+    **	A header that couldn't be read whole, or that makes no sense, leaves an empty mixfile
+    **	(and says so) rather than allocating from whatever happened to be in the buffer.
+    */
+    if (got < (int)sizeof(fileheader) || fileheader.count < 0) {
+        fprintf(stderr,
+                "mixfile: %s: unreadable header (%d of %d bytes, count %d)\n",
+                Filename != NULL ? Filename : "?",
+                got,
+                (int)sizeof(fileheader),
+                (int)fileheader.count);
+        fileheader.count = 0;
+        fileheader.size = 0;
+    }
 
     Count = fileheader.count;
     DataSize = fileheader.size;
