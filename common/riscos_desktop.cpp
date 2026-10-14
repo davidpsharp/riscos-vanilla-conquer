@@ -254,37 +254,53 @@ static void Quit_Game(void)
 }
 
 /*
-** While the game waits on the desktop its memory is paged out, but the event handler UnixLib
-** installed stays: an enabled event (a key or mouse button press, event 11) then ran whatever
-** another task had at that address, in SVC mode, and could corrupt the system heap. Around
-** Wimp_Poll the handler is the OS's default, and the game's is put back after.
+** While the game waits on the desktop its memory is paged out, but the handlers UnixLib
+** installed stay. An error raised by another task (seen: the Filer's) or an enabled event (a key
+** or mouse button press) then ran whatever that task had at the game's addresses, in SVC mode,
+** and could corrupt the system heap. Around Wimp_Poll the handlers are the OS's defaults: the
+** exceptions, error, callback, escape and event. The game's are put back after.
 */
-struct EventHandlerType
+struct HandlerType
 {
     int Address;
     int Workspace;
     int Buffer;
 };
 
-static EventHandlerType Use_Event_Handler(const EventHandlerType& handler)
+// OS_ChangeEnvironment numbers: undefined instruction, prefetch abort, data abort, address
+// exception, error, callback, escape, event.
+static const int Swapped_Handlers[] = {1, 2, 3, 4, 6, 7, 9, 10};
+static const int Swapped_Count = sizeof(Swapped_Handlers) / sizeof(Swapped_Handlers[0]);
+
+static HandlerType Set_Handler(int number, const HandlerType& handler)
 {
     _kernel_swi_regs regs;
-    regs.r[0] = 10; // the event handler
+    regs.r[0] = number;
     regs.r[1] = handler.Address;
     regs.r[2] = handler.Workspace;
     regs.r[3] = handler.Buffer;
     _kernel_swi(OS_ChangeEnvironment, &regs, &regs);
-    EventHandlerType previous = {regs.r[1], regs.r[2], regs.r[3]};
+    HandlerType previous = {regs.r[1], regs.r[2], regs.r[3]};
     return previous;
 }
 
-static EventHandlerType Default_Event_Handler(void)
+// Puts the OS's default handlers in, keeping the game's in saved.
+static void Use_Default_Handlers(HandlerType saved[])
 {
-    _kernel_swi_regs regs;
-    regs.r[0] = 10;
-    _kernel_swi(OS_ReadDefaultHandler, &regs, &regs);
-    EventHandlerType handler = {regs.r[1], regs.r[2], regs.r[3]};
-    return handler;
+    for (int i = 0; i < Swapped_Count; i++) {
+        _kernel_swi_regs regs;
+        regs.r[0] = Swapped_Handlers[i];
+        _kernel_swi(OS_ReadDefaultHandler, &regs, &regs);
+        HandlerType handler = {regs.r[1], regs.r[2], regs.r[3]};
+        saved[i] = Set_Handler(Swapped_Handlers[i], handler);
+    }
+}
+
+static void Use_Game_Handlers(const HandlerType saved[])
+{
+    for (int i = 0; i < Swapped_Count; i++) {
+        Set_Handler(Swapped_Handlers[i], saved[i]);
+    }
 }
 
 /*
@@ -299,9 +315,10 @@ static void Wait_For_Icon_Click(void)
         _kernel_swi_regs regs;
         regs.r[0] = 1; // no null events: sleep until something happens
         regs.r[1] = reinterpret_cast<int>(block);
-        EventHandlerType game_handler = Use_Event_Handler(Default_Event_Handler());
+        HandlerType game_handlers[Swapped_Count];
+        Use_Default_Handlers(game_handlers);
         _kernel_oserror* error = _kernel_swi(Wimp_Poll, &regs, &regs);
-        Use_Event_Handler(game_handler);
+        Use_Game_Handlers(game_handlers);
         __pthread_start_ticker();
         if (error != nullptr) {
             fprintf(stderr, "desktop: Wimp_Poll: %s\n", error->errmess);
