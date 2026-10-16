@@ -3,9 +3,9 @@
 > This fork runs **Tiberian Dawn** (`!VanillaTD`) and **Red Alert** (`!VanillaRA`) on **RISC OS**: a Raspberry Pi with RISC OS 5.30, and a StrongARM Risc PC with RISC OS 4.
 > Ported by David Sharp, with the help of an AI assistant (Claude).
 >
-> - **[RISC OS port README](riscos/README.md)**: how it is built and tested, and what is different from upstream.
-> - **Playing it**: each game's `!Help` file (in `riscos/app/!VanillaTD` and `riscos/app/!VanillaRA`) explains installing and running it. You need your own copy of the game data; the games' `Prepare` step installs it from the freeware CD images.
+> - **Playing it**: each game's `!Help` file explains installing and running it: [`!VanillaTD.!Help`](https://github.com/davidpsharp/riscos-vanilla-conquer/blob/riscos/riscos/app/!VanillaTD/!Help,fff) and [`!VanillaRA.!Help`](https://github.com/davidpsharp/riscos-vanilla-conquer/blob/riscos/riscos/app/!VanillaRA/!Help,fff), the same files you get with the apps on RISC OS. You need your own copy of the game data; the games' `Prepare` step installs it from the freeware CD images.
 > - **Downloads**: the zips are on the [Releases page](../../releases).
+> - **Building it yourself** (for developers): the [RISC OS port README](https://github.com/davidpsharp/riscos-vanilla-conquer/blob/riscos/riscos/README.md) explains how it is compiled and tested, and what is different from upstream.
 > - Everything below is the upstream Vanilla Conquer README.
 
 # Vanilla Conquer
