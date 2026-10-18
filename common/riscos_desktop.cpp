@@ -1255,7 +1255,9 @@ void RISCOS_Desktop_Start(void)
     if (no_data) {
         fprintf(stderr, "desktop: no game data (%s)\n", Data_Problem().c_str());
     }
-    if (IconHandle >= 0 && (no_data || (RISCOS_Desktop_Click_To_Start && !restarted)) && getenv("VC_NODESKTOP") == nullptr) {
+    // VC_NODESKTOP (for tests) skips the wait, but never when there is no data to play with.
+    if (IconHandle >= 0
+        && (no_data || (RISCOS_Desktop_Click_To_Start && !restarted && getenv("VC_NODESKTOP") == nullptr))) {
         fprintf(stderr, "desktop: waiting for a click on the icon bar\n");
         AudioPaused = Mixer_Is_Running(); // in case the sound is set up first
         if (AudioPaused) {
