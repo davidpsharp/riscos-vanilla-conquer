@@ -69,11 +69,26 @@ To install them:
   2. Drag the ISO file(s) onto that icon: both discs at once, or one
      after the other.
 
-The game copies the data into !VanillaTD, so the ISO files can be on any
-disc, and can be deleted afterwards. It reads them directly: no CD drive
-or CDFS is needed. Meanwhile a window says which file it's on, and the
-desktop carries on as usual; each disc takes a few minutes. When it has
-finished, click the icon to play.
+When you drop a disc, the game says which one it is, how much space its
+game data and its movies (about 430 MB per disc) need, and how much is free,
+and asks whether to install the game data only or the movies too.
+Without the movies the game simply skips them; drop the disc again later
+to add them. If there isn't room for the movies as well, it says how much
+more space they need; if there isn't room even for the game data, it says
+so and installs nothing.
+
+The game copies the data into the gamedata directory inside !VanillaTD,
+so the ISO files can be on any disc, and can be deleted afterwards. It
+reads them directly: no CD drive or CDFS is needed. Meanwhile a window
+shows which file it's copying and how far it has got, and the desktop
+carries on as usual; each disc takes a few minutes. When it has finished,
+the window says which discs are installed and which you can still add;
+click the icon to play.
+
+Deleting the gamedata directory uninstalls the game data: the game then
+asks for the CD images again. Your settings and saved games are kept
+elsewhere, in Choices. Data installed by an earlier version, straight
+into !VanillaTD, is moved into gamedata the next time the game starts.
 
 Each file is checked against a known checksum as it's copied. If
 anything goes wrong, a window lists what happened. A file that comes out
@@ -88,14 +103,12 @@ download that didn't finish, too.
 
 Each time the game starts, it checks that its files are all there at the
 right sizes (it takes a moment). Until they are, clicking the icon says
-what's missing and opens this file, instead of starting the game.
+what's missing, instead of starting the game. Help on the icon's menu
+opens this file.
 *Set VanillaTD$NoDataCheck 1 skips that check, for game data from
 elsewhere.
 
-To leave out the movies (about 430 MB per disc), change the line
-"Set VanillaTD$NoMovies 0" in !VanillaTD.!Run to 1 before dragging the
-images. Without movies the game simply skips them. Without the Nod disc
-you can still play GDI missions and multiplayer.
+Without the Nod disc you can still play GDI missions and multiplayer.
 
 From the command line, Utils.vcprep installs from images too, with
 -nomovies to leave out the movies and -force to rewrite files already

@@ -29,6 +29,8 @@
 #include "riscos_autosize.h"
 #include "ccfile.h"
 #include "../riscos/tools/vcprep/discid.h"
+#include "../riscos/tools/vcprep/vcfiles.h"
+#undef SEP // vcfiles.h's, for its tables only
 #include "gitinfo.h"
 #include "ini.h"
 #include "mixer_sdl1.h"
@@ -39,6 +41,7 @@
 #include <pthread.h>
 #include <swis.h>
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -604,17 +607,21 @@ static void Use_Game_Handlers(const HandlerType saved[])
 enum MessageAction
 {
     ActionNone,
-    ActionRestart, // the first button saves PendingChoice as the screen size and restarts
+    ActionRestart,         // the first button saves PendingChoice as the screen size and restarts
+    ActionInstall,         // the first installs with the movies, the second without
+    ActionInstallDataOnly, // the first installs without the movies (there's no room for them)
+    ActionInstallMovies,   // the first installs the movies (the game data is already there)
 };
 
-static const int MessageWidth = 1040;
-static const int MaxLines = 9;
+static const int MessageWidth = 1120;
+static const int MaxLines = 14;
 static int MessageWindow = -1;
 static int MessageButtons = 0;   // icons 0 .. MessageButtons - 1
 static MessageAction PendingAction = ActionNone;
 static std::string PendingChoice;
 static char MessageLines[MaxLines][100];
-static char ButtonText[2][20];
+static const int MaxButtons = 3;
+static char ButtonText[MaxButtons][28];
 static char SpriteName[16];
 static int ProgressIcon = -1; // the line that shows how an install is going, or -1
 
@@ -664,12 +671,12 @@ static bool Wimp_Has_Sprite(const char* name)
 ** Opens the message window, in the middle of the screen and in front: the text, the Wimp's
 ** "error" or "information" sprite if it has one, and one or two buttons (the first is the default).
 */
-static void Show_Message(const std::string& text, bool error, const char* first, const char* second,
+static void Show_Message(const std::string& text, bool error, const std::vector<std::string>& buttons,
                          bool progress = false)
 {
     Close_Message();
     fprintf(stderr, "desktop: message: %s\n", text.c_str());
-    int lines = Wrap(text, 54);
+    int lines = Wrap(text, 58);
     ProgressIcon = -1;
     if (progress && lines < MaxLines) {
         MessageLines[lines++][0] = '\0'; // filled in by Show_Progress
@@ -699,7 +706,7 @@ static void Show_Message(const std::string& text, bool error, const char* first,
             int length;
         } title;
         int icon_count;
-        Icon icons[3 + MaxLines];
+        Icon icons[1 + MaxButtons + MaxLines];
     } block;
     memset(&block, 0, sizeof(block));
     block.behind = -1;
@@ -715,15 +722,24 @@ static void Show_Message(const std::string& text, bool error, const char* first,
     block.title.length = int(strlen(App.name)) + 1;
 
     int n = 0;
-    snprintf(ButtonText[0], sizeof(ButtonText[0]), "%s", first);
-    snprintf(ButtonText[1], sizeof(ButtonText[1]), "%s", second != nullptr ? second : "");
-    MessageButtons = second != nullptr ? 2 : 1;
+    MessageButtons = buttons.size() < size_t(MaxButtons) ? int(buttons.size()) : MaxButtons;
     static const char default_valid[] = "R6,3";
     static const char action_valid[] = "R5,3";
+    // Left to right, ending at the right edge; the first is the default (Return).
+    int widths[MaxButtons], total = 0;
     for (int i = 0; i < MessageButtons; i++) {
-        int x1 = MessageWidth - 32 - (MessageButtons - 1 - i) * 232;
-        Indirected(block.icons[n++], x1 - 216, buttons_y - 68, x1, buttons_y, 0x1700313D, ButtonText[i],
+        snprintf(ButtonText[i], sizeof(ButtonText[i]), "%s", buttons[i].c_str());
+        widths[i] = int(strlen(ButtonText[i])) * 16 + 64;
+        if (widths[i] < 216) {
+            widths[i] = 216;
+        }
+        total += widths[i] + (i > 0 ? 16 : 0);
+    }
+    int x0 = MessageWidth - 32 - total;
+    for (int i = 0; i < MessageButtons; i++) {
+        Indirected(block.icons[n++], x0, buttons_y - 68, x0 + widths[i], buttons_y, 0x1700313D, ButtonText[i],
                    i == 0 ? default_valid : action_valid);
+        x0 += widths[i] + 16;
     }
     for (int i = 0; i < lines; i++) {
         int top = -32 - 44 * i;
@@ -807,6 +823,8 @@ static void Show_Progress(const std::string& text)
     Swi(Wimp_SetIconState, regs);
 }
 
+static void Install_Choice(MessageAction action, int button);
+
 // A button of the message window (0 the first), or Escape or its close icon (the last).
 static void Message_Choice(int button)
 {
@@ -817,13 +835,16 @@ static void Message_Choice(int button)
         Save_Choice(PendingChoice);
         Restart_Game();
     }
+    if (action == ActionInstall || action == ActionInstallDataOnly || action == ActionInstallMovies) {
+        Install_Choice(action, button);
+    }
 }
 
 // A message with OK, saying something went wrong (error) or how things are.
 static void Tell(const std::string& text, bool error)
 {
     PendingAction = ActionNone;
-    Show_Message(text, error, "OK", nullptr);
+    Show_Message(text, error, {"OK"});
 }
 
 // Asks before restarting for a new screen size; Restart saves it and restarts the game.
@@ -831,7 +852,7 @@ static void Ask_Restart(const std::string& choice)
 {
     Show_Message("Changing the screen size restarts the game, and the game in progress will be lost. "
                  "Save it first if you want to keep it.",
-                 false, "Restart", "Cancel");
+                 false, {"Restart", "Cancel"});
     PendingAction = ActionRestart;
     PendingChoice = choice;
 }
@@ -863,8 +884,11 @@ static bool Installed_Now = false; // installed while this copy waited: a click 
 static bool Installing = false;
 static int InstallTask = 0;         // the task window's task, once seen
 static unsigned InstallStarted = 0; // when it was started, in centiseconds
-static std::vector<std::string> Pending; // images dropped, waiting for the rest of the drag
-static unsigned PendingSince = 0;
+static std::vector<std::string> Pending; // images to install, once the question about the movies is answered
+static std::vector<std::string> ToLook;  // files dropped, to be looked at once the drag has all arrived
+static unsigned LookSince = 0;
+static int InstallDiscs = 0;             // the discs being installed (1 GDI or Allied, 2 Nod or Soviet)
+static bool InstallMovies = true;
 
 static unsigned Now(void)
 {
@@ -901,24 +925,223 @@ static std::string Install_Task_Name(void)
     return std::string(App.name) + " install";
 }
 
-// A click on the icon while the data isn't there.
+static std::string Data_Dir(void);
+
+// A click on the icon while the data isn't there. !Help isn't opened: most people won't need it.
 static void Explain_No_Data(void)
 {
     if (Installing) {
         Tell("The game data is being installed. Click the icon when that has finished.", false);
         return;
     }
-    Tell(std::string(App.purpose) + "'s game data isn't installed, or is incomplete (" + Data_Problem()
-             + "). Drag the CD images (ISO files) onto this icon to install it. !Help, opening now, says "
-               "where to get them.",
+    std::string problem = Data_Problem();
+    std::string data = Data_Dir();
+    _kernel_swi_regs regs;
+    regs.r[0] = 17;
+    regs.r[1] = reinterpret_cast<int>(data.c_str());
+    bool nothing = _kernel_swi(OS_File, &regs, &regs) != nullptr || regs.r[0] != 2; // no gamedata yet
+    Tell(std::string(App.purpose) + (nothing ? "'s game data isn't installed yet." : "'s game data is incomplete (" + problem + ").")
+             + " Drag the CD images (ISO files) onto this icon to install it. !Help says where to get them: choose "
+               "Help on this icon's menu, or open !Help in the " + Own_App() + " directory.",
          false);
-    Open_Help();
+}
+
+
+static bool Is_RA(void)
+{
+    return strcmp(App.prefix, "VanillaRA") == 0;
+}
+
+// Where the installed data goes: the gamedata directory in the application. Deleting it uninstalls it.
+static std::string Data_Dir(void)
+{
+    return Os_Variable(App_Variable("Dir")) + ".gamedata";
+}
+
+// An installed file's size, by where it goes in gamedata (MIX.SCORES, gdi.MIX.GENERAL), or -1.
+static long Installed_Size(const std::string& dest)
+{
+    std::string path = Data_Dir() + "." + dest;
+    _kernel_swi_regs regs;
+    regs.r[0] = 17;
+    regs.r[1] = reinterpret_cast<int>(path.c_str());
+    if (_kernel_swi(OS_File, &regs, &regs) != nullptr || regs.r[0] != 1) {
+        return -1;
+    }
+    return long(unsigned(regs.r[4]));
+}
+
+static std::string Known_Dest(const Known& k, const char* side)
+{
+    return k.dest[0] == '@' ? std::string(side) + (k.dest + 1) : std::string(k.dest);
+}
+
+// Whether vcprep would copy a file: not if it's there at its size (CONQUER.INI: if it's there).
+static bool Will_Copy(const Known& k, const char* side)
+{
+    long size = Installed_Size(Known_Dest(k, side));
+    return strcmp(k.name, "CONQUER.INI") == 0 ? size < 0 : size != long(k.size);
+}
+
+static const int GameDiscs = 3; // both bits: GDI and Nod, or Allied and Soviet
+
+/*
+** The bytes installing these discs would add, as vcprep would copy them (a file both discs hold,
+** once). Tiberian Dawn: the files both discs share, and each disc's GENERAL, then its MOVIES.
+** Red Alert: REDALERT and, without the movies, a MAIN with them left out that does for both
+** discs; with them, each disc's own MAIN.
+*/
+static double Install_Bytes(int discs, bool movies)
+{
+    std::vector<std::string> planned;
+    double bytes = 0;
+    auto add = [&](const Known& k, const char* side) {
+        std::string dest = Known_Dest(k, side);
+        for (const std::string& p : planned) {
+            if (p == dest) {
+                return;
+            }
+        }
+        planned.push_back(dest);
+        if (Will_Copy(k, side)) {
+            bytes += k.size;
+        }
+    };
+    for (int d = 0; d < 2; d++) {
+        if (!(discs & (1 << d))) {
+            continue;
+        }
+        if (Is_RA()) {
+            add(RA_Redalert, "");
+            add(movies ? RA_Discs[d].main : RA_No_Movies, "");
+        } else {
+            for (size_t k = 0; k < DISC_FILES_COUNT; k++) {
+                add(Disc_Files[k], "");
+            }
+            for (size_t k = 0; k < ARCHIVE_FILES_COUNT; k++) {
+                add(Archive_Files[k], "");
+            }
+            add(Sides[d].general, Sides[d].dir);
+            if (movies) {
+                add(Sides[d].movies, Sides[d].dir);
+            }
+        }
+    }
+    return bytes;
+}
+
+// A disc's game data is installed (without movies, one Red Alert disc does for both).
+static bool Disc_Installed(int d)
+{
+    if (Is_RA()) {
+        return Installed_Size(RA_Redalert.dest) == long(RA_Redalert.size)
+               && (Installed_Size(RA_No_Movies.dest) == long(RA_No_Movies.size)
+                   || Installed_Size(RA_Discs[d].main.dest) == long(RA_Discs[d].main.size));
+    }
+    for (size_t k = 0; k < DISC_FILES_COUNT; k++) {
+        if (Installed_Size(Disc_Files[k].dest) != long(Disc_Files[k].size)) {
+            return false;
+        }
+    }
+    for (size_t k = 0; k < ARCHIVE_FILES_COUNT; k++) {
+        if (strcmp(Archive_Files[k].name, "CONQUER.INI") != 0
+            && Installed_Size(Archive_Files[k].dest) != long(Archive_Files[k].size)) {
+            return false;
+        }
+    }
+    return Installed_Size(Known_Dest(Sides[d].general, Sides[d].dir)) == long(Sides[d].general.size);
+}
+
+static bool Movies_Installed(int d)
+{
+    if (Is_RA()) {
+        return Installed_Size(RA_Discs[d].main.dest) == long(RA_Discs[d].main.size);
+    }
+    return Installed_Size(Known_Dest(Sides[d].movies, Sides[d].dir)) == long(Sides[d].movies.size);
+}
+
+// Free space where the data goes, in bytes; <App>$TestFree (in MB) pretends, for testing.
+static double Free_Space(void)
+{
+    std::string test = Os_Variable(App_Variable("TestFree"));
+    if (!test.empty()) {
+        return atof(test.c_str()) * 1024 * 1024;
+    }
+    std::string where = Data_Dir();
+    _kernel_swi_regs regs;
+    regs.r[0] = 17;
+    regs.r[1] = reinterpret_cast<int>(where.c_str());
+    if (_kernel_swi(OS_File, &regs, &regs) != nullptr || regs.r[0] != 2) {
+        where = Os_Variable(App_Variable("Dir")); // no gamedata yet
+    }
+    regs.r[0] = 55; // FreeSpace64: discs over 4 GB
+    regs.r[1] = reinterpret_cast<int>(where.c_str());
+    if (_kernel_swi(OS_FSControl, &regs, &regs) == nullptr) {
+        return double(unsigned(regs.r[0])) + double(unsigned(regs.r[1])) * 4294967296.0;
+    }
+    regs.r[0] = 49; // FreeSpace: older filing systems (RISC OS 3.7 and 4)
+    regs.r[1] = reinterpret_cast<int>(where.c_str());
+    if (_kernel_swi(OS_FSControl, &regs, &regs) == nullptr) {
+        return double(unsigned(regs.r[0]));
+    }
+    return -1;
+}
+
+// The disc the application is on, for messages: SCSI::HardDisc0, say.
+static std::string Disc_Name(void)
+{
+    std::string dir = Os_Variable(App_Variable("Dir"));
+    char buffer[512];
+    _kernel_swi_regs regs;
+    regs.r[0] = 37; // canonicalise
+    regs.r[1] = reinterpret_cast<int>(dir.c_str());
+    regs.r[2] = reinterpret_cast<int>(buffer);
+    regs.r[3] = 0;
+    regs.r[4] = 0;
+    regs.r[5] = sizeof(buffer);
+    if (_kernel_swi(OS_FSControl, &regs, &regs) == nullptr) {
+        dir = buffer;
+    }
+    size_t dollar = dir.find(".$");
+    return dollar != std::string::npos ? dir.substr(0, dollar) : dir;
+}
+
+// A size for a message, with a hard space so that the window never splits "144 MB".
+static std::string Megabytes(double bytes, bool round_up = false)
+{
+    char text[32];
+    double mb = bytes / (1024 * 1024);
+    if (mb >= 10240 && !round_up) {
+        snprintf(text, sizeof(text), "%.1f\xA0GB", mb / 1024);
+    } else {
+        snprintf(text, sizeof(text), "%.0f\xA0MB", round_up ? ceil(mb) : mb < 1 ? 1 : floor(mb + 0.5));
+    }
+    return text;
+}
+
+// "the C&C95 GDI disc", "the C&C95 GDI and Nod discs", "the Red Alert Allied disc".
+static std::string Disc_List(int discs)
+{
+    const char* names[2] = {Is_RA() ? "Allied" : "GDI", Is_RA() ? "Soviet" : "Nod"};
+    std::string text = std::string("the ") + (Is_RA() ? "Red Alert " : "C&C95 ");
+    if (discs == GameDiscs) {
+        return text + names[0] + " and " + names[1] + " discs";
+    }
+    return text + names[discs & 1 ? 0 : 1] + " disc";
+}
+
+static int Disc_Bit(int type)
+{
+    const char* id = Disc_Types[type].id;
+    return strcmp(id, "td-gdi") == 0 || strcmp(id, "ra-allied") == 0 ? 1
+           : strcmp(id, "td-nod") == 0 || strcmp(id, "ra-soviet") == 0 ? 2 : 0;
 }
 
 /*
-** Message_DataLoad on the icon: a file dragged onto it from the Filer. This game's discs wait in
-** Pending for the rest of the drag (the Filer sends one message per file); anything else is
-** turned away here, saying why.
+** Message_DataLoad on the icon: a file dragged onto it from the Filer. Nothing is read here: the
+** window says it's being looked at straight away, and the files are read on a null event once
+** the drag has all arrived (the Filer sends one message per file) and the window is on the
+** screen (a disc that has to spin up takes a moment).
 */
 static void Data_Load(int* block)
 {
@@ -950,39 +1173,127 @@ static void Data_Load(int* block)
         Tell(leaf + " is a zip file. Unzip it first, then drag the CD image (ISO file) inside it onto the icon.", true);
         return;
     }
-    int cut = 0;
-    char volume[40];
-    int disc = Disc_Identify(file.c_str(), &cut, volume, sizeof(volume));
-    fprintf(stderr, "desktop: %s is %s%s (volume %s)\n", leaf.c_str(),
-            disc >= 0 ? Disc_Types[disc].id : disc == DISC_NOT_ISO ? "not a CD image" : "an unknown disc",
-            cut ? ", cut short" : "", volume);
-    if (disc == DISC_NOT_ISO) {
-        Tell(leaf + " isn't a CD image (ISO file). !Help says which ones to drag here.", true);
-    } else if (cut) {
-        Tell(leaf + " is " + (disc >= 0 ? Disc_Types[disc].name : std::string("a CD image"))
-                 + ", but cut short: its download or copy didn't finish. Get it again.",
-             true);
-    } else if (disc == DISC_UNKNOWN) {
-        Tell(leaf + " isn't one of the freeware discs this game installs from. !Help says which ones to get.", true);
-    } else if (Disc_Types[disc].app == nullptr) {
-        Tell(leaf + " is " + Disc_Types[disc].name
-                 + ", which won't work: this game needs the Windows 95 version (see !Help).",
-             true);
-    } else if (Own_App() != Disc_Types[disc].app) {
-        Tell(leaf + " is " + Disc_Types[disc].name + ": drag it onto the " + Disc_Types[disc].app + " icon instead.",
-             true);
-    } else {
-        Pending.push_back(file);
-        PendingSince = Now();
+    if (ToLook.empty()) {
+        PendingAction = ActionNone;
+        Show_Message("Looking at " + leaf + "...", false, {"Cancel"});
     }
+    ToLook.push_back(file);
+    LookSince = Now();
+}
+
+// The question asked about the discs in Pending, with the buttons there's room for.
+static void Ask_About_Movies(const std::string& intro)
+{
+    double data = Install_Bytes(InstallDiscs, false);
+    double with = Install_Bytes(InstallDiscs, true);
+    double movies = with > data ? with - data : 0;
+    double free = Free_Space();
+    const double margin = 2.0 * 1024 * 1024;
+    std::string where = Disc_Name();
+    std::string free_text = free >= 0 ? Megabytes(free) : std::string("unknown");
+    fprintf(stderr, "desktop: to install: data %.0f, with the movies %.0f, free %.0f bytes\n", data, with, free);
+    if (data <= 0 && movies <= 0) {
+        Pending.clear();
+        Tell(intro + " Its game data and movies are already installed.", false);
+        return;
+    }
+    if (data <= 0) {
+        if (free >= 0 && free < with + margin) {
+            Pending.clear();
+            Tell(intro + " Its game data is already installed. Its movies take up " + Megabytes(movies) + ", and "
+                     + where + " has only " + free_text + " free.",
+                 true);
+            return;
+        }
+        Show_Message(intro + " Its game data is already installed; its movies take up " + Megabytes(movies)
+                         + ". Free on " + where + ": " + free_text + ". Install the movies?",
+                     false, {"Install the movies", "Cancel"});
+        PendingAction = ActionInstallMovies;
+        return;
+    }
+    if (free >= 0 && free < data + margin) {
+        Pending.clear();
+        Tell(intro + " There isn't room for it on " + where + ": its game data needs " + Megabytes(data, true)
+                 + ", and only " + free_text + " is free. Free some space, then drag the CD image onto this icon again.",
+             true);
+        return;
+    }
+    std::string sizes = "Game data: " + Megabytes(data) + ". Movies: " + Megabytes(movies) + ". Free on " + where
+                        + ": " + free_text + ".";
+    if (movies <= 0) {
+        Show_Message(intro + " " + sizes + " Its movies are already installed.", false, {"Install", "Cancel"});
+        PendingAction = ActionInstallDataOnly;
+        return;
+    }
+    if (free >= 0 && free < with + margin) {
+        double short_by = with + margin - free; // the movies, less what's left after the game data
+        Show_Message(intro + " " + sizes + " After installing the levels, you need to free up "
+                         + Megabytes(short_by, true) + " if you want to install the movies: they take up "
+                         + Megabytes(movies) + ".",
+                     true, {"Game data only", "Cancel"});
+        PendingAction = ActionInstallDataOnly;
+        return;
+    }
+    Show_Message(intro + " " + sizes + " Install the game data only, or the movies too? Without the movies the game "
+                     "skips them.",
+                 false, {"Game data and movies", "Game data only", "Cancel"});
+    PendingAction = ActionInstall;
+}
+
+// Once the drag has all arrived: which discs the dropped files are, and what to do with them.
+static void Look_At_Drops(void)
+{
+    std::vector<std::string> files;
+    files.swap(ToLook);
+    std::string problems, intro;
+    int discs = 0;
+    for (const std::string& file : files) {
+        std::string leaf = file.substr(file.find_last_of('.') + 1);
+        int cut = 0;
+        char volume[40];
+        int disc = Disc_Identify(file.c_str(), &cut, volume, sizeof(volume));
+        fprintf(stderr, "desktop: %s is %s%s (volume %s)\n", leaf.c_str(),
+                disc >= 0 ? Disc_Types[disc].id : disc == DISC_NOT_ISO ? "not a CD image" : "an unknown disc",
+                cut ? ", cut short" : "", volume);
+        std::string problem;
+        if (disc == DISC_NOT_ISO) {
+            problem = leaf + " isn't a CD image (ISO file). !Help says which ones to drag here.";
+        } else if (cut) {
+            problem = leaf + " is " + (disc >= 0 ? Disc_Types[disc].name : std::string("a CD image"))
+                      + ", but cut short: its download or copy didn't finish. Get it again.";
+        } else if (disc == DISC_UNKNOWN) {
+            problem = leaf + " isn't one of the freeware discs this game installs from. !Help says which ones to get.";
+        } else if (Disc_Types[disc].app == nullptr) {
+            problem = leaf + " is " + Disc_Types[disc].name
+                      + ", which won't work: this game needs the Windows 95 version (see !Help).";
+        } else if (Own_App() != Disc_Types[disc].app) {
+            problem = leaf + " is " + Disc_Types[disc].name + ": drag it onto the " + Disc_Types[disc].app + " icon instead.";
+        } else if (discs & Disc_Bit(disc)) {
+            continue; // the same disc twice
+        } else {
+            discs |= Disc_Bit(disc);
+            Pending.push_back(file);
+            intro += (intro.empty() ? "" : " ") + leaf + " is " + Disc_Types[disc].name + ".";
+        }
+        if (!problem.empty()) {
+            problems += (problems.empty() ? "" : " ") + problem;
+        }
+    }
+    Close_Message();
+    if (discs == 0) {
+        Tell(problems.empty() ? std::string("Nothing to install.") : problems, true);
+        return;
+    }
+    InstallDiscs = discs;
+    Ask_About_Movies(problems.empty() ? intro : problems + " " + intro);
 }
 
 /*
 ** Installs the images in Pending with Utils.vcprep in a task window, so the desktop goes on
 ** working meanwhile. The list goes in <App>$Install, one per line, as it may be too long for a
-** command line.
+** command line. vcprep puts the data in the application's gamedata directory.
 */
-static void Start_Install(void)
+static void Start_Install(bool movies)
 {
     std::string list;
     for (size_t i = 0; i < Pending.size(); i++) {
@@ -992,10 +1303,10 @@ static void Start_Install(void)
     std::string var = App_Variable("Install");
     Set_Os_Variable(var, list.c_str());
     std::string dir = Os_Variable(App_Variable("Dir"));
-    bool ra = strcmp(App.prefix, "VanillaRA") == 0;
-    std::string prepare = dir + ".Utils.vcprep -window -images " + var + (ra ? " -raapp " : " -app ") + dir;
-    if (!Os_Variable(App_Variable("NoMovies")).empty()) {
-        prepare += " -nomovies"; // set in !Run, for a small disc
+    std::string prepare = dir + ".Utils.vcprep -window -images " + var + (Is_RA() ? " -raapp " : " -app ") + dir;
+    InstallMovies = movies;
+    if (!movies) {
+        prepare += " -nomovies";
     }
     std::string command = "TaskWindow \"" + prepare + "\" -wimpslot 6000K -name \"" + Install_Task_Name() + "\" -quit";
     fprintf(stderr, "desktop: %s\n", command.c_str());
@@ -1010,11 +1321,22 @@ static void Start_Install(void)
     InstallTask = 0;
     InstallStarted = Now();
     PendingAction = ActionNone;
-    Show_Message(std::string("Installing the ") + App.purpose
-                     + " game data from the CD image. This takes a few minutes per disc; the desktop carries on "
-                       "meanwhile.",
-                 false, "Hide", nullptr, true);
+    Show_Message("Installing " + Disc_List(InstallDiscs) + (movies ? ", with the movies" : ", without the movies")
+                     + ". This takes a few minutes per disc; the desktop carries on meanwhile.",
+                 false, {"Hide"}, true);
     Show_Progress("Starting");
+}
+
+// The answer to the question about the movies (the button, 0 the first).
+static void Install_Choice(MessageAction action, int button)
+{
+    bool go = button == 0 || (action == ActionInstall && button == 1);
+    if (!go || Pending.empty()) {
+        Pending.clear();
+        ToLook.clear();
+        return;
+    }
+    Start_Install(action == ActionInstallMovies || (action == ActionInstall && button == 0));
 }
 
 // The task window's task if it's running, or 0. Also spots it before its messages would.
@@ -1049,27 +1371,79 @@ static void Install_Finished(void)
     InstallTask = 0;
     std::string problem = Data_Problem();
     fprintf(stderr, "desktop: install finished: %s\n", problem.empty() ? "all there" : problem.c_str());
+    int done = 0, failed = 0, missing = 0, without_movies = 0;
+    for (int d = 0; d < 2; d++) {
+        int bit = 1 << d;
+        if (InstallDiscs & bit) {
+            bool ok = Disc_Installed(d) && (!InstallMovies || Movies_Installed(d));
+            (ok ? done : failed) |= bit;
+        }
+        if (!Disc_Installed(d)) {
+            missing |= bit;
+        } else if (!Movies_Installed(d)) {
+            without_movies |= bit;
+        }
+    }
+    std::string text;
+    if (done != 0) {
+        std::string list = Disc_List(done);
+        list[0] = 'T';
+        text = list + (done == GameDiscs ? "' data is installed" : "'s data is installed")
+               + (InstallMovies ? ", with the movies." : ", without the movies.");
+    }
+    if (failed != 0) {
+        text += (text.empty() ? "" : " ") + std::string("The data from ") + Disc_List(failed)
+                + " didn't install completely" + (problem.empty() ? "" : " (" + problem + ")")
+                + ". The install window said why. Drag the CD image onto this icon to try again: what's already "
+                  "installed is kept.";
+    } else if (missing != 0) {
+        text += " You can also install " + Disc_List(missing) + ": drag its CD image onto this icon.";
+    } else if (Is_RA() && without_movies != 0) {
+        text += " Without the movies, one disc is enough for both campaigns. To add a disc's movies, drag its CD "
+                "image onto this icon again.";
+    } else {
+        text += std::string(" Both discs are installed") + (without_movies != 0 ? ", without all of the movies." : ".");
+    }
     if (problem.empty()) {
         Installed_Now = true;
-        Tell(std::string("The ") + App.purpose + " game data is installed. Click the icon to play.", false);
-    } else {
-        Tell(std::string(App.purpose) + "'s game data is still incomplete (" + problem
-                 + "). The install window said why. Drag the CD images onto this icon to try again.",
-             true);
+        text += " Click the icon to play.";
     }
+    Tell(text, failed != 0);
 }
 
 // On a null event while installing, or while a drag is still arriving.
 static void Install_Tick(void)
 {
-    if (!Pending.empty() && !Installing && Now() - PendingSince >= 50) {
-        Start_Install();
+    if (!ToLook.empty() && !Installing && Now() - LookSince >= 30) {
+        Look_At_Drops();
         return;
     }
     if (Installing) {
+        // vcprep says the file it's copying, how far it has got and which file of how many. A
+        // file Utils.ramix writes comes with its full size and where it's going, to watch it grow.
         std::string now = Os_Variable(App_Variable("Installing"));
-        if (!now.empty()) {
-            Show_Progress("Now: " + now);
+        char name[40], path[512];
+        int percent = 0, file = 0, files = 0;
+        unsigned long size = 0;
+        int got = sscanf(now.c_str(), "%39s %d %d %d %lu %511s", name, &percent, &file, &files, &size, path);
+        if (got >= 4) {
+            if (percent < 0 && got == 6 && size > 0) {
+                _kernel_swi_regs regs;
+                regs.r[0] = 17;
+                regs.r[1] = reinterpret_cast<int>(path);
+                if (_kernel_swi(OS_File, &regs, &regs) == nullptr && regs.r[0] == 1) {
+                    percent = int(double(unsigned(regs.r[4])) * 100 / size);
+                }
+            }
+            for (char* p = name; *p != '\0'; p++) {
+                if (*p == '.') {
+                    *p = '/';
+                }
+            }
+            char text[100];
+            snprintf(text, sizeof(text), "Copying %s: %d%% (file %d of %d)", name, percent < 0 ? 0 : percent, file,
+                     files);
+            Show_Progress(text);
         }
         int task = Find_Install_Task();
         if (task != 0) {
@@ -1091,10 +1465,10 @@ static void Wait_For_Icon_Click(void)
     for (;;) {
         __pthread_stop_ticker(); // the game's threads mustn't run while other tasks are paged in
         _kernel_swi_regs regs;
-        bool ticking = Installing || !Pending.empty();
-        regs.r[0] = ticking ? 0 : 1; // null events only to watch an install: else sleep
+        bool ticking = Installing || !ToLook.empty();
+        regs.r[0] = ticking ? 0 : 1; // null events only to watch an install or a drop: else sleep
         regs.r[1] = reinterpret_cast<int>(block);
-        regs.r[2] = int(Now() + 50);
+        regs.r[2] = int(Now() + (Installing ? 20 : 10)); // the progress, five times a second
         HandlerType game_handlers[Swapped_Count];
         Use_Default_Handlers(game_handlers);
         _kernel_oserror* error = _kernel_swi(ticking ? Wimp_PollIdle : Wimp_Poll, &regs, &regs);
@@ -1225,6 +1599,11 @@ void RISCOS_Desktop_Start(void)
     if (RISCOS_GetTaskHandle() == 0) {
         InGame = true;
         return;
+    }
+    std::string moved = Os_Variable(App_Variable("Moved"));
+    if (!moved.empty()) {
+        fprintf(stderr, "desktop: moved %s of game data from an earlier install into gamedata\n", moved.c_str());
+        Set_Os_Variable(App_Variable("Moved"), nullptr);
     }
     Create_Info_Window();
     Build_Menu();

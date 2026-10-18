@@ -64,11 +64,26 @@ To install them:
   2. Drag the ISO file(s) onto that icon: both discs at once, or one
      after the other.
 
-The game copies the data into !VanillaRA, so the ISO files can be on any
-disc, and can be deleted afterwards. It reads them directly: no CD drive
-or CDFS is needed. Meanwhile a window says which file it's on, and the
-desktop carries on as usual; each disc takes a few minutes. When it has
-finished, click the icon to play.
+When you drop a disc, the game says which one it is, how much space its
+game data and its movies (370 MB on the Allied disc, 415 MB on the Soviet one) need, and how much is free,
+and asks whether to install the game data only or the movies too.
+Without the movies the game simply skips them; drop the disc again later
+to add them. If there isn't room for the movies as well, it says how much
+more space they need; if there isn't room even for the game data, it says
+so and installs nothing.
+
+The game copies the data into the gamedata directory inside !VanillaRA,
+so the ISO files can be on any disc, and can be deleted afterwards. It
+reads them directly: no CD drive or CDFS is needed. Meanwhile a window
+shows which file it's copying and how far it has got, and the desktop
+carries on as usual; each disc takes a few minutes. When it has finished,
+the window says which discs are installed and which you can still add;
+click the icon to play.
+
+Deleting the gamedata directory uninstalls the game data: the game then
+asks for the CD images again. Your settings and saved games are kept
+elsewhere, in Choices. Data installed by an earlier version, straight
+into !VanillaRA, is moved into gamedata the next time the game starts.
 
 Each file is checked against a known checksum as it's copied. If
 anything goes wrong, a window lists what happened. A file that comes out
@@ -82,17 +97,16 @@ wrong one: a C&C95 or Tiberian Sun disc, for instance, goes on the
 
 Each time the game starts, it checks that its files are all there at the
 right sizes (it takes a moment). Until they are, clicking the icon says
-what's missing and opens this file, instead of starting the game.
+what's missing, instead of starting the game. Help on the icon's menu
+opens this file.
 *Set VanillaRA$NoDataCheck 1 skips that check, for game data from
 elsewhere.
 
-With the movies, each disc's data goes in its own folder (!VanillaRA.allied
-and !VanillaRA.soviet), and the game uses whichever it needs, as it would
-the CDs. To leave the movies out (370 MB on the Allied disc, 415 MB on the
-Soviet one), change the line "Set VanillaRA$NoMovies 0" in !VanillaRA.!Run
-to 1 before dragging the images: one 85 MB copy of the game data is
-written instead, the same from either disc, so one disc is then enough for
-both campaigns. Without movies the game simply skips them.
+With the movies, each disc's data goes in its own folder
+(gamedata.allied and gamedata.soviet), and the game uses whichever it
+needs, as it would the CDs. Without them, one 85 MB copy of the game data
+is written instead, the same from either disc, so one disc is then enough
+for both campaigns.
 
 From the command line, Utils.vcprep installs from images too, with
 -nomovies to leave out the movies and -force to rewrite files already

@@ -45,10 +45,12 @@ cp "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 # common/riscos_fs.h). REDALERT.MIX is the same on both discs; each disc's
 # MAIN.MIX goes in a folder named for it, where the game looks for it.
 RA="$WORK/ra"
-mkdir -p "$APP/MIX" "$APP/INI" "$APP/allied/MIX" "$APP/soviet/MIX"
-ln -f "$RA/CD1_ALLIES/INSTALL/REDALERT.MIX" "$APP/MIX/REDALERT"
-ln -f "$RA/CD1_ALLIES/MAIN.MIX" "$APP/allied/MIX/MAIN"
-ln -f "$RA/CD2_Soviet/MAIN.MIX" "$APP/soviet/MIX/MAIN"
+# The data goes in gamedata, as installing from the CD images puts it.
+DATA="$APP/gamedata"
+mkdir -p "$DATA/MIX" "$DATA/INI" "$DATA/allied/MIX" "$DATA/soviet/MIX"
+ln -f "$RA/CD1_ALLIES/INSTALL/REDALERT.MIX" "$DATA/MIX/REDALERT"
+ln -f "$RA/CD1_ALLIES/MAIN.MIX" "$DATA/allied/MIX/MAIN"
+ln -f "$RA/CD2_Soviet/MAIN.MIX" "$DATA/soviet/MIX/MAIN"
 
 # Every leaf name in the application must fit a 10 character filing system.
 too_long=$(cd "$APP" && find . -mindepth 1 | sed 's|,[0-9a-f][0-9a-f][0-9a-f]$||' | awk -F/ 'length($NF) > 10 {print}')

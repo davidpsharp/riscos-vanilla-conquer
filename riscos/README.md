@@ -154,9 +154,9 @@ The shared files are identical on both discs, so they're written once, and it ke
 The GDI and Nod CDs differ only in `GENERAL.MIX` (scenarios and briefings) and `MOVIES.MIX`. `prepare-td-data.sh <GDI.iso> --movies --nod <Nod.iso>` stores those per disc. `deploy-td.sh` then lays the app out like this:
 
 ```
-!VanillaTD.MIX.*               shared data (CONQUER, SCORES, SOUNDS, ...)
-!VanillaTD.gdi.MIX.GENERAL     GDI disc (plus .MOVIES)
-!VanillaTD.nod.MIX.GENERAL     Nod disc (plus .MOVIES)
+!VanillaTD.gamedata.MIX.*      shared data (CONQUER, SCORES, SOUNDS, ...)
+!VanillaTD.gamedata.gdi.MIX.GENERAL  GDI disc (plus .MOVIES)
+!VanillaTD.gamedata.nod.MIX.GENERAL  Nod disc (plus .MOVIES)
 ```
 
 The game picks `gdi` or `nod` according to the side being played (`Force_CD_Available`). `GENERAL` and `MOVIES` must not also be at the top level, or they would shadow the other side's copies.
@@ -172,17 +172,17 @@ The movies are about 430 MB per side and can be left out on small discs.
 `deploy-ra.sh` builds `!VanillaRA` (`build/riscos-ra`, `-DBUILD_VANILLARA=ON`) with `Utils.vcprep` and `Utils.ramix`, and lays it out in `../vcport-work/hostfs/!VanillaRA`, hard-linking the data from `../vcport-work/ra` (the Allied and Soviet discs extracted to `CD1_ALLIES` and `CD2_Soviet`):
 
 ```
-!VanillaRA.MIX.REDALERT          the same on both discs
-!VanillaRA.allied.MIX.MAIN       the Allied disc's MAIN.MIX (455 MB with movies)
-!VanillaRA.soviet.MIX.MAIN       the Soviet disc's (500 MB)
-!VanillaRA.MIX.MAIN              or instead: MAIN.MIX without movies (85 MB, the same from either disc)
+!VanillaRA.gamedata.MIX.REDALERT          the same on both discs
+!VanillaRA.gamedata.allied.MIX.MAIN       the Allied disc's MAIN.MIX (455 MB with movies)
+!VanillaRA.gamedata.soviet.MIX.MAIN       the Soviet disc's (500 MB)
+!VanillaRA.gamedata.MIX.MAIN              or instead: MAIN.MIX without movies (85 MB, the same from either disc)
 ```
 
 The game looks for a disc's files in `allied` or `soviet`, as it would ask for that CD. Without movies, one `MIX.MAIN` serves both campaigns.
 
 **Memory:** the game needs more than RISC OS 3.x's 28 MB WimpSlot limit, so `startup.cpp` gives UnixLib a dynamic area for the heap (`__dynamic_da_name`, "VanillaRA heap", up to 64 MB). `!Run` sets a 6000K slot. Allied 1 uses 32.7 MB of heap.
 
-**Prepare:** `vcprep` recognises a Red Alert disc image by its `MAIN.MIX` (Allied 454,605,294 bytes, Soviet 500,577,414) and `INSTALL/REDALERT.MIX`, and checks each by CRC-32. With movies it copies `MAIN.MIX` into `allied` or `soviet`. With `-nomovies` it runs `Utils.ramix copy <image>@<offset> <app>.MIX.MAIN MOVIES1.MIX MOVIES2.MIX`, which decrypts the mixfile index (RSA and Blowfish, with the game's public key) and writes a plain mixfile without the movies. The game reads plain mixfiles as well as encrypted ones. `Prepare` works with either app or both (`-app`, `-raapp`, `VanillaTD$Dir`, `VanillaRA$Dir`). **Tested:** on the Mac, and on RO 3.71 (RPCEmu, HostFS) with the Soviet image and `-nomovies`; the game then ran from the prepared app. The Pi 4's SD card lacked the space for a 660 MB image.
+**Prepare:** `vcprep` recognises a Red Alert disc image by its `MAIN.MIX` (Allied 454,605,294 bytes, Soviet 500,577,414) and `INSTALL/REDALERT.MIX`, and checks each by CRC-32. With movies it copies `MAIN.MIX` into `allied` or `soviet`. With `-nomovies` it runs `Utils.ramix copy <image>@<offset> <app>.gamedata.MIX.MAIN MOVIES1.MIX MOVIES2.MIX`, which decrypts the mixfile index (RSA and Blowfish, with the game's public key) and writes a plain mixfile without the movies. The game reads plain mixfiles as well as encrypted ones. `Prepare` works with either app or both (`-app`, `-raapp`, `VanillaTD$Dir`, `VanillaRA$Dir`). **Tested:** on the Mac, and on RO 3.71 (RPCEmu, HostFS) with the Soviet image and `-nomovies`; the game then ran from the prepared app. The Pi 4's SD card lacked the space for a 660 MB image.
 
 **Low resolution:** `REDALERT.MIX` has the DOS version's 320x200 graphics (`LORES.MIX`), so `VanillaRA$LowRes` / `-LOWRES` needs nothing extra. On the Risc PC, Allied 1 took 10.3 ms/frame rather than 24.9.
 
@@ -265,7 +265,7 @@ Hotkeys are stored in `[SDL1Hotkeys]`.
 RISC OS 3.x FileCore allows 10-character leaf names and silently truncates longer ones. UnixLib stores `TEMPICNH.MIX` as `TEMPICNH/MIX` (12 characters), which becomes `TEMPICNH/M`. So on RISC OS, `NAME.EXT` files are kept the traditional way, in an `EXT` directory:
 
 ```
-!VanillaTD.!Run            !VanillaTD.MIX.CONQUER     (CONQUER.MIX)
+!VanillaTD.!Run            !VanillaTD.gamedata.MIX.CONQUER (CONQUER.MIX)
 !VanillaTD.!RunImage       !VanillaTD.MIX.TEMPICNH    (TEMPICNH.MIX)
 !VanillaTD.INI.CONQUER     (CONQUER.INI)
 !VanillaTD.000.SAVEGAME    (SAVEGAME.000, created by the game)

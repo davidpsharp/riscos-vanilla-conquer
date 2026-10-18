@@ -9,22 +9,20 @@ RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad Sy
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaRA$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
 | The game data comes from the freeware CD images (ISO files), dragged onto the icon bar
-| icon. Utils.vcprep checks that every file is there at its size (no checksums, so it's
-| quick); without it, that MIX.REDALERT is. A problem goes in VanillaRA$DataProblem, and then a
-| click on the icon says how to install the data instead of starting the game.
-| VanillaRA$NoDataCheck skips the check.
+| icon, and goes in the gamedata directory here (deleting it uninstalls it). Utils.vcprep
+| moves data an earlier version installed straight into this directory into gamedata, then
+| checks that every file is there at its size (no checksums, so it's quick); without it, that
+| gamedata.MIX.REDALERT is. A problem goes in VanillaRA$DataProblem, and then a click on the icon
+| says how to install the data instead of starting the game. VanillaRA$NoDataCheck skips the
+| check.
 WimpSlot -min 1000K -max 1000K
 Set VanillaRA$Checker 0
 IfThere <VanillaRA$Dir>.Utils.vcprep Then Set VanillaRA$Checker 1
 Set VanillaRA$DataProblem MIX.REDALERT is missing
 If <VanillaRA$Checker>=1 Then Run <VanillaRA$Dir>.Utils.vcprep -check ra -raapp <VanillaRA$Dir>
-If <VanillaRA$Checker>=0 Then IfThere <VanillaRA$Dir>.MIX.REDALERT Then Unset VanillaRA$DataProblem
+If <VanillaRA$Checker>=0 Then IfThere <VanillaRA$Dir>.gamedata.MIX.REDALERT Then Unset VanillaRA$DataProblem
 Unset VanillaRA$Checker
 If "<VanillaRA$NoDataCheck>"<>"" Then Unset VanillaRA$DataProblem
-| Installing from CD images dragged onto the icon leaves out the movies (about 400 MB per
-| disc) if this is 1.
-Set VanillaRA$NoMovies 0
-If "<VanillaRA$NoMovies>"="0" Then Unset VanillaRA$NoMovies
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaRA$Dir>.Modules.DRenderer

@@ -51,6 +51,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #ifdef __riscos__
 #include <kernel.h>
@@ -129,84 +130,16 @@ static unsigned long Crc_Update(unsigned long crc, const unsigned char* buf, siz
     return crc ^ 0xFFFFFFFFUL;
 }
 
-/* ---- Known files ---- */
+#include "vcfiles.h"
 
-struct Known
-{
-    const char* name;  /* On the disc or in SETUP.Z. */
-    const char* dest;  /* Relative to the app dir; "@" is replaced by gdi or nod. */
-    unsigned long size;
-    unsigned long crc;
-};
-
-/* Plain files in the root of the disc, identical on both discs. */
-static const struct Known Disc_Files[] = {
-    {"AUD.MIX", "MIX" SEP "AUD", 1890646, 0x930cf805UL},
-    {"CONQUER.MIX", "MIX" SEP "CONQUER", 2039435, 0x1cf22830UL},
-    {"DESERT.MIX", "MIX" SEP "DESERT", 677061, 0x1f2f49f4UL},
-    {"SCORES.MIX", "MIX" SEP "SCORES", 39114329, 0xad4bd953UL},
-    {"SOUNDS.MIX", "MIX" SEP "SOUNDS", 1228794, 0xe4e52377UL},
-    {"TEMPERAT.MIX", "MIX" SEP "TEMPERAT", 639607, 0xa1112d4eUL},
-    {"WINTER.MIX", "MIX" SEP "WINTER", 667385, 0x4af93813UL},
-};
-
-/* Files in INSTALL/SETUP.Z (under C&C95\), identical on both discs. */
-static const struct Known Archive_Files[] = {
-    {"CCLOCAL.MIX", "MIX" SEP "CCLOCAL", 121305, 0xcc71829fUL},
-    {"DESEICNH.MIX", "MIX" SEP "DESEICNH", 120296, 0xfaab9715UL},
-    {"LOCAL.MIX", "MIX" SEP "LOCAL", 4, 0x8bc21544UL},
-    {"SPEECH.MIX", "MIX" SEP "SPEECH", 594297, 0x872fa2b3UL},
-    {"TEMPICNH.MIX", "MIX" SEP "TEMPICNH", 119935, 0x1772c942UL},
-    {"TRANSIT.MIX", "MIX" SEP "TRANSIT", 4105646, 0xce4d7722UL},
-    {"UPDATE.MIX", "MIX" SEP "UPDATE", 10233756, 0x025b22c8UL},
-    {"UPDATEC.MIX", "MIX" SEP "UPDATEC", 990901, 0x473893aeUL},
-    {"WINTICNH.MIX", "MIX" SEP "WINTICNH", 119935, 0xceb5e4f4UL},
-    {"CONQUER.INI", "INI" SEP "CONQUER", 310, 0x2fc12471UL},
-};
-
-/* The files that differ between the discs. */
-struct Side
-{
-    const char* dir;
-    struct Known general;
-    struct Known movies;
-};
-
-static const struct Side Sides[] = {
-    {"gdi",
-     {"GENERAL.MIX", "@" SEP "MIX" SEP "GENERAL", 2584388, 0xce92c64fUL},
-     {"MOVIES.MIX", "@" SEP "MIX" SEP "MOVIES", 449080410, 0xa907244fUL}},
-    {"nod",
-     {"GENERAL.MIX", "@" SEP "MIX" SEP "GENERAL", 2549589, 0xccee57e6UL},
-     {"MOVIES.MIX", "@" SEP "MIX" SEP "MOVIES", 432535694, 0x7b65d73cUL}},
-};
-
-/*
-** Red Alert (the 1996 Windows 95 discs, freeware since 2008). REDALERT.MIX is the
-** same on both; MAIN.MIX differs only in its movies. With movies, each disc's
-** MAIN.MIX goes in allied or soviet, where the game looks for a disc's files.
-** Without, a copy of MAIN.MIX leaving the movies out (85 MB, the same from either
-** disc) goes in MIX, made by Utils.ramix, which can decrypt its index.
-*/
-static const struct Known RA_Redalert = {"REDALERT.MIX", "MIX" SEP "REDALERT", 25046328, 0xd011d267UL};
-static const struct Known RA_No_Movies = {"MAIN.MIX", "MIX" SEP "MAIN", 85242860, 0x9820857bUL};
-
-struct RA_Disc
-{
-    const char* name;
-    struct Known main;
-};
-
-static const struct RA_Disc RA_Discs[] = {
-    {"Allied", {"MAIN.MIX", "allied" SEP "MIX" SEP "MAIN", 454605294, 0x07a47814UL}},
-    {"Soviet", {"MAIN.MIX", "soviet" SEP "MIX" SEP "MAIN", 500577414, 0x4d4140cbUL}},
-};
 
 /* ---- Options and state ---- */
 
-static const char* App_Dir;
-static const char* TD_Dir;
-static const char* RA_Dir;
+static const char* App_Dir;  /* where the data being installed or checked goes: TD_Dir or RA_Dir */
+static const char* TD_Dir;   /* !VanillaTD.gamedata */
+static const char* RA_Dir;   /* !VanillaRA.gamedata */
+static const char* TD_App;   /* !VanillaTD itself */
+static const char* RA_App;
 static const char* Side_Dir;
 static int Force = 0;
 static int Problems = 0;
@@ -216,18 +149,31 @@ static unsigned char Buffer[256 * 1024];
 
 static void Set_Var(const char* name, const char* value);
 
-/* In -window mode, says which file is being installed (and how far, for a big one). */
-static void Progress(const char* name, int percent)
+/*
+** In -window mode, says which file is being installed, how far it has got in per cent, and which
+** file of how many, for the game's window: "MIX.SCORES 45 3 18". Another program writing a file
+** (Utils.ramix) can't say how far it has got, so then the percentage is -1 and the variable also
+** gives the file's full size and where it's being written, for the game to watch it grow.
+*/
+static int Copying = 0, Copy_Count = 0;
+
+static void Progress(const struct Known* k, int percent)
 {
     char text[64];
     if (Progress_Var == NULL) {
         return;
     }
-    if (percent >= 0) {
-        snprintf(text, sizeof(text), "%s, %d%%", name, percent);
-    } else {
-        snprintf(text, sizeof(text), "%s", name);
+    snprintf(text, sizeof(text), "%s %d %d %d", k->name, percent, Copying, Copy_Count);
+    Set_Var(Progress_Var, text);
+}
+
+static void Progress_Growing(const struct Known* k, const char* path)
+{
+    char text[1200];
+    if (Progress_Var == NULL) {
+        return;
     }
+    snprintf(text, sizeof(text), "%s -1 %d %d %lu %s", k->name, Copying, Copy_Count, k->size, path);
     Set_Var(Progress_Var, text);
 }
 
@@ -254,11 +200,11 @@ static void Dest_Path(const struct Known* k, char* out, size_t outlen)
     }
 }
 
-/* Creates each directory along the path of a file. */
-static void Make_Dirs(const char* path)
+/* Creates each directory along the path of a file, below base (which must exist). */
+static void Make_Dirs_Below(const char* base, const char* path)
 {
     char dir[1024];
-    const char* p = path + strlen(App_Dir) + 1;
+    const char* p = path + strlen(base) + 1;
     while ((p = strstr(p, SEP)) != NULL) {
         size_t len = (size_t)(p - path);
         if (len >= sizeof(dir)) {
@@ -269,6 +215,11 @@ static void Make_Dirs(const char* path)
         mkdir(dir, 0755);
         p++;
     }
+}
+
+static void Make_Dirs(const char* path)
+{
+    Make_Dirs_Below(App_Dir, path);
 }
 
 static void Set_Type(const char* path, int type)
@@ -470,7 +421,7 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     struct Entry e;
     FILE* out;
     unsigned long left, crc = 0, done = 0, next_dot = 0;
-    int failed = 0;
+    int failed = 0, shown = 0;
 
     Dest_Path(k, path, sizeof(path));
     if (Already_Present(k, path)) {
@@ -484,7 +435,8 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     if (k->size > 100000000UL) {
         printf("  %-12s %lu MB, this takes a while\n", k->name, k->size >> 20);
     }
-    Progress(k->name, -1);
+    ++Copying;
+    Progress(k, 0);
 
     Make_Dirs(path);
     Temp_Path(path, temp, sizeof(temp));
@@ -510,13 +462,15 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
         crc = Crc_Update(crc, Buffer, chunk);
         left -= chunk;
         done += chunk;
-        if (e.size > 20000000UL && done >= next_dot) {
-            if (Progress_Var != NULL) {
-                Progress(k->name, (int)(done / (e.size / 100 + 1)));
-            } else {
-                printf("  %-12s %lu%%\r", k->name, (unsigned long)(done / (e.size / 100 + 1)));
-                fflush(stdout);
+        if (Progress_Var != NULL) {
+            int percent = (int)((double)done * 100 / e.size);
+            if (percent != shown) {
+                Progress(k, percent);
+                shown = percent;
             }
+        } else if (e.size > 20000000UL && done >= next_dot) {
+            printf("  %-12s %lu%%\r", k->name, (unsigned long)(done / (e.size / 100 + 1)));
+            fflush(stdout);
             next_dot = done + 10000000UL;
         }
     }
@@ -531,6 +485,8 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
 
 struct Blast_Io
 {
+    const struct Known* known; /* the file being unpacked, for the progress */
+    int shown;
     const struct Entry* in;  /* SETUP.Z */
     unsigned long in_pos;    /* where the next read comes from, in it */
     unsigned long in_left;
@@ -564,6 +520,13 @@ static int Blast_Out(void* how, unsigned char* buf, unsigned len)
     if (fwrite(buf, 1, len, io->out) != len) {
         io->write_error = 1;
         return 1;
+    }
+    if (io->known != NULL && io->known->size > 0) {
+        int percent = (int)((double)io->out_size * 100 / io->known->size);
+        if (percent != io->shown && percent <= 100) {
+            Progress(io->known, percent);
+            io->shown = percent;
+        }
     }
     return 0;
 }
@@ -650,7 +613,8 @@ static void Extract_Archive(const struct Entry* root)
                     }
 
                     Make_Dirs(path);
-                    Progress(kn->name, -1);
+                    ++Copying;
+                    Progress(kn, 0);
                     Temp_Path(path, temp, sizeof(temp));
                     out = fopen(temp, "wb");
                     if (out == NULL) {
@@ -659,6 +623,7 @@ static void Extract_Archive(const struct Entry* root)
                         continue;
                     }
                     memset(&io, 0, sizeof(io));
+                    io.known = kn;
                     io.in = &setup;
                     io.in_pos = base + offset;
                     io.in_left = csize;
@@ -686,7 +651,7 @@ static void Extract_Archive(const struct Entry* root)
                            io.out_size,
                            io.crc,
                            failed,
-                           strcmp(kn->name, "CONQUER.INI") == 0 ? FILETYPE_TEXT : FILETYPE_DATA);
+                           FILETYPE_DATA); /* the INI too: every installed file is Data */
                 }
             }
         }
@@ -742,6 +707,7 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
         return 0;
     }
     App_Dir = RA_Dir;
+    mkdir(App_Dir, 0755); /* gamedata, the first time */
     printf("%s: Red Alert %s disc, installing into %s\n", iso_name, disc->name, App_Dir);
     Remove_Temp(&RA_Redalert);
     Remove_Temp(&RA_No_Movies);
@@ -760,10 +726,12 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
             Make_Dirs(path);
             printf("  %-12s without its movies (-nomovies)\n", RA_No_Movies.name);
             fflush(stdout);
+            ++Copying;
+            Progress_Growing(&RA_No_Movies, temp);
             snprintf(command,
                      sizeof(command),
                      "%s" SEP "Utils" SEP "ramix copy %s@%ld %s MOVIES1.MIX MOVIES2.MIX",
-                     App_Dir,
+                     RA_App,
                      iso_name,
                      Source_Offset(main_mix),
                      temp);
@@ -838,6 +806,7 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
     }
     Side_Dir = side->dir;
     App_Dir = TD_Dir;
+    mkdir(App_Dir, 0755); /* gamedata, the first time */
     printf("%s: %s disc, installing into %s\n", iso_name, strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
 
     for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
@@ -1059,9 +1028,133 @@ static char* Read_Var(const char* name)
 
 static void Set_Var(const char* name, const char* value)
 {
-    printf("%s: %s\n", name, value != NULL ? value : "(unset)");
+    fprintf(stderr, "%s: %s\n", name, value != NULL ? value : "(unset)"); /* not held back */
 }
 #endif
+
+/* A known file's path below base, with the disc's directory for "@". */
+static void Known_Path(const char* base, const struct Known* k, const char* side, char* out, size_t outlen)
+{
+    if (k->dest[0] == '@') {
+        snprintf(out, outlen, "%s" SEP "%s%s", base, side, k->dest + 1);
+    } else {
+        snprintf(out, outlen, "%s" SEP "%s", base, k->dest);
+    }
+}
+
+/*
+** Data installed by an earlier version went straight into the application directory; it moves
+** into gamedata, file by file and only where gamedata hasn't one of its own: renamed, so nothing
+** is copied and it takes no time, and if it's stopped part-way the next run carries on. The
+** directories left empty are removed. The number moved goes in <App>$Moved, for the game's log.
+*/
+static int Moved = 0;
+
+static void Migrate_One(const char* app, const char* data, const struct Known* k, const char* side)
+{
+    char from[1024], to[1024];
+    Known_Path(app, k, side, from, sizeof(from));
+    Known_Path(data, k, side, to, sizeof(to));
+    if (File_Size(from) < 0 || File_Size(to) >= 0) {
+        return;
+    }
+    mkdir(data, 0755);
+    Make_Dirs_Below(data, to);
+    if (rename(from, to) == 0) {
+        Set_Type(to, FILETYPE_DATA);
+        ++Moved;
+    }
+}
+
+static void Migrate(int td)
+{
+    const char* app = td ? TD_App : RA_App;
+    const char* data = td ? TD_Dir : RA_Dir;
+    static const char* const td_dirs[] = {"gdi" SEP "MIX", "gdi", "nod" SEP "MIX", "nod", "INI", "MIX"};
+    static const char* const ra_dirs[] = {"allied" SEP "MIX", "allied", "soviet" SEP "MIX", "soviet", "MIX"};
+    char path[1024], text[32];
+    size_t k;
+    if (app == NULL) {
+        return;
+    }
+    if (td) {
+        for (k = 0; k < DISC_FILES_COUNT; ++k) {
+            Migrate_One(app, data, &Disc_Files[k], "");
+        }
+        for (k = 0; k < ARCHIVE_FILES_COUNT; ++k) {
+            Migrate_One(app, data, &Archive_Files[k], "");
+        }
+        for (k = 0; k < SIDES_COUNT; ++k) {
+            Migrate_One(app, data, &Sides[k].general, Sides[k].dir);
+            Migrate_One(app, data, &Sides[k].movies, Sides[k].dir);
+        }
+    } else {
+        Migrate_One(app, data, &RA_Redalert, "");
+        Migrate_One(app, data, &RA_No_Movies, "");
+        for (k = 0; k < RA_DISCS_COUNT; ++k) {
+            Migrate_One(app, data, &RA_Discs[k].main, "");
+        }
+    }
+    if (Moved == 0) {
+        return;
+    }
+    for (k = 0; k < (td ? sizeof(td_dirs) : sizeof(ra_dirs)) / sizeof(td_dirs[0]); ++k) {
+        snprintf(path, sizeof(path), "%s" SEP "%s", app, td ? td_dirs[k] : ra_dirs[k]);
+        rmdir(path); /* only if it's empty */
+    }
+    snprintf(text, sizeof(text), "%d files", Moved);
+    Set_Var(td ? "VanillaTD$Moved" : "VanillaRA$Moved", text);
+}
+
+/* How many files installing these images will copy, for the progress ("file 3 of 18"): those
+** not there yet, each once (both C&C95 discs hold the shared files; the second is skipped). */
+static int Plan_Count(const char** images, int num_images, int movies)
+{
+    static char planned[64][1024];
+    int count = 0, i;
+    size_t k;
+    for (i = 0; i < num_images; ++i) {
+        int cut = 0;
+        char volume[40];
+        int d = Disc_Identify(images[i], &cut, volume, sizeof(volume));
+        const struct Known* files[32];
+        const char* sides[32];
+        int n = 0, j, m;
+        if (d < 0) {
+            continue;
+        }
+        if (strcmp(Disc_Types[d].id, "td-gdi") == 0 || strcmp(Disc_Types[d].id, "td-nod") == 0) {
+            const struct Side* side = &Sides[strcmp(Disc_Types[d].id, "td-gdi") == 0 ? 0 : 1];
+            if (TD_Dir == NULL) continue;
+            for (k = 0; k < DISC_FILES_COUNT; ++k) { files[n] = &Disc_Files[k]; sides[n++] = ""; }
+            for (k = 0; k < ARCHIVE_FILES_COUNT; ++k) { files[n] = &Archive_Files[k]; sides[n++] = ""; }
+            files[n] = &side->general; sides[n++] = side->dir;
+            if (movies) { files[n] = &side->movies; sides[n++] = side->dir; }
+        } else if (strcmp(Disc_Types[d].id, "ra-allied") == 0 || strcmp(Disc_Types[d].id, "ra-soviet") == 0) {
+            if (RA_Dir == NULL) continue;
+            files[n] = &RA_Redalert; sides[n++] = "";
+            files[n] = movies ? &RA_Discs[strcmp(Disc_Types[d].id, "ra-allied") == 0 ? 0 : 1].main : &RA_No_Movies;
+            sides[n++] = "";
+        }
+        for (j = 0; j < n; ++j) {
+            char path[1024];
+            int dup = 0;
+            long size;
+            Known_Path(strncmp(Disc_Types[d].id, "td", 2) == 0 ? TD_Dir : RA_Dir, files[j], sides[j], path, sizeof(path));
+            size = File_Size(path);
+            if (strcmp(files[j]->name, "CONQUER.INI") == 0 ? size >= 0 : (!Force && size == (long)files[j]->size)) {
+                continue;
+            }
+            for (m = 0; m < count; ++m) {
+                dup |= strcmp(planned[m], path) == 0;
+            }
+            if (!dup && count < 64) {
+                snprintf(planned[count++], sizeof(planned[0]), "%s", path);
+            }
+        }
+    }
+    return count;
+}
 
 /* -identify: which disc a file is. */
 static int Identify(const char* path)
@@ -1103,6 +1196,7 @@ static int Window_Install(const char** images, int num_images, int movies)
     Set_Var("RAMix$Quiet", "1"); /* Utils.ramix prints nothing either */
     Holding = 1;
     Crc_Init();
+    Copy_Count = Plan_Count(images, num_images, movies);
     printf("Installing the game data.\n\n");
     for (i = 0; i < num_images; ++i) {
         if (Install_From(images[i], movies, 0) == 0 && Problems == 0) {
@@ -1182,13 +1276,22 @@ int main(int argc, char** argv)
     if (RA_Dir == NULL) {
         RA_Dir = getenv("VanillaRA$Dir");
     }
-    TD_Dir = TD_Dir != NULL && *TD_Dir != '\0' ? Canonical(TD_Dir) : NULL;
-    RA_Dir = RA_Dir != NULL && *RA_Dir != '\0' ? Canonical(RA_Dir) : NULL;
+    TD_App = TD_Dir != NULL && *TD_Dir != '\0' ? Canonical(TD_Dir) : NULL;
+    RA_App = RA_Dir != NULL && *RA_Dir != '\0' ? Canonical(RA_Dir) : NULL;
+    /* The data goes in gamedata inside each application. */
+    {
+        static char td[1024], ra[1024];
+        snprintf(td, sizeof(td), "%s" SEP "gamedata", TD_App != NULL ? TD_App : "");
+        snprintf(ra, sizeof(ra), "%s" SEP "gamedata", RA_App != NULL ? RA_App : "");
+        TD_Dir = TD_App != NULL ? td : NULL;
+        RA_Dir = RA_App != NULL ? ra : NULL;
+    }
     if (check != NULL) {
         int td = strcmp(check, "td") == 0;
         if ((!td && strcmp(check, "ra") != 0) || (td ? TD_Dir : RA_Dir) == NULL) {
             return Usage();
         }
+        Migrate(td);
         if (td) {
             Check_TD();
         } else {
@@ -1213,6 +1316,10 @@ int main(int argc, char** argv)
     }
     if ((TD_Dir == NULL && RA_Dir == NULL) || (num_images == 0 && search == NULL)) {
         return Usage();
+    }
+    Migrate(TD_App != NULL);
+    if (RA_App != NULL && TD_App != NULL) {
+        Migrate(0);
     }
     if (window) {
         return Window_Install(images, num_images, movies);

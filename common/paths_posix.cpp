@@ -203,15 +203,18 @@ const char* PathsClass::Data_Path()
         }
 
 #if defined(__riscos__)
-        // Game data lives inside the application directory.
-        DataPath = ProgramPath;
+        // Game data lives in the gamedata directory inside the application, installed there from
+        // the CD images by Utils.vcprep; deleting it uninstalls it.
+        // (Not with the suffix, which is for the system-wide data directories elsewhere. Paths.Init
+        // still uses the application directory itself if the data is there, as it once was.)
+        DataPath = ProgramPath + SEP + "gamedata";
 #else
         DataPath = ProgramPath.substr(0, ProgramPath.find_last_of("/")) + SEP + "share";
-#endif
 
         if (!Suffix.empty()) {
             DataPath += SEP + Suffix;
         }
+#endif
     }
 
     return DataPath.c_str();

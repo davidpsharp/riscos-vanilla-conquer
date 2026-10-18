@@ -45,7 +45,9 @@ cp "$WORK/hostfs/modules/SharedULib,ffa" "$APP/Modules/"
 cp "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 # Lay the data out as RISC OS 3.x FileCore needs it: leaf names of at most
 # 10 characters, with NAME.EXT stored as EXT.NAME (see common/riscos_fs.h).
-mkdir -p "$APP/MIX" "$APP/INI"
+# The data goes in gamedata, as installing from the CD images puts it.
+DATA="$APP/gamedata"
+mkdir -p "$DATA/MIX" "$DATA/INI"
 HAVE_DISCS=
 [ -d "$WORK/tddata/cd" ] && HAVE_DISCS=1
 for f in "$WORK"/tddata/*.MIX; do
@@ -54,25 +56,25 @@ for f in "$WORK"/tddata/*.MIX; do
     # With per-disc data, GENERAL and MOVIES come from the gdi/nod directories
     # only, or the top-level copies would shadow the other side's.
     if [ -n "$HAVE_DISCS" ] && { [ "$name" = GENERAL ] || [ "$name" = MOVIES ]; }; then
-        rm -f "$APP/MIX/$name"
+        rm -f "$DATA/MIX/$name"
         continue
     fi
-    ln -f "$f" "$APP/MIX/$name"
+    ln -f "$f" "$DATA/MIX/$name"
 done
 if [ -n "$HAVE_DISCS" ]; then
     for disc in "$WORK"/tddata/cd/*; do
         side=$(basename "$disc")
-        mkdir -p "$APP/$side/MIX"
+        mkdir -p "$DATA/$side/MIX"
         for f in "$disc"/*.MIX; do
-            ln -f "$f" "$APP/$side/MIX/$(basename "$f" .MIX)"
+            ln -f "$f" "$DATA/$side/MIX/$(basename "$f" .MIX)"
         done
     done
 fi
-if [ ! -f "$APP/INI/CONQUER" ]; then
+if [ ! -f "$DATA/INI/CONQUER" ]; then
     if [ -f "$APP/CONQUER.INI" ]; then
-        mv "$APP/CONQUER.INI" "$APP/INI/CONQUER"
+        mv "$APP/CONQUER.INI" "$DATA/INI/CONQUER"
     else
-        cp "$WORK/tddata/CONQUER.INI" "$APP/INI/CONQUER"
+        cp "$WORK/tddata/CONQUER.INI" "$DATA/INI/CONQUER"
     fi
 fi
 
