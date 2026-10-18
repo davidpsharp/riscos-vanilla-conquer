@@ -1,6 +1,12 @@
 | !Run for Vanilla Conquer: Red Alert
 Set VanillaRA$Dir <Obey$Dir>
 IconSprites <VanillaRA$Dir>.!Sprites
+| The game data comes from the original CD images (ISO files), installed by Prepare.
+| Without it, open !Help, which says where to get them and how, and stop.
+Set VanillaRA$NoData 1
+IfThere <VanillaRA$Dir>.MIX.REDALERT Then Set VanillaRA$NoData 0
+If "<VanillaRA$NoData>"="1" Then Filer_Run <VanillaRA$Dir>.!Help
+If "<VanillaRA$NoData>"="1" Then Error Red Alert's game data isn't installed. It comes from the freeware Red Alert CD images (ISO files): !Help, now open, says where to get them and how to install them with Prepare.
 | Low resolution: 1 runs the game at 320x200 (the DOS version's size), about twice
 | as fast, for slower machines; 0 runs it at 640x400. It uses the game's own 320x200
 | graphics, with less of the map on screen and a smaller sidebar.
