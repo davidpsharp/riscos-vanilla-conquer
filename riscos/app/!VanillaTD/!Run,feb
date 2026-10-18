@@ -8,10 +8,11 @@ Set VanillaTD$LowRes 0
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaTD$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
-| The game data comes from the original CD images (ISO files), installed by Prepare.
-| Utils.vcprep checks that every file is there at its size (no checksums, so it's quick);
-| without it, that MIX.CONQUER is. If anything is wrong, open !Help, which says where to get
-| the images and how to install them, and stop. VanillaTD$NoDataCheck skips the check.
+| The game data comes from the freeware CD images (ISO files), dragged onto the icon bar
+| icon. Utils.vcprep checks that every file is there at its size (no checksums, so it's
+| quick); without it, that MIX.CONQUER is. A problem goes in VanillaTD$DataProblem, and then a
+| click on the icon says how to install the data instead of starting the game.
+| VanillaTD$NoDataCheck skips the check.
 WimpSlot -min 1000K -max 1000K
 Set VanillaTD$Checker 0
 IfThere <VanillaTD$Dir>.Utils.vcprep Then Set VanillaTD$Checker 1
@@ -20,8 +21,10 @@ If <VanillaTD$Checker>=1 Then Run <VanillaTD$Dir>.Utils.vcprep -check td -app <V
 If <VanillaTD$Checker>=0 Then IfThere <VanillaTD$Dir>.MIX.CONQUER Then Unset VanillaTD$DataProblem
 Unset VanillaTD$Checker
 If "<VanillaTD$NoDataCheck>"<>"" Then Unset VanillaTD$DataProblem
-If "<VanillaTD$DataProblem>"<>"" Then Filer_Run <VanillaTD$Dir>.!Help
-If "<VanillaTD$DataProblem>"<>"" Then Error Tiberian Dawn's game data isn't installed, or is incomplete (<VanillaTD$DataProblem>). !Help, now open, says where to get the freeware C&C95 CD images (ISO files) and how to install them with Prepare.
+| Installing from CD images dragged onto the icon leaves out the movies (about 400 MB per
+| disc) if this is 1.
+Set VanillaTD$NoMovies 0
+If "<VanillaTD$NoMovies>"="0" Then Unset VanillaTD$NoMovies
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaTD$Dir>.Modules.DRenderer

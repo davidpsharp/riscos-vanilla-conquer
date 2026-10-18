@@ -12,12 +12,23 @@
 ** Between them, "Screen size" leads to the sizes the game can use on this monitor. At the start
 ** a choice is only saved, as the game reads it after the click; once the game is running the
 ** screen can't change size under it, so a different size restarts the game, after asking.
+** "Help" opens !Help.
+**
+** The game data comes from the freeware CD images (ISO files), dragged onto the icon. !Run checks
+** the installed files (Utils.vcprep -check) and leaves any problem in <App>$DataProblem; while
+** there is one, a click on the icon says how to install the data and opens !Help, instead of
+** starting the game. A dragged file is identified here from its directory (discid.h): this game's
+** disc is installed by Utils.vcprep in a task window, which closes by itself when all went well;
+** another game's disc, an MS-DOS one, a cut-short image or something else is turned away, saying
+** why. The paths the game set up at the start were for an app without its data, so once it is
+** installed a click restarts the game rather than going on.
 */
 #ifdef __riscos__
 
 #include "riscos_desktop.h"
 #include "riscos_autosize.h"
 #include "ccfile.h"
+#include "../riscos/tools/vcprep/discid.h"
 #include "gitinfo.h"
 #include "ini.h"
 #include "mixer_sdl1.h"
@@ -32,6 +43,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 // SDL's RISC OS port, which keeps the task and the desktop's mode.
 extern "C" int RISCOS_GetTaskHandle(void);
@@ -199,6 +211,34 @@ static std::string App_Variable(const char* name)
     return std::string(App.prefix) + "$" + name;
 }
 
+// A system variable's value ("" if unset), read from the OS: not every one reaches getenv.
+static std::string Os_Variable(const std::string& name)
+{
+    char buf[512];
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(name.c_str());
+    regs.r[1] = reinterpret_cast<int>(buf);
+    regs.r[2] = sizeof(buf) - 1;
+    regs.r[3] = 0;
+    regs.r[4] = 3; // expanded to a string
+    if (_kernel_swi(OS_ReadVarVal, &regs, &regs) != nullptr) {
+        return "";
+    }
+    buf[regs.r[2]] = '\0';
+    return buf;
+}
+
+static void Set_Os_Variable(const std::string& name, const char* value)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(name.c_str());
+    regs.r[1] = reinterpret_cast<int>(value);
+    regs.r[2] = value != nullptr ? int(strlen(value)) : -1; // -1 deletes it
+    regs.r[3] = 0;
+    regs.r[4] = 4; // literal: the value isn't GSTrans'd
+    _kernel_swi(OS_SetVarVal, &regs, &regs);
+}
+
 const std::string& RISCOS_Desktop_Auto_Resolution(void)
 {
     return RISCOS_Auto_Resolution(App.ini);
@@ -281,7 +321,7 @@ template <int N> struct MenuBlock
     MenuItem items[N];
 };
 
-static MenuBlock<3> Menu;
+static MenuBlock<4> Menu;
 static MenuBlock<MaxSizes> SizeMenu;
 static std::string SizeChoices[MaxSizes];
 static char SizeText[MaxSizes][32];
@@ -414,16 +454,25 @@ static void Build_Size_Menu(void)
 }
 
 /*
-** The icon bar menu: Info (leading to the Info window), Screen size and Quit.
+** The icon bar menu: Info (leading to the Info window), Help, Screen size and Quit.
 */
+enum
+{
+    MenuInfo,
+    MenuHelp,
+    MenuSize,
+    MenuQuit,
+};
+
 static void Build_Menu(void)
 {
     memset(&Menu, 0, sizeof(Menu));
     Menu_Header(Menu.title, Menu.colours, Menu.width, Menu.height, Menu.gap, App.name);
-    Plain_Item(Menu.items[0], "Info", InfoWindow);
-    Plain_Item(Menu.items[1], "Screen size", reinterpret_cast<int>(&SizeMenu));
-    Plain_Item(Menu.items[2], "Quit", -1);
-    Menu.items[2].flags = ItemLast;
+    Plain_Item(Menu.items[MenuInfo], "Info", InfoWindow);
+    Plain_Item(Menu.items[MenuHelp], "Help", -1);
+    Plain_Item(Menu.items[MenuSize], "Screen size", reinterpret_cast<int>(&SizeMenu));
+    Plain_Item(Menu.items[MenuQuit], "Quit", -1);
+    Menu.items[MenuQuit].flags = ItemLast;
     int width = (int(strlen("Screen size")) + 3) * 16; // and the submenu arrow
     if (width > Menu.width) {
         Menu.width = width;
@@ -437,7 +486,7 @@ static void Open_Menu(int mouse_x)
     _kernel_swi_regs regs;
     regs.r[1] = reinterpret_cast<int>(&Menu);
     regs.r[2] = mouse_x - 64;
-    regs.r[3] = 96 + 3 * 44; // an icon bar menu sits just above the icon bar
+    regs.r[3] = 96 + 4 * 44; // an icon bar menu sits just above the icon bar
     Swi(Wimp_CreateMenu, regs);
 }
 
@@ -495,54 +544,6 @@ static void Restart_Game(void)
     Quit_Game();
 }
 
-// Asks before restarting for a new screen size: true for Restart.
-static bool Ask_Restart(void)
-{
-    struct
-    {
-        int number;
-        char message[252];
-    } error;
-    error.number = 0;
-    snprintf(error.message, sizeof(error.message),
-             "Changing the screen size restarts the game, and the game in progress will be lost. "
-             "Save it first if you want to keep it.");
-    _kernel_swi_regs regs;
-    regs.r[0] = reinterpret_cast<int>(&error);
-    regs.r[1] = 2 | (1 << 8) | (4 << 9); // Cancel, new style, a question
-    regs.r[2] = reinterpret_cast<int>(App.name);
-    regs.r[3] = reinterpret_cast<int>(App.sprite);
-    regs.r[4] = 1; // the Wimp's sprite area
-    regs.r[5] = reinterpret_cast<int>("Restart");
-    if (!Swi(Wimp_ReportError, regs)) {
-        return false;
-    }
-    return regs.r[1] == 3; // the first extra button
-}
-
-// A size chosen from the menu: saved at the start; once in the game, a restart if it differs.
-static void Choose_Size(int index)
-{
-    if (index < 0 || index >= SizeCount || ForcedLowRes || Low_Res_Variable()) {
-        return;
-    }
-    const std::string& choice = SizeChoices[index];
-    if (!InGame) {
-        Save_Choice(choice);
-        return;
-    }
-    int w, h;
-    Choice_Size(choice, w, h);
-    if (w == ScreenW && h == ScreenH) {
-        Save_Choice(choice); // the same screen, e.g. the default chosen by its size
-        return;
-    }
-    if (Ask_Restart()) {
-        Save_Choice(choice);
-        Restart_Game();
-    }
-}
-
 /*
 ** While the game waits on the desktop its memory is paged out, but the handlers UnixLib
 ** installed stay. An error raised by another task (seen: the Filer's) or an enabled event (a key
@@ -594,6 +595,493 @@ static void Use_Game_Handlers(const HandlerType saved[])
 }
 
 /*
+** Messages go in a small window of the game's own rather than Wimp_ReportError. An error box opened
+** by the game while it waited on the desktop left the desktop unredrawn after it closed (the box
+** stayed on the screen and the icon bar went blank), on RISC OS 4.39 and 5.30 alike and even once
+** the game had quit; a BASIC task's boxes were fine. A window also leaves the desktop working,
+** which suits an install running meanwhile. Return picks the first button, Escape the last.
+*/
+enum MessageAction
+{
+    ActionNone,
+    ActionRestart, // the first button saves PendingChoice as the screen size and restarts
+};
+
+static const int MessageWidth = 1040;
+static const int MaxLines = 9;
+static int MessageWindow = -1;
+static int MessageButtons = 0;   // icons 0 .. MessageButtons - 1
+static MessageAction PendingAction = ActionNone;
+static std::string PendingChoice;
+static char MessageLines[MaxLines][100];
+static char ButtonText[2][20];
+static char SpriteName[16];
+static int ProgressIcon = -1; // the line that shows how an install is going, or -1
+
+static void Close_Message(void)
+{
+    if (MessageWindow < 0) {
+        return;
+    }
+    int block[1] = {MessageWindow};
+    _kernel_swi_regs regs;
+    regs.r[1] = reinterpret_cast<int>(block);
+    Swi(Wimp_DeleteWindow, regs);
+    MessageWindow = -1;
+}
+
+// Splits text into lines of at most width characters, at spaces.
+static int Wrap(const std::string& text, size_t width)
+{
+    int lines = 0;
+    size_t pos = 0;
+    while (pos < text.size() && lines < MaxLines) {
+        size_t end = text.size();
+        if (end - pos > width) {
+            end = text.rfind(' ', pos + width);
+            if (end == std::string::npos || end <= pos) {
+                end = pos + width;
+            }
+        }
+        snprintf(MessageLines[lines++], sizeof(MessageLines[0]), "%s", text.substr(pos, end - pos).c_str());
+        pos = end;
+        while (pos < text.size() && text[pos] == ' ') {
+            pos++;
+        }
+    }
+    return lines;
+}
+
+static bool Wimp_Has_Sprite(const char* name)
+{
+    _kernel_swi_regs regs;
+    regs.r[0] = 40; // read sprite information
+    regs.r[2] = reinterpret_cast<int>(name);
+    return _kernel_swi(Wimp_SpriteOp, &regs, &regs) == nullptr;
+}
+
+/*
+** Opens the message window, in the middle of the screen and in front: the text, the Wimp's
+** "error" or "information" sprite if it has one, and one or two buttons (the first is the default).
+*/
+static void Show_Message(const std::string& text, bool error, const char* first, const char* second,
+                         bool progress = false)
+{
+    Close_Message();
+    fprintf(stderr, "desktop: message: %s\n", text.c_str());
+    int lines = Wrap(text, 54);
+    ProgressIcon = -1;
+    if (progress && lines < MaxLines) {
+        MessageLines[lines++][0] = '\0'; // filled in by Show_Progress
+    }
+    snprintf(SpriteName, sizeof(SpriteName), "%s", error ? "error" : "information");
+    bool sprite = Wimp_Has_Sprite(SpriteName);
+    int text_x = sprite ? 128 : 32;
+    int buttons_y = -(32 + 44 * (lines > 2 ? lines : 2) + 28);
+    int height = -buttons_y + 68 + 28;
+
+    static struct
+    {
+        int visible[4];
+        int scroll[2];
+        int behind;
+        unsigned flags;
+        unsigned char colours[8];
+        int extent[4];
+        unsigned title_flags;
+        unsigned button_type;
+        int sprite_area;
+        short min_w, min_h;
+        struct
+        {
+            const char* buffer;
+            const char* validation;
+            int length;
+        } title;
+        int icon_count;
+        Icon icons[3 + MaxLines];
+    } block;
+    memset(&block, 0, sizeof(block));
+    block.behind = -1;
+    block.flags = 0x84000012; // moveable, auto-redraw, title bar, new format; kept on the screen
+    const unsigned char colours[8] = {7, 2, 7, 1, 12, 14, 12, 0};
+    memcpy(block.colours, colours, sizeof(colours));
+    block.extent[1] = -height;
+    block.extent[2] = MessageWidth;
+    block.title_flags = 0x0000013D;
+    block.sprite_area = 1;
+    block.title.buffer = App.name;
+    block.title.validation = reinterpret_cast<const char*>(-1);
+    block.title.length = int(strlen(App.name)) + 1;
+
+    int n = 0;
+    snprintf(ButtonText[0], sizeof(ButtonText[0]), "%s", first);
+    snprintf(ButtonText[1], sizeof(ButtonText[1]), "%s", second != nullptr ? second : "");
+    MessageButtons = second != nullptr ? 2 : 1;
+    static const char default_valid[] = "R6,3";
+    static const char action_valid[] = "R5,3";
+    for (int i = 0; i < MessageButtons; i++) {
+        int x1 = MessageWidth - 32 - (MessageButtons - 1 - i) * 232;
+        Indirected(block.icons[n++], x1 - 216, buttons_y - 68, x1, buttons_y, 0x1700313D, ButtonText[i],
+                   i == 0 ? default_valid : action_valid);
+    }
+    for (int i = 0; i < lines; i++) {
+        int top = -32 - 44 * i;
+        if (progress && i == lines - 1) {
+            ProgressIcon = n;
+        }
+        Indirected(block.icons[n++], text_x, top - 44, MessageWidth - 32, top, 0x07000111, MessageLines[i],
+                   reinterpret_cast<const char*>(-1));
+        block.icons[n - 1].data.ind.length = sizeof(MessageLines[i]);
+    }
+    if (sprite) {
+        Indirected(block.icons[n++], 32, -32 - 76, 32 + 76, -32, 0x1700011A, SpriteName,
+                   reinterpret_cast<const char*>(1)); // sprite name, in the Wimp's pool
+        block.icons[n - 1].data.ind.length = int(strlen(SpriteName)) + 1;
+    }
+    block.icon_count = n;
+
+    _kernel_swi_regs regs;
+    regs.r[1] = reinterpret_cast<int>(&block);
+    if (!Swi(Wimp_CreateWindow, regs)) {
+        return;
+    }
+    MessageWindow = regs.r[0];
+
+    // In the middle of the screen, in front, with the (invisible) caret so it gets the keys.
+    int size[4];
+    static const int vars[] = {4, 5, 11, 12, -1};
+    regs.r[0] = reinterpret_cast<int>(vars);
+    regs.r[1] = reinterpret_cast<int>(size);
+    int screen_w = 1600, screen_h = 1200;
+    if (_kernel_swi(OS_ReadVduVariables, &regs, &regs) == nullptr) {
+        screen_w = (size[2] + 1) << size[0];
+        screen_h = (size[3] + 1) << size[1];
+    }
+    int open[8];
+    open[0] = MessageWindow;
+    open[1] = (screen_w - MessageWidth) / 2;
+    open[2] = (screen_h - height) / 2;
+    open[3] = open[1] + MessageWidth;
+    open[4] = open[2] + height;
+    open[5] = 0;
+    open[6] = 0;
+    open[7] = -1;
+    regs.r[1] = reinterpret_cast<int>(open);
+    Swi(Wimp_OpenWindow, regs);
+    regs.r[0] = MessageWindow;
+    regs.r[1] = -1;
+    regs.r[2] = 0;
+    regs.r[3] = 0;
+    regs.r[4] = 1 << 25; // invisible
+    regs.r[5] = -1;
+    Swi(Wimp_SetCaretPosition, regs);
+}
+
+// Shows how the install is going on the message window's progress line, if it's open.
+static void Show_Progress(const std::string& text)
+{
+    if (MessageWindow < 0 || ProgressIcon < 0) {
+        return;
+    }
+    // The icon's own buffer is one of MessageLines: change it, then have the icon redrawn.
+    struct
+    {
+        int window, icon;
+        Icon info;
+    } state;
+    state.window = MessageWindow;
+    state.icon = ProgressIcon;
+    _kernel_swi_regs regs;
+    regs.r[1] = reinterpret_cast<int>(&state);
+    if (!Swi(Wimp_GetIconState, regs)) {
+        return;
+    }
+    char* buffer = const_cast<char*>(state.info.data.ind.buffer);
+    if (strcmp(buffer, text.c_str()) == 0) {
+        return;
+    }
+    snprintf(buffer, sizeof(MessageLines[0]), "%s", text.c_str());
+    int set[4] = {MessageWindow, ProgressIcon, 0, 0}; // no change to its flags: just redraw it
+    regs.r[1] = reinterpret_cast<int>(set);
+    Swi(Wimp_SetIconState, regs);
+}
+
+// A button of the message window (0 the first), or Escape or its close icon (the last).
+static void Message_Choice(int button)
+{
+    Close_Message();
+    MessageAction action = PendingAction;
+    PendingAction = ActionNone;
+    if (action == ActionRestart && button == 0) {
+        Save_Choice(PendingChoice);
+        Restart_Game();
+    }
+}
+
+// A message with OK, saying something went wrong (error) or how things are.
+static void Tell(const std::string& text, bool error)
+{
+    PendingAction = ActionNone;
+    Show_Message(text, error, "OK", nullptr);
+}
+
+// Asks before restarting for a new screen size; Restart saves it and restarts the game.
+static void Ask_Restart(const std::string& choice)
+{
+    Show_Message("Changing the screen size restarts the game, and the game in progress will be lost. "
+                 "Save it first if you want to keep it.",
+                 false, "Restart", "Cancel");
+    PendingAction = ActionRestart;
+    PendingChoice = choice;
+}
+
+// A size chosen from the menu: saved at the start; once in the game, a restart if it differs.
+static void Choose_Size(int index)
+{
+    if (index < 0 || index >= SizeCount || ForcedLowRes || Low_Res_Variable()) {
+        return;
+    }
+    const std::string& choice = SizeChoices[index];
+    if (!InGame) {
+        Save_Choice(choice);
+        return;
+    }
+    int w, h;
+    Choice_Size(choice, w, h);
+    if (w == ScreenW && h == ScreenH) {
+        Save_Choice(choice); // the same screen, e.g. the default chosen by its size
+        return;
+    }
+    Ask_Restart(choice);
+}
+
+/*
+** The game data: whether it's installed, and installing it from CD images dragged onto the icon.
+*/
+static bool Installed_Now = false; // installed while this copy waited: a click restarts the game
+static bool Installing = false;
+static int InstallTask = 0;         // the task window's task, once seen
+static unsigned InstallStarted = 0; // when it was started, in centiseconds
+static std::vector<std::string> Pending; // images dropped, waiting for the rest of the drag
+static unsigned PendingSince = 0;
+
+static unsigned Now(void)
+{
+    _kernel_swi_regs regs;
+    _kernel_swi(OS_ReadMonotonicTime, &regs, &regs);
+    return unsigned(regs.r[0]);
+}
+
+// The problem with the installed data that !Run found (or vcprep, after installing), or "".
+static std::string Data_Problem(void)
+{
+    if (!Os_Variable(App_Variable("NoDataCheck")).empty()) {
+        return "";
+    }
+    return Os_Variable(App_Variable("DataProblem"));
+}
+
+static void Open_Help(void)
+{
+    std::string command = "Filer_Run " + Os_Variable(App_Variable("Dir")) + ".!Help";
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(command.c_str());
+    Swi(OS_CLI, regs);
+}
+
+static std::string Own_App(void)
+{
+    return std::string("!") + App.prefix;
+}
+
+// The task window's name, which the Task Manager lists it by.
+static std::string Install_Task_Name(void)
+{
+    return std::string(App.name) + " install";
+}
+
+// A click on the icon while the data isn't there.
+static void Explain_No_Data(void)
+{
+    if (Installing) {
+        Tell("The game data is being installed. Click the icon when that has finished.", false);
+        return;
+    }
+    Tell(std::string(App.purpose) + "'s game data isn't installed, or is incomplete (" + Data_Problem()
+             + "). Drag the CD images (ISO files) onto this icon to install it. !Help, opening now, says "
+               "where to get them.",
+         false);
+    Open_Help();
+}
+
+/*
+** Message_DataLoad on the icon: a file dragged onto it from the Filer. This game's discs wait in
+** Pending for the rest of the drag (the Filer sends one message per file); anything else is
+** turned away here, saying why.
+*/
+static void Data_Load(int* block)
+{
+    std::string file = reinterpret_cast<const char*>(block) + 44;
+    int filetype = block[10];
+    std::string leaf = file.substr(file.find_last_of('.') + 1);
+
+    // DataLoadAck, so the Filer knows it arrived (the file is only read, never moved).
+    block[3] = block[2];
+    block[4] = 4;
+    _kernel_swi_regs regs;
+    regs.r[0] = 17;
+    regs.r[1] = reinterpret_cast<int>(block);
+    regs.r[2] = block[1];
+    Swi(Wimp_SendMessage, regs);
+
+    fprintf(stderr, "desktop: %s dragged to the icon\n", file.c_str());
+    if (filetype == 0x1000 || filetype == 0x2000) {
+        Tell(leaf + " is a directory. Drag the CD image files (ISO files) themselves onto the icon.", true);
+        return;
+    }
+    if (Installing) {
+        Tell("The game data is being installed. Drag more CD images here when that has finished.", false);
+        return;
+    }
+    // Any filetype is taken: a disc is known by its contents. Zipped images (as downloaded)
+    // aren't read yet, so they get their own message.
+    if (filetype == 0xDDC) {
+        Tell(leaf + " is a zip file. Unzip it first, then drag the CD image (ISO file) inside it onto the icon.", true);
+        return;
+    }
+    int cut = 0;
+    char volume[40];
+    int disc = Disc_Identify(file.c_str(), &cut, volume, sizeof(volume));
+    fprintf(stderr, "desktop: %s is %s%s (volume %s)\n", leaf.c_str(),
+            disc >= 0 ? Disc_Types[disc].id : disc == DISC_NOT_ISO ? "not a CD image" : "an unknown disc",
+            cut ? ", cut short" : "", volume);
+    if (disc == DISC_NOT_ISO) {
+        Tell(leaf + " isn't a CD image (ISO file). !Help says which ones to drag here.", true);
+    } else if (cut) {
+        Tell(leaf + " is " + (disc >= 0 ? Disc_Types[disc].name : std::string("a CD image"))
+                 + ", but cut short: its download or copy didn't finish. Get it again.",
+             true);
+    } else if (disc == DISC_UNKNOWN) {
+        Tell(leaf + " isn't one of the freeware discs this game installs from. !Help says which ones to get.", true);
+    } else if (Disc_Types[disc].app == nullptr) {
+        Tell(leaf + " is " + Disc_Types[disc].name
+                 + ", which won't work: this game needs the Windows 95 version (see !Help).",
+             true);
+    } else if (Own_App() != Disc_Types[disc].app) {
+        Tell(leaf + " is " + Disc_Types[disc].name + ": drag it onto the " + Disc_Types[disc].app + " icon instead.",
+             true);
+    } else {
+        Pending.push_back(file);
+        PendingSince = Now();
+    }
+}
+
+/*
+** Installs the images in Pending with Utils.vcprep in a task window, so the desktop goes on
+** working meanwhile. The list goes in <App>$Install, one per line, as it may be too long for a
+** command line.
+*/
+static void Start_Install(void)
+{
+    std::string list;
+    for (size_t i = 0; i < Pending.size(); i++) {
+        list += Pending[i] + "\n";
+    }
+    Pending.clear();
+    std::string var = App_Variable("Install");
+    Set_Os_Variable(var, list.c_str());
+    std::string dir = Os_Variable(App_Variable("Dir"));
+    bool ra = strcmp(App.prefix, "VanillaRA") == 0;
+    std::string prepare = dir + ".Utils.vcprep -window -images " + var + (ra ? " -raapp " : " -app ") + dir;
+    if (!Os_Variable(App_Variable("NoMovies")).empty()) {
+        prepare += " -nomovies"; // set in !Run, for a small disc
+    }
+    std::string command = "TaskWindow \"" + prepare + "\" -wimpslot 6000K -name \"" + Install_Task_Name() + "\" -quit";
+    fprintf(stderr, "desktop: %s\n", command.c_str());
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(command.c_str());
+    _kernel_oserror* error = _kernel_swi(Wimp_StartTask, &regs, &regs);
+    if (error != nullptr) {
+        Tell(std::string("The installer couldn't be started in a task window: ") + error->errmess, true);
+        return;
+    }
+    Installing = true;
+    InstallTask = 0;
+    InstallStarted = Now();
+    PendingAction = ActionNone;
+    Show_Message(std::string("Installing the ") + App.purpose
+                     + " game data from the CD image. This takes a few minutes per disc; the desktop carries on "
+                       "meanwhile.",
+                 false, "Hide", nullptr, true);
+    Show_Progress("Starting");
+}
+
+// The task window's task if it's running, or 0. Also spots it before its messages would.
+static int Find_Install_Task(void)
+{
+    std::string name = Install_Task_Name();
+    int buffer[16 * 4];
+    _kernel_swi_regs regs;
+    regs.r[0] = 0;
+    do {
+        regs.r[1] = reinterpret_cast<int>(buffer);
+        regs.r[2] = sizeof(buffer);
+        if (_kernel_swi(TaskManager_EnumerateTasks, &regs, &regs) != nullptr) {
+            return 0;
+        }
+        int entries = (reinterpret_cast<int*>(regs.r[1]) - buffer) / 4;
+        for (int i = 0; i < entries; i++) {
+            const char* task = reinterpret_cast<const char*>(buffer[i * 4 + 1]);
+            if (task != nullptr && strncmp(task, name.c_str(), name.size()) == 0
+                && (task[name.size()] < ' ' || task[name.size()] == '\0')) {
+                return buffer[i * 4];
+            }
+        }
+    } while (regs.r[0] >= 0);
+    return 0;
+}
+
+// The task window has gone: what does the data look like now?
+static void Install_Finished(void)
+{
+    Installing = false;
+    InstallTask = 0;
+    std::string problem = Data_Problem();
+    fprintf(stderr, "desktop: install finished: %s\n", problem.empty() ? "all there" : problem.c_str());
+    if (problem.empty()) {
+        Installed_Now = true;
+        Tell(std::string("The ") + App.purpose + " game data is installed. Click the icon to play.", false);
+    } else {
+        Tell(std::string(App.purpose) + "'s game data is still incomplete (" + problem
+                 + "). The install window said why. Drag the CD images onto this icon to try again.",
+             true);
+    }
+}
+
+// On a null event while installing, or while a drag is still arriving.
+static void Install_Tick(void)
+{
+    if (!Pending.empty() && !Installing && Now() - PendingSince >= 50) {
+        Start_Install();
+        return;
+    }
+    if (Installing) {
+        std::string now = Os_Variable(App_Variable("Installing"));
+        if (!now.empty()) {
+            Show_Progress("Now: " + now);
+        }
+        int task = Find_Install_Task();
+        if (task != 0) {
+            InstallTask = task;
+        } else if (InstallTask != 0 || Now() - InstallStarted > 3000) {
+            Install_Finished(); // gone, or never seen after 30 s
+        }
+    }
+}
+
+
+/*
 ** Polls the Wimp until the icon is clicked with Select or Adjust (true), handling the icon's
 ** menu, the Info window and the desktop quitting.
 */
@@ -603,11 +1091,13 @@ static void Wait_For_Icon_Click(void)
     for (;;) {
         __pthread_stop_ticker(); // the game's threads mustn't run while other tasks are paged in
         _kernel_swi_regs regs;
-        regs.r[0] = 1; // no null events: sleep until something happens
+        bool ticking = Installing || !Pending.empty();
+        regs.r[0] = ticking ? 0 : 1; // null events only to watch an install: else sleep
         regs.r[1] = reinterpret_cast<int>(block);
+        regs.r[2] = int(Now() + 50);
         HandlerType game_handlers[Swapped_Count];
         Use_Default_Handlers(game_handlers);
-        _kernel_oserror* error = _kernel_swi(Wimp_Poll, &regs, &regs);
+        _kernel_oserror* error = _kernel_swi(ticking ? Wimp_PollIdle : Wimp_Poll, &regs, &regs);
         Use_Game_Handlers(game_handlers);
         __pthread_start_ticker();
         if (error != nullptr) {
@@ -616,31 +1106,78 @@ static void Wait_For_Icon_Click(void)
         }
 
         switch (regs.r[0]) {
+        case 0: // Null_Reason
+            Install_Tick();
+            break;
+
+        case 1: { // Redraw_Window_Request: a window of the task's (the Info window) to redraw
+            regs.r[1] = reinterpret_cast<int>(block);
+            int more = 0;
+            if (Swi(Wimp_RedrawWindow, regs)) {
+                more = regs.r[0];
+            }
+            while (more) { // the Wimp draws its icons; nothing else to draw
+                regs.r[1] = reinterpret_cast<int>(block);
+                if (!Swi(Wimp_GetRectangle, regs)) {
+                    break;
+                }
+                more = regs.r[0];
+            }
+            break;
+        }
+
         case 2: // Open_Window_Request
             regs.r[1] = reinterpret_cast<int>(block);
             Swi(Wimp_OpenWindow, regs);
             break;
 
         case 3: // Close_Window_Request
+            if (block[0] == MessageWindow) {
+                Message_Choice(MessageButtons - 1);
+                break;
+            }
             regs.r[1] = reinterpret_cast<int>(block);
             Swi(Wimp_CloseWindow, regs);
             break;
 
+        case 8: // Key_Pressed: the message window has the caret
+            if (block[0] == MessageWindow && (block[6] == 13 || block[6] == 27)) {
+                Message_Choice(block[6] == 13 ? 0 : MessageButtons - 1);
+                break;
+            }
+            regs.r[0] = block[6];
+            Swi(Wimp_ProcessKey, regs);
+            break;
+
         case 6: // Mouse_Click: x, y, buttons, window, icon
+            if (block[3] == MessageWindow && block[4] >= 0 && block[4] < MessageButtons && (block[2] & (4 | 1))) {
+                Message_Choice(block[4]);
+                break;
+            }
             if (block[3] == -2 && block[4] == IconHandle) {
                 if (block[2] & 2) {
                     Open_Menu(block[0]);
                 } else if (block[2] & (4 | 1)) {
+                    if (Installed_Now) {
+                        Restart_Game(); // with the paths found now the data is there
+                    }
+                    if (Installing || !Data_Problem().empty()) {
+                        Explain_No_Data();
+                        break;
+                    }
                     return;
                 }
             }
             break;
 
         case 9: // Menu_Selection: the item, then the submenu's
-            if (block[0] == 2) {
+            if (block[0] == MenuQuit) {
                 Quit_Game();
             }
-            if (block[0] == 1) {
+            if (block[0] == MenuHelp) {
+                Open_Help();
+            }
+            if (block[0] == MenuSize) {
                 Choose_Size(block[1]);
             }
             {
@@ -657,6 +1194,12 @@ static void Wait_For_Icon_Click(void)
         case 18: // User_Message_Recorded
             if (block[4] == 0) { // Message_Quit
                 Quit_Game();
+            }
+            if (block[4] == 3 && block[5] == -2 && block[6] == IconHandle) { // Message_DataLoad
+                Data_Load(block);
+            }
+            if (block[4] == 0x400C3 && Installing && InstallTask != 0 && block[1] == InstallTask) {
+                Install_Finished(); // Message_TaskCloseDown from the task window
             }
             break;
 
@@ -700,7 +1243,19 @@ void RISCOS_Desktop_Start(void)
         _kernel_swi(OS_SetVarVal, &regs, &regs);
     }
 
-    if (IconHandle >= 0 && RISCOS_Desktop_Click_To_Start && !restarted && getenv("VC_NODESKTOP") == nullptr) {
+    // Files dragged to the icon, and task windows closing (a Wimp task gets only the messages it
+    // asks for, as well as Message_Quit).
+    static const int messages[] = {3, 0x400C3, 0};
+    _kernel_swi_regs mregs;
+    mregs.r[0] = reinterpret_cast<int>(messages);
+    _kernel_swi(Wimp_AddMessages, &mregs, &mregs);
+
+    // Without its data the game can't start: it waits for the CD images, whatever else was asked.
+    bool no_data = !Data_Problem().empty();
+    if (no_data) {
+        fprintf(stderr, "desktop: no game data (%s)\n", Data_Problem().c_str());
+    }
+    if (IconHandle >= 0 && (no_data || (RISCOS_Desktop_Click_To_Start && !restarted)) && getenv("VC_NODESKTOP") == nullptr) {
         fprintf(stderr, "desktop: waiting for a click on the icon bar\n");
         AudioPaused = Mixer_Is_Running(); // in case the sound is set up first
         if (AudioPaused) {

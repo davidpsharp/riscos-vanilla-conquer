@@ -8,10 +8,11 @@ Set VanillaRA$LowRes 0
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaRA$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
-| The game data comes from the original CD images (ISO files), installed by Prepare.
-| Utils.vcprep checks that every file is there at its size (no checksums, so it's quick);
-| without it, that MIX.REDALERT is. If anything is wrong, open !Help, which says where to get
-| the images and how to install them, and stop. VanillaRA$NoDataCheck skips the check.
+| The game data comes from the freeware CD images (ISO files), dragged onto the icon bar
+| icon. Utils.vcprep checks that every file is there at its size (no checksums, so it's
+| quick); without it, that MIX.REDALERT is. A problem goes in VanillaRA$DataProblem, and then a
+| click on the icon says how to install the data instead of starting the game.
+| VanillaRA$NoDataCheck skips the check.
 WimpSlot -min 1000K -max 1000K
 Set VanillaRA$Checker 0
 IfThere <VanillaRA$Dir>.Utils.vcprep Then Set VanillaRA$Checker 1
@@ -20,8 +21,10 @@ If <VanillaRA$Checker>=1 Then Run <VanillaRA$Dir>.Utils.vcprep -check ra -raapp 
 If <VanillaRA$Checker>=0 Then IfThere <VanillaRA$Dir>.MIX.REDALERT Then Unset VanillaRA$DataProblem
 Unset VanillaRA$Checker
 If "<VanillaRA$NoDataCheck>"<>"" Then Unset VanillaRA$DataProblem
-If "<VanillaRA$DataProblem>"<>"" Then Filer_Run <VanillaRA$Dir>.!Help
-If "<VanillaRA$DataProblem>"<>"" Then Error Red Alert's game data isn't installed, or is incomplete (<VanillaRA$DataProblem>). !Help, now open, says where to get the freeware Red Alert CD images (ISO files) and how to install them with Prepare.
+| Installing from CD images dragged onto the icon leaves out the movies (about 400 MB per
+| disc) if this is 1.
+Set VanillaRA$NoMovies 0
+If "<VanillaRA$NoMovies>"="0" Then Unset VanillaRA$NoMovies
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaRA$Dir>.Modules.DRenderer
