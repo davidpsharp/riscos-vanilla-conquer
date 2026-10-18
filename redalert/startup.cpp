@@ -295,7 +295,7 @@ int main(int argc, char* argv[])
 #ifdef __riscos__
     {
         // The icon bar icon and its Info window; any -AUTOSTART goes straight into the game.
-        static const RISCOSDesktopApp app = {"!vanillara", "Vanilla RA", "C&C: Red Alert", "Electronic Arts; Vanilla Conquer"};
+        static const RISCOSDesktopApp app = {"!vanillara", "Vanilla RA", "C&C: Red Alert", "Electronic Arts; Vanilla Conquer", "REDALERT.INI", "VanillaRA"};
         RISCOS_Desktop_Set_App(app);
         for (int i = 1; i < argc; i++) {
             if (strncasecmp(argv[i], "-AUTOSTART", 10) == 0) {
@@ -370,9 +370,14 @@ int main(int argc, char* argv[])
         */
         Read_Setup_Options(&cfile);
 
+#ifdef __riscos__
+        // The icon bar icon, and the wait for a click, during which a screen size can be chosen.
+        RISCOS_Desktop_Start();
+#endif
+
 #ifndef REMASTER_BUILD
         /*
-        ** If DOSMode is enabled, adjust resolution accordingly. -LOWRES, or the variable
+        ** If DOSMode or LowRes is enabled, adjust resolution accordingly. -LOWRES, or the variable
         ** VanillaRA$LowRes (set by !Run on RISC OS), asks for it for this run only,
         ** leaving REDALERT.INI as it is.
         */
@@ -381,7 +386,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i) {
             low_res_asked = low_res_asked || strcasecmp(argv[i], "-LOWRES") == 0;
         }
-        if (Settings.Video.DOSMode || low_res_asked) {
+        bool forced_low_res = low_res_asked;
+        if (Settings.Video.DOSMode || Settings.Video.LowRes || forced_low_res) {
             RESFACTOR = 1;
             ScreenWidth = 320;
             ScreenHeight = 200;
@@ -390,13 +396,22 @@ int main(int argc, char* argv[])
             ** A bigger screen shows more of the battlefield (see Use_Game_Layout); it must
             ** hold the 640x400 menus.
             */
+            std::string resolution = Settings.Video.Resolution;
+#ifdef __riscos__
+            if (resolution == "auto") {
+                resolution = RISCOS_Desktop_Auto_Resolution();
+            }
+#endif
             int w = 0, h = 0;
-            if (sscanf(Settings.Video.Resolution.c_str(), "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 2048
+            if (sscanf(resolution.c_str(), "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 2048
                 && h <= 2048) {
                 ScreenWidth = w;
                 ScreenHeight = h;
             }
         }
+#ifdef __riscos__
+        RISCOS_Desktop_Set_Screen(ScreenWidth, ScreenHeight, forced_low_res);
+#endif
 #endif
         Set_Resfactor_Globals(RESFACTOR);
 

@@ -353,7 +353,8 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     }
 
 #ifdef __riscos__
-    // The icon on the icon bar, and (at the start) waiting there for a click to start the game.
+    // The icon on the icon bar and the wait for a click, if the game hasn't done it already
+    // (it does, before choosing its screen size).
     if (win_flags & SDL_FULLSCREEN) {
         RISCOS_Desktop_Start();
     }

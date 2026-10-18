@@ -217,6 +217,21 @@ The Risc PC, the Pi 4 and the Mac end the battle the same way with the same seed
 - Partial presents work in every mission: the empty map, objects and power bar passes now mark that they drew nothing (0 tiles missed with `VC_DIRTYCHECK`).
 - `As_Pointer` cached.
 
+## Screen size
+
+**The icon bar menu:** Info, Screen size and Quit. Screen size lists Automatic (the size picked below, shown in brackets), the usual sizes (640x400, 640x480, 800x600, 1024x768, 1280x800, 1280x1024) that SDL lists for the monitor at 256 colours, any size set by hand in the settings file, and 320x200 (low resolution, `[Video] LowRes`). The start-up wait for a click (`RISCOS_Desktop_Start`) now comes before the game reads its screen size, so a size chosen there applies straight away. Chosen once the game is running (after Shift+F12), a different size asks first (Wimp_ReportError with Restart and Cancel), then saves it, sets `VanillaTD$Restart` and quits; `Filer_Run` of the application, queued just before, starts it again after the old copy has gone, and the new copy skips the click. `VanillaTD$LowRes=1` still forces 320x200, and then the menu's other sizes are shaded.
+
+**Automatic:** `[Video] Resolution` is `auto` by default on RISC OS (`common/riscos_autosize.cpp`). The first time, a speed test (`common/riscos_speedtest.cpp`, about 0.8 s, before the icon appears) measures a logic-like loop, memory copies, and writes to screen memory (the desktop's own pixels, read once and written back, so nothing changes on screen). The results go in the settings file's `[RISCOS]` section; later starts only run a tenth of a second of the loop, to notice a copy moved to another machine, and pick again for the desktop as it is. `VC_RETUNE=1` measures again. The pick is the largest size in the desktop's shape (and no bigger than it) whose projected load, 15 game frames of logic and drawing plus FrameLimit full-screen presents a second, scaled from the Risc PC's measured times, stays under 600 ms a second; an exact fraction of the desktop nearly as big is preferred, and 640x400 is the floor. `riscos/tests/speedtest` runs the test alone and prints the pick.
+
+| Machine | cpu | memory (KB/s) | screen (KB/s) | Desktop | Pick (projected ms/s) |
+| --- | --- | --- | --- | --- | --- |
+| Risc PC, StrongARM, RISC OS 4.39 | 10,500 | 13,800–14,300 | 18,400 | 1280x1024, 8 bpp | 640x400, the floor (640x400 itself projects 684) |
+| Raspberry Pi 4, RISC OS 5.30 | 90,300 | 2,609,000 | 2,387,000 | 1680x1050, 32 bpp | 1680x1050 (68 at 60 presents) |
+| Raspberry Pi 3, RISC OS 5.30 | 46,600 | 728,000 | 822,000 | 1680x1050, 32 bpp | 1680x1050 (179 at 60 presents) |
+| Raspberry Pi 2, RISC OS 5.30 | 30,900 | 309,000 | 561,000–566,000 | 1680x1050, 32 bpp | 1680x1050 (274 at 60 presents) |
+| RPCEmu, RISC OS 5.30 (emu530) | 15,500–16,000 | 516,000–547,000 | 491,000–539,000 | 800x600, 8 bpp | 800x600 (180 at 60 presents); 1024x768 on a 1024x768 desktop (220) |
+| RPCEmu, RISC OS 3.71 (emu371) | 15,700 | 242,000 | 252,000 | 800x600, 32 bpp | 800x600 (187 at 30 presents) |
+
 ## Network play
 
 LAN play works: Multiplayer Game → Network. Vanilla Conquer emulates the original IPX networking over UDP broadcast. On RISC OS the game lists the network interfaces with `SIOCGIFCONF`, because UnixLib has no `getifaddrs`. It falls back to broadcasting to `255.255.255.255`. The machine needs a network card and the Internet module. Without them, Network just returns to the menu.

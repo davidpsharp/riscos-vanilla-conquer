@@ -84,8 +84,10 @@ set(COMMON_SRC
     readline.cpp
     rect.cpp
     rgb.cpp
+    riscos_autosize.cpp
     riscos_desktop.cpp
     riscos_fs.cpp
+    riscos_speedtest.cpp
     rndstraw.cpp
     settings.cpp
     sha.cpp
