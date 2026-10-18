@@ -37,6 +37,9 @@
 #include "riscos_fs.h"
 #include "function.h"
 #include "common/riscos_desktop.h"
+#ifdef __riscos__
+#include "common/mixer_sdl1.h"
+#endif
 #include "common/gitinfo.h"
 #include "common/ini.h"
 #include "common/paths.h"
@@ -220,6 +223,9 @@ int main(int argc, char** argv)
         // The icon bar icon and its Info window; any -AUTOSTART goes straight into the game.
         static const RISCOSDesktopApp app = {"!vanillatd", "Vanilla TD", "Command & Conquer", "Electronic Arts; Vanilla Conquer"};
         RISCOS_Desktop_Set_App(app);
+        // VanillaTD$Sound SharedSoundBuffer (in !Run): mix with other programs' sound when those
+        // modules are loaded; otherwise, and by default, SDL and DigitalRenderer play it.
+        Mixer_Prefer_Output(getenv("VanillaTD$Sound"));
         for (int i = 1; i < argc; i++) {
             if (strncasecmp(argv[i], "-AUTOSTART", 10) == 0) {
                 RISCOS_Desktop_Click_To_Start = false;

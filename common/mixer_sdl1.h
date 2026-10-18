@@ -21,6 +21,11 @@ bool Mixer_Init(int rate, bool reverse_channels);
 void Mixer_Shutdown();
 void Mixer_Pause(bool pause);
 bool Mixer_Is_Open();
+// Open and not paused (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING when SDL plays the sound).
+bool Mixer_Is_Running();
+// RISC OS: "SharedSoundBuffer" plays through that module, mixed with other programs' sound, when
+// it's loaded (riscos_ssb.h); anything else, or nullptr, is SDL as usual. Before Mixer_Init.
+void Mixer_Prefer_Output(const char* name);
 
 // buffers: queue length, up to MIXER_MAX_BUFFERS. A channel that runs out of queued
 // data stops, but resumes by itself when more is queued (unlike an OpenAL source),
@@ -63,6 +68,8 @@ struct MixerStats
     int MaxChannels;       // Most channels playing in one callback since the last call.
     int StallCount;        // Gaps of 150 ms or more between callbacks since the last call (up to 4).
     MixerStall Stalls[4];
+    unsigned OutputDry;    // RISC OS SharedSoundBuffer: times its queue was found empty since the last call.
+    unsigned OutputQueued; // ... and the most bytes queued (0 when SDL plays the sound).
 };
 void Mixer_Get_Stats(MixerStats& stats);
 // Bytes queued and played since the channel was last stopped.

@@ -151,7 +151,7 @@ elseif(OPENAL)
     list(APPEND COMMONV_SRC soundio_common.cpp soundio_openal.cpp vqaaudio_openal.cpp)
 elseif(SDL1)
     # No OpenAL: mix in software on SDL 1.2's audio callback (e.g. RISC OS).
-    list(APPEND COMMONV_SRC soundio_common.cpp soundio_sdl1.cpp vqaaudio_sdl1.cpp mixer_sdl1.cpp)
+    list(APPEND COMMONV_SRC soundio_common.cpp soundio_sdl1.cpp vqaaudio_sdl1.cpp mixer_sdl1.cpp riscos_ssb.cpp)
 else()
     list(APPEND COMMONV_SRC soundio_null.cpp vqaaudio_null.cpp)
 endif()

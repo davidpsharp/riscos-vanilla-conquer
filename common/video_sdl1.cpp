@@ -1702,6 +1702,12 @@ static void Log_Frame_Rate(Uint32 render_ms)
                 audio.DryCount - last_audio.DryCount,
                 audio.Peak,
                 audio.MaxChannels);
+        if (audio.OutputQueued != 0) {
+            fprintf(stderr,
+                    "audio: SharedSoundBuffer queue up to %u bytes, found empty %u times\n",
+                    audio.OutputQueued,
+                    audio.OutputDry);
+        }
         for (int i = 0; i < audio.StallCount; ++i) {
             fprintf(stderr,
                     "stall: audio thread didn't run for %u ms at %u.%03u s\n",
