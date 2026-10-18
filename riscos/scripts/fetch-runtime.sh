@@ -3,7 +3,8 @@
 #   SharedULib - SharedUnixLibrary, required by every GCCSDK program
 #   DRenderer  - digital sound renderer, used by SDL audio
 # along with each package's copyright notice (<module>-Copyright), which the
-# release zip includes.
+# release zip includes, and SDL 1.2's licence (SDL-Copyright, the LGPL 2.1): SDL is
+# linked into !RunImage from the same package the build container uses.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 OUT="${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}/hostfs/modules"
@@ -19,3 +20,6 @@ for pkg in SharedUnixLibrary_1.16-1:SharedULib DRenderer_0.56-r-1b:DRenderer; do
     unzip -q -o -p "$tmp/$zip.zip" RiscPkg/Copyright > "$OUT/$mod-Copyright"
     echo "$OUT/$mod,ffa"
 done
+curl -fsSL -o "$tmp/sdl.zip" https://www.riscos.info/packages/arm/Library/libsdl1.2-dev_1.2.16-1_arm.zip
+unzip -q -o -p "$tmp/sdl.zip" 'Apps/Library/!SDL/doc/COPYING' > "$OUT/SDL-Copyright"
+echo "$OUT/SDL-Copyright"

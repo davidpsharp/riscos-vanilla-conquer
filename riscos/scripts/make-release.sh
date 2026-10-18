@@ -25,7 +25,7 @@ if [ "${2:-}" != --no-build ]; then
     # test copy).
     "$ROOT/riscos/scripts/$DEPLOY"
 fi
-[ -f "$WORK/hostfs/modules/DRenderer-Copyright" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
+[ -f "$WORK/hostfs/modules/SDL-Copyright" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
 
 rm -rf "$PKG"
 mkdir -p "$APP/Utils" "$APP/Modules" "$APP/Licences"
@@ -41,6 +41,7 @@ cp "$ROOT/License.txt" "$APP/Licences/GPL-3,fff"
 sed -n '/^\/\* blast.h/,/\*\//p' "$ROOT/riscos/tools/vcprep/blast.h" > "$APP/Licences/Blast,fff"
 cp "$WORK/hostfs/modules/SharedULib-Copyright" "$APP/Licences/UnixLib,fff"
 cp "$WORK/hostfs/modules/DRenderer-Copyright" "$APP/Licences/DRenderer,fff"
+cp "$WORK/hostfs/modules/SDL-Copyright" "$APP/Licences/SDL,fff"
 
 # RISC OS 3.x FileCore truncates leaf names longer than 10 characters.
 too_long=$(cd "$PKG" && find . -mindepth 1 | sed 's|,[0-9a-f][0-9a-f][0-9a-f]$||' | awk -F/ 'length($NF) > 10')
