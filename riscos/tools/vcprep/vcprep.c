@@ -1100,6 +1100,7 @@ static int Window_Install(const char** images, int num_images, int movies)
 {
     int i;
     Progress_Var = TD_Dir != NULL ? "VanillaTD$Installing" : "VanillaRA$Installing";
+    Set_Var("RAMix$Quiet", "1"); /* Utils.ramix prints nothing either */
     Holding = 1;
     Crc_Init();
     printf("Installing the game data.\n\n");
@@ -1110,6 +1111,7 @@ static int Window_Install(const char** images, int num_images, int movies)
         }
     }
     Set_Var(Progress_Var, NULL);
+    Set_Var("RAMix$Quiet", NULL);
     Problem[0] = '\0';
     if (TD_Dir != NULL) {
         Check_TD();
@@ -1128,9 +1130,13 @@ static int Window_Install(const char** images, int num_images, int movies)
     if (Problem[0] != '\0') {
         printf("The game's data is still incomplete: %s.\n", Problem);
     }
-    printf("\nPress a key to close this window.\n");
+    printf("\nPress a key when you have read this, then close this window.\n");
     fflush(stdout);
+#ifdef __riscos__
+    _swix(OS_ReadC, 0); /* any key: getchar would wait for a whole line */
+#else
     getchar();
+#endif
     return 1;
 }
 

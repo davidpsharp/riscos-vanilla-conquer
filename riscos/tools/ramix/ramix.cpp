@@ -271,6 +271,9 @@ int main(int argc, char** argv)
         fprintf(stderr, "ramix: write failed\n");
         return 1;
     }
-    printf("%s: %u of %u entries, %u bytes\n", argv[3], unsigned(kept.size()), unsigned(entries.size()), size);
+    // vcprep -window sets RAMix$Quiet: run in a task window, a line printed would open it.
+    if (getenv("RAMix$Quiet") == nullptr) {
+        printf("%s: %u of %u entries, %u bytes\n", argv[3], unsigned(kept.size()), unsigned(entries.size()), size);
+    }
     return 0;
 }
