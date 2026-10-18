@@ -292,7 +292,7 @@ riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-
 `make-release.sh` builds the game, then assembles `!VanillaTD` in `build/release`, with:
 - `!RunImage` and `Utils.vcprep`
 - `!Help`: the user documentation (requirements, installing the data, settings, network play, known issues)
-- `!Sprites`/`!Sprites22`: made from `resources/vanillatd_icon.svg` by `tools/make-sprites.py`
+- `!Sprites`/`!Sprites22`: made from `icons/vanillatd-icon.png` by `tools/make-sprites.py`; `tools/make-icon.py` makes that picture (and RA's) from the OpenTS banner
 - `Modules`: SharedUnixLibrary and DigitalRenderer
 - `Licences`: GPL-3 with EA's additional terms, blast, UnixLib and DRenderer
 
