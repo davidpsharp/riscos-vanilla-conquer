@@ -1,59 +1,46 @@
 #!/usr/bin/env python3
-"""Make the !VanillaTD application sprites from resources/vanillatd_icon.svg.
+"""Make the !VanillaTD or !VanillaRA application sprites from riscos/icons/vanilla<game>-icon.png.
 
 Writes two RISC OS sprite files (filetype &FF9), each holding a 34x34
-"!vanillatd" and an 18x18 "sm!vanillatd" icon with a mask:
-  !Sprites22  mode 28, 8bpp, default 256-colour palette (square-pixel modes)
+"!vanilla<game>" and an 18x18 "sm!vanilla<game>" icon with a mask:
+  !Sprites22  mode 28, 8bpp, with 256 colours of its own chosen for the
+              icon (square-pixel modes)
   !Sprites    mode 27, 4bpp, with its own 16-colour palette (the fallback;
               the Wimp scales it for rectangular-pixel modes such as 12)
-
-The colours come from rasterising the SVG with macOS QuickLook, which draws
-its gradients more faithfully than ImageMagick's built-in renderer, but onto
-an opaque white background; so the transparency comes from ImageMagick's
-render. ImageMagick also does the downscaling.
+Both work on RISC OS 3.5 and later, which this port needs. The pictures are made
+by make-icon.py; ImageMagick downscales them.
 
 Usage: make-sprites.py <output directory> [game]
-  game: td (the default, !vanillatd from vanillatd_icon.svg) or ra (!vanillara
-  from vanillara_icon.svg).
+  game: td (the default, !vanillatd) or ra (!vanillara).
 """
 import os
 import struct
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = sys.argv[2] if len(sys.argv) > 2 else "td"
-SVG = os.path.join(ROOT, "resources", "vanilla%s_icon.svg" % GAME)
+PICTURE = os.path.join(ROOT, "riscos", "icons", "vanilla%s-icon.png" % GAME)
 NAME = "!vanilla%s" % GAME
 
 
-def render(size, tmp):
+def render(size):
     """Return size*size (r, g, b, a) tuples."""
-    big = os.path.join(tmp, "icon.png")
-    if not os.path.exists(big):
-        subprocess.run(["qlmanage", "-t", "-s", "1024", "-o", tmp, SVG], check=True, capture_output=True)
-        alpha = os.path.join(tmp, "alpha.png")
-        subprocess.run(["magick", "-background", "none", "-density", "96", SVG, "-resize", "1024x1024!", alpha], check=True)
-        subprocess.run(["magick", os.path.join(tmp, os.path.basename(SVG) + ".png"), "-alpha", "off", "(", alpha,
-                        "-alpha", "extract", ")", "-compose", "CopyOpacity", "-composite", big], check=True)
     raw = subprocess.run(
-        ["magick", big, "-filter", "Lanczos", "-resize", "%dx%d" % (size, size), "-depth", "8", "rgba:-"],
-        check=True, capture_output=True).stdout
+        ["magick", PICTURE, "-filter", "Lanczos", "-resize", "%dx%d" % (size, size), "-unsharp", "0x0.6+0.6+0",
+         "-depth", "8", "rgba:-"], check=True, capture_output=True).stdout
     return [tuple(raw[i:i + 4]) for i in range(0, len(raw), 4)]
 
 
-def default_256():
-    """The standard RISC OS 256-colour palette: two bits of tint shared by
-    all three guns, plus two more bits per gun."""
-    pal = []
-    for p in range(256):
-        t = p & 3
-        r = ((p >> 4) & 1) << 3 | ((p >> 2) & 1) << 2 | t
-        g = ((p >> 6) & 1) << 3 | ((p >> 5) & 1) << 2 | t
-        b = ((p >> 7) & 1) << 3 | ((p >> 3) & 1) << 2 | t
-        pal.append((r * 17, g * 17, b * 17))
-    return pal
+def palette_256(pixels):
+    """255 colours for the opaque pixels (Pillow's median cut), plus black."""
+    from PIL import Image
+    opaque = [p[:3] for p in pixels if p[3] >= 128]
+    im = Image.new("RGB", (len(opaque), 1))
+    im.putdata(opaque)
+    pal = im.quantize(colors=255, method=Image.Quantize.MEDIANCUT).getpalette()[:255 * 3]
+    pal = [tuple(pal[i:i + 3]) for i in range(0, len(pal), 3)]
+    return pal + [(0, 0, 0)] * (256 - len(pal))
 
 
 def nearest(pal, c):
@@ -113,11 +100,10 @@ def preview(path, pixels_idx, pal, size):
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "."
-    with tempfile.TemporaryDirectory() as tmp:
-        big, small = render(34, tmp), render(18, tmp)
-    pal256 = default_256()
+    big, small = render(34), render(18)
+    pal256 = palette_256(big + small)
     pal16 = kmeans_16(big + small)
-    files = {"!Sprites22,ff9": (28, 8, pal256, False), "!Sprites,ff9": (27, 4, pal16, True)}
+    files = {"!Sprites22,ff9": (28, 8, pal256, True), "!Sprites,ff9": (27, 4, pal16, True)}
     for fname, (mode, bpp, pal, store) in files.items():
         spr = []
         for name, pixels, size in ((NAME, big, 34), ("sm" + NAME, small, 18)):
