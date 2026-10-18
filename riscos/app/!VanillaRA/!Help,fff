@@ -54,46 +54,52 @@ As of October 2026 they can be downloaded from cnc-comm.com:
 
 The downloads are zip files (RA_Allies.zip and RA_Soviet.zip), each
 holding one .iso file of about 600 MB (CD1_ALLIES.iso and CD2_SOVIET.iso).
-Unzip them first; that's easiest on a modern computer. Prepare has been
-checked with these images, and every file matched.
+Unzip them first; that's easiest on a modern computer. These images have
+been checked, and every file matched.
 
-The Prepare file that comes next to !VanillaRA installs the data from
-the ISO files (it also installs Tiberian Dawn's, if you have !VanillaTD):
+To install them:
 
-  1. Put !VanillaRA where you want to keep the game, and open the
-     directory containing it, so the Filer has seen it.
-  2. Copy Prepare into the directory holding the ISO file(s). They
-     don't need to be on the same disc as !VanillaRA.
-  3. Double-click Prepare.
+  1. Put !VanillaRA where you want to keep the game, and double-click
+     it. Its icon appears on the icon bar.
+  2. Drag the ISO file(s) onto that icon: both discs at once, or one
+     after the other.
 
-Prepare installs from every disc image it finds in its own directory,
-reading the ISO files directly (no CD drive or CDFS needed), and checks
-each file it writes against a known checksum. Files already installed
-are skipped, so it's safe to run it again. Each file is only given its
-real name once it's right, so if Prepare is stopped part-way (Escape, a
-full disc, a power cut), running it again redoes the file it didn't
-finish.
+The game copies the data into !VanillaRA, so the ISO files can be on any
+disc, and can be deleted afterwards. It reads them directly: no CD drive
+or CDFS is needed. Meanwhile a window says which file it's on, and the
+desktop carries on as usual; each disc takes a few minutes. When it has
+finished, click the icon to play.
 
-Every time the game starts, !Run checks that its files are all there at
-the right sizes (it takes a moment); if one isn't, it says which, opens
-this file and doesn't start the game. *Set VanillaRA$NoDataCheck 1 skips
-that check, for game data from elsewhere.
+Each file is checked against a known checksum as it's copied. If
+anything goes wrong, a window lists what happened. A file that comes out
+wrong, or a copy that is stopped part-way (a full disc, a power cut),
+leaves nothing that looks installed: drag the image onto the icon again
+to finish. Files already installed are skipped, so that's always safe.
 
-From the command line you can also name the images and give options:
+The game recognises each disc by its contents, and says so if it's the
+wrong one: a C&C95 or Tiberian Sun disc, for instance, goes on the
+!VanillaTD or !OpenTS icon. It spots a download that didn't finish, too.
 
-  *Obey ADFS::HardDisc4.$.ISOs.Prepare -nomovies
-  *Obey ADFS::HardDisc4.$.Prepare SCSI::Big.$.CD1_ALLIES/iso
-
-  -nomovies  leaves out the movies (370 MB on the Allied disc, 415 MB on
-             the Soviet one). Prepare then writes one 85 MB copy of the
-             game data without them, the same from either disc, using
-             !VanillaRA.Utils.ramix.
-  -force     rewrites files that are already there
+Each time the game starts, it checks that its files are all there at the
+right sizes (it takes a moment). Until they are, clicking the icon says
+what's missing and opens this file, instead of starting the game.
+*Set VanillaRA$NoDataCheck 1 skips that check, for game data from
+elsewhere.
 
 With the movies, each disc's data goes in its own folder (!VanillaRA.allied
 and !VanillaRA.soviet), and the game uses whichever it needs, as it would
-the CDs. Without movies one disc is enough for both campaigns. Without
-movies the game simply skips them.
+the CDs. To leave the movies out (370 MB on the Allied disc, 415 MB on the
+Soviet one), change the line "Set VanillaRA$NoMovies 0" in !VanillaRA.!Run
+to 1 before dragging the images: one 85 MB copy of the game data is
+written instead, the same from either disc, so one disc is then enough for
+both campaigns. Without movies the game simply skips them.
+
+From the command line, Utils.vcprep installs from images too, with
+-nomovies to leave out the movies and -force to rewrite files already
+there:
+
+  *WimpSlot -min 6000K -max 6000K
+  *Run <VanillaRA$Dir>.Utils.vcprep -raapp <VanillaRA$Dir> SCSI::Big.$.CD1_ALLIES/iso
 
 
 Playing
@@ -103,7 +109,7 @@ Double-click !VanillaRA to put its icon on the icon bar, then click the
 icon to start the game. The keys are the same as in the original game.
 Shift+F12 in the game goes back to the desktop, with the game paused
 where it was (sound too); click the icon again to carry on. The icon's
-menu has Info, Screen size (see below) and Quit.
+menu has Info, Help (this file), Screen size (see below) and Quit.
 
 Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
 change its options.

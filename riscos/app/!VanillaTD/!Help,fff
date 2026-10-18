@@ -60,45 +60,49 @@ As of September 2026 they can be downloaded from:
 The downloads are zip files, each holding one .iso file (about 600 MB).
 Unzip them first; that's easiest on a modern computer, as the zip and
 the ISO together need over 1 GB for each disc. The images from
-cnc-comm.com and CNCNZ.com have been checked with Prepare, and every
-file matched.
+cnc-comm.com and CNCNZ.com have been checked, and every file matched.
 
-The Prepare file that comes next to !VanillaTD installs the data from
-the ISO files:
+To install them:
 
-  1. Put !VanillaTD where you want to keep the game, and open the
-     directory containing it, so the Filer has seen it.
-  2. Copy Prepare into the directory holding the ISO file(s). They
-     don't need to be on the same disc as !VanillaTD, which helps if
-     there isn't room for both the ISOs and the game on one disc.
-  3. Double-click Prepare.
+  1. Put !VanillaTD where you want to keep the game, and double-click
+     it. Its icon appears on the icon bar.
+  2. Drag the ISO file(s) onto that icon: both discs at once, or one
+     after the other.
 
-Prepare installs from every C&C95 disc image it finds in its own
-directory: GDI, Nod or both. It reads the ISO files directly (no CD
-drive or CDFS needed), unpacks the game files into !VanillaTD and checks
-each one against a known checksum. It recognises the images by their
-contents, so it doesn't matter if RISC OS has shortened their names.
-The files both discs share are only written once, and files already
-installed are skipped, so it's safe to run it again. Each file is checked
-as it's written and only given its real name once it's right, so if
-Prepare is stopped part-way (Escape, a full disc, a power cut), running
-it again redoes the file it didn't finish.
+The game copies the data into !VanillaTD, so the ISO files can be on any
+disc, and can be deleted afterwards. It reads them directly: no CD drive
+or CDFS is needed. Meanwhile a window says which file it's on, and the
+desktop carries on as usual; each disc takes a few minutes. When it has
+finished, click the icon to play.
 
-Every time the game starts, !Run checks that its files are all there at
-the right sizes (it takes a moment); if one isn't, it says which, opens
-this file and doesn't start the game. *Set VanillaTD$NoDataCheck 1 skips
-that check, for game data from elsewhere.
+Each file is checked against a known checksum as it's copied. If
+anything goes wrong, a window lists what happened. A file that comes out
+wrong, or a copy that is stopped part-way (a full disc, a power cut),
+leaves nothing that looks installed: drag the image onto the icon again
+to finish. Files already installed are skipped, so that's always safe.
 
-From the command line you can also name the images and give options:
+The game recognises each disc by its contents, and says so if it's the
+wrong one: a Red Alert or Tiberian Sun disc, for instance, goes on the
+!VanillaRA or !OpenTS icon, and an MS-DOS disc won't do. It spots a
+download that didn't finish, too.
 
-  *Obey ADFS::HardDisc4.$.ISOs.Prepare -nomovies
-  *Obey ADFS::HardDisc4.$.Prepare SCSI::Big.$.CNC95_GDI/iso
+Each time the game starts, it checks that its files are all there at the
+right sizes (it takes a moment). Until they are, clicking the icon says
+what's missing and opens this file, instead of starting the game.
+*Set VanillaTD$NoDataCheck 1 skips that check, for game data from
+elsewhere.
 
-  -nomovies  leaves out the movies (about 430 MB per disc)
-  -force     rewrites files that are already there
+To leave out the movies (about 430 MB per disc), change the line
+"Set VanillaTD$NoMovies 0" in !VanillaTD.!Run to 1 before dragging the
+images. Without movies the game simply skips them. Without the Nod disc
+you can still play GDI missions and multiplayer.
 
-Without the Nod disc you can still play GDI missions and multiplayer.
-Without movies the game simply skips them.
+From the command line, Utils.vcprep installs from images too, with
+-nomovies to leave out the movies and -force to rewrite files already
+there:
+
+  *WimpSlot -min 6000K -max 6000K
+  *Run <VanillaTD$Dir>.Utils.vcprep -app <VanillaTD$Dir> SCSI::Big.$.CNC95_GDI/iso
 
 
 Playing
@@ -112,7 +116,8 @@ the original game; F9 to F12 are map bookmarks (Ctrl+F9 to set one).
 Double-clicking !VanillaTD puts its icon on the icon bar; click the icon
 to start the game. Shift+F12 in the game goes back to the desktop, with
 the game paused where it was (sound too); click the icon again to carry
-on. The icon's menu has Info, Screen size (see below) and Quit.
+on. The icon's menu has Info, Help (this file), Screen size (see below)
+and Quit.
 
 Settings are in !VanillaTD.INI.CONQUER, which the game creates the first
 time it runs. Settings that may be useful on RISC OS:
@@ -200,8 +205,8 @@ Known issues
     after about five minutes; it hasn't happened again since. If it
     happens to you, please send the CRC files the game writes in
     !VanillaTD, and stderr, from both machines.
-  * Red Alert is a separate application, !VanillaRA. Prepare installs
-    both games' data.
+  * Red Alert is a separate application, !VanillaRA: drag its discs
+    onto its own icon.
 
 
 Problems

@@ -35,9 +35,6 @@ fi
 mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaRA/* "$APP/"
 cp "$ROOT/$BDIR/vanillara,ff8" "$APP/!RunImage,ff8"
-# Prepare sits next to !VanillaRA, as in the release zip; it uses Utils.vcprep and
-# Utils.ramix (MAIN.MIX without movies).
-cp "$ROOT/riscos/app/Prepare,feb" "$APP/../"
 mkdir -p "$APP/Utils"
 cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"
 cp "$ROOT/$BDIR/ramix,ff8" "$APP/Utils/"

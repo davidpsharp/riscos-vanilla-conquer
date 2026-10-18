@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the release zip: !VanillaTD (or with RELEASE_GAME=ra, !VanillaRA) with the
-# game, the runtime modules and licences, and Prepare next to it, but no game data.
+# game, its tools (Utils.vcprep installs the data from CD images dragged onto the
+# icon), the runtime modules and licences, but no game data.
 # Filetypes are kept (see tools/riscos-zip.py).
 # Usage: [RELEASE_GAME=ra] make-release.sh <version> [--no-build]
 #   e.g. make-release.sh preview  ->  build/release/VanillaTD-riscos-preview.zip
@@ -30,7 +31,6 @@ fi
 rm -rf "$PKG"
 mkdir -p "$APP/Utils" "$APP/Modules" "$APP/Licences"
 cp "$ROOT"/riscos/app/\!$NAME/* "$APP/"
-cp "$ROOT/riscos/app/Prepare,feb" "$PKG/"
 cp "$ROOT/$IMAGE" "$APP/!RunImage,ff8"
 cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"
 if [ "$NAME" = VanillaRA ]; then
@@ -53,6 +53,6 @@ fi
 
 ZIP=$OUT/$NAME-riscos-$VERSION.zip
 rm -f "$ZIP"
-python3 "$ROOT/riscos/tools/riscos-zip.py" "$ZIP" "$APP" "$PKG/Prepare,feb" >/dev/null
+python3 "$ROOT/riscos/tools/riscos-zip.py" "$ZIP" "$APP" >/dev/null
 unzip -l "$ZIP"
 shasum -a 256 "$ZIP"
