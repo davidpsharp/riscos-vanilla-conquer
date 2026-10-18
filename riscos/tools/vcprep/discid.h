@@ -5,8 +5,9 @@
 **
 ** Shared by the Vanilla Conquer RISC OS port (Tiberian Dawn and Red Alert: the game and
 ** vcprep) and the OpenTS RISC OS port (Tiberian Sun: the game and tsprep), so that every
-** game recognises every disc and can say which game a wrong one is for. The twin of this
-** file is OpenTS's port/riscos/tools/discid.h; keep the two the same.
+** game recognises every disc and can say which game a wrong one is for. The twins are
+** Vanilla Conquer's riscos/tools/vcprep/discid.h and OpenTS's port/riscos/tools/discid.h;
+** keep the two the same.
 **
 ** Only the directory is read. Whether the files themselves are whole is found when they
 ** are installed, each against its own CRC-32; a CRC of the whole image could be added to
