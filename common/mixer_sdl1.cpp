@@ -1,10 +1,12 @@
 #include "mixer_sdl1.h"
 
 #include "phasetime.h"
+#include "riscos_ssb.h"
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 enum SlotState
 {
@@ -66,6 +68,12 @@ static int OutputSamples = 0;
 static bool AudioOpen = false;
 static bool ReverseChannels = false;
 static int OutputRate = 22050;
+
+// RISC OS: playing through SharedSoundBuffer instead of SDL (riscos_ssb.h), and the lock that then
+// stands in for SDL's audio lock between the game and the output's thread.
+static bool UseSSB = false;
+static bool PreferSSB = false;
+static SDL_mutex* SSBLock = nullptr;
 
 static void Update_Step(MixerChannel* ch)
 {
@@ -162,7 +170,20 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
 static void Lock_Audio()
 {
     PhaseTimer lock_timer(PHASE_CB_AUDIO_LOCK);
-    SDL_LockAudio();
+    if (UseSSB) {
+        SDL_mutexP(SSBLock);
+    } else {
+        SDL_LockAudio();
+    }
+}
+
+static void Unlock_Audio()
+{
+    if (UseSSB) {
+        SDL_mutexV(SSBLock);
+    } else {
+        SDL_UnlockAudio();
+    }
 }
 
 /*
@@ -269,6 +290,56 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
     }
 }
 
+static void SSB_Fill(unsigned char* stream, int len)
+{
+    SDL_mutexP(SSBLock);
+    Mixer_Callback(nullptr, stream, len);
+    SDL_mutexV(SSBLock);
+}
+
+void Mixer_Prefer_Output(const char* name)
+{
+    // Read now: getenv's copy of a RISC OS variable may not last.
+    PreferSSB = name != nullptr && strcasecmp(name, "SharedSoundBuffer") == 0;
+}
+
+/*
+** RISC OS, when asked for (Mixer_Prefer_Output("SharedSoundBuffer")): play through SharedSoundBuffer,
+** mixed with other programs' sound. False if the modules aren't loaded or the stream won't open,
+** and SDL plays it as before.
+*/
+static bool Open_SSB(int rate, int frames)
+{
+    if (!PreferSSB) {
+        return false;
+    }
+    if (!SSB_Available()) {
+        fprintf(stderr, "audio: SharedSoundBuffer asked for, but it or StreamManager isn't loaded\n");
+        return false;
+    }
+    // VC_SSBQUEUE=<ms>: how much is kept queued ahead of the sound system (60 by default).
+    int queue_ms = 60;
+    if (const char* ms = getenv("VC_SSBQUEUE")) {
+        int n = atoi(ms);
+        if (n >= 10 && n <= 2000) {
+            queue_ms = n;
+        }
+    }
+    SSBLock = SDL_CreateMutex();
+    if (SSBLock == nullptr) {
+        return false;
+    }
+    UseSSB = true; // before the thread starts: it fills through the lock
+    if (!SSB_Open(rate, frames, queue_ms, SSB_Fill)) {
+        UseSSB = false;
+        SDL_DestroyMutex(SSBLock);
+        SSBLock = nullptr;
+        return false;
+    }
+    fprintf(stderr, "audio: SharedSoundBuffer, %d Hz, %d frames a block, %d ms queued\n", rate, frames, queue_ms);
+    return true;
+}
+
 bool Mixer_Init(int rate, bool reverse_channels)
 {
     Init_Limit_Table();
@@ -298,6 +369,17 @@ bool Mixer_Init(int rate, bool reverse_channels)
         }
     }
     desired.callback = Mixer_Callback;
+
+    // SharedSoundBuffer keeps blocks queued ahead (60 ms), so they can be smaller: 512 frames, 23 ms.
+    int ssb_frames = getenv("VC_AUDIOBUF") != nullptr ? desired.samples : 512;
+    if (Open_SSB(desired.freq, ssb_frames)) {
+        OutputRate = desired.freq;
+        OutputSamples = ssb_frames;
+        ReverseChannels = reverse_channels;
+        AudioOpen = true;
+        SSB_Pause(false);
+        return true;
+    }
 
     // Passing no "obtained" spec makes SDL convert to the device format for us.
     if (SDL_OpenAudio(&desired, nullptr) != 0) {
@@ -329,16 +411,36 @@ void Mixer_Shutdown()
     if (!AudioOpen) {
         return;
     }
-    SDL_CloseAudio();
-    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    if (UseSSB) {
+        SSB_Close();
+        UseSSB = false;
+        SDL_DestroyMutex(SSBLock);
+        SSBLock = nullptr;
+    } else {
+        SDL_CloseAudio();
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    }
     AudioOpen = false;
 }
 
 void Mixer_Pause(bool pause)
 {
-    if (AudioOpen) {
+    if (!AudioOpen) {
+        return;
+    }
+    if (UseSSB) {
+        SSB_Pause(pause);
+    } else {
         SDL_PauseAudio(pause ? 1 : 0);
     }
+}
+
+bool Mixer_Is_Running()
+{
+    if (UseSSB) {
+        return AudioOpen && !SSB_Is_Paused();
+    }
+    return SDL_GetAudioStatus() == SDL_AUDIO_PLAYING;
 }
 
 void Mixer_Get_Stats(MixerStats& stats)
@@ -360,7 +462,12 @@ void Mixer_Get_Stats(MixerStats& stats)
         stats.Stalls[i] = Stalls[i];
     }
     StallCount = 0;
-    SDL_UnlockAudio();
+    stats.OutputDry = 0;
+    stats.OutputQueued = 0;
+    if (UseSSB) {
+        SSB_Get_Stats(stats.OutputDry, stats.OutputQueued);
+    }
+    Unlock_Audio();
 }
 
 bool Mixer_Is_Open()
@@ -386,11 +493,11 @@ MixerChannel* Mixer_Create_Channel(int bits_per_sample, int channels, int rate, 
     for (int c = 0; c < MAX_MIXER_CHANNELS; ++c) {
         if (Channels[c] == nullptr) {
             Channels[c] = ch;
-            SDL_UnlockAudio();
+            Unlock_Audio();
             return ch;
         }
     }
-    SDL_UnlockAudio();
+    Unlock_Audio();
 
     free(ch);
     return nullptr;
@@ -408,7 +515,7 @@ void Mixer_Destroy_Channel(MixerChannel* ch)
             Channels[c] = nullptr;
         }
     }
-    SDL_UnlockAudio();
+    Unlock_Audio();
 
     for (int i = 0; i < MIXER_MAX_BUFFERS; ++i) {
         free(ch->Slots[i].Data);
@@ -423,14 +530,14 @@ void Mixer_Set_Format(MixerChannel* ch, int bits_per_sample, int channels, int r
     ch->Channels = channels > 1 ? 2 : 1;
     ch->Rate = rate > 0 ? rate : 22050;
     Update_Step(ch);
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 void Mixer_Set_Gain(MixerChannel* ch, unsigned gain)
 {
     Lock_Audio();
     ch->Gain = gain;
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 bool Mixer_Queue(MixerChannel* ch, const void* data, size_t len)
@@ -442,7 +549,7 @@ bool Mixer_Queue(MixerChannel* ch, const void* data, size_t len)
     Lock_Audio();
     MixerSlot* slot = &ch->Slots[ch->Tail];
     bool free_slot = slot->State != SLOT_QUEUED;
-    SDL_UnlockAudio();
+    Unlock_Audio();
 
     if (!free_slot) {
         return false;
@@ -468,7 +575,7 @@ bool Mixer_Queue(MixerChannel* ch, const void* data, size_t len)
         ch->Starved = false;
         ch->Playing = true;
     }
-    SDL_UnlockAudio();
+    Unlock_Audio();
     return true;
 }
 
@@ -481,7 +588,7 @@ int Mixer_Free_Buffers(MixerChannel* ch)
             ++count;
         }
     }
-    SDL_UnlockAudio();
+    Unlock_Audio();
     return count;
 }
 
@@ -491,14 +598,14 @@ void Mixer_Play(MixerChannel* ch)
     ch->Paused = false;
     ch->Playing = ch->Slots[ch->Head].State == SLOT_QUEUED;
     ch->Starved = !ch->Playing;
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 void Mixer_Pause_Channel(MixerChannel* ch, bool pause)
 {
     Lock_Audio();
     ch->Paused = pause;
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 void Mixer_Stop(MixerChannel* ch)
@@ -516,7 +623,7 @@ void Mixer_Stop(MixerChannel* ch)
     for (int i = 0; i < MIXER_MAX_BUFFERS; ++i) {
         ch->Slots[i].State = SLOT_FREE;
     }
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 void Mixer_Get_Channel_Counts(MixerChannel* ch, unsigned& queued, unsigned& played)
@@ -524,13 +631,13 @@ void Mixer_Get_Channel_Counts(MixerChannel* ch, unsigned& queued, unsigned& play
     Lock_Audio();
     queued = ch->BytesQueued;
     played = ch->BytesPlayed;
-    SDL_UnlockAudio();
+    Unlock_Audio();
 }
 
 bool Mixer_Is_Playing(MixerChannel* ch)
 {
     Lock_Audio();
     bool playing = ch->Playing && ch->Slots[ch->Head].State == SLOT_QUEUED;
-    SDL_UnlockAudio();
+    Unlock_Audio();
     return playing;
 }

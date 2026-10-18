@@ -25,5 +25,13 @@ If "<VanillaTD$DataProblem>"<>"" Then Error Tiberian Dawn's game data isn't inst
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaTD$Dir>.Modules.DRenderer
+| Sound: SharedSoundBuffer mixes the game's sound with other programs' sound, if SharedSound,
+| StreamManager and SharedSoundBuffer are in !System (not included here; StreamManager and
+| SharedSoundBuffer are in ssb.zip on the RDPClient page). Without them, or with
+| DigitalRenderer here, DigitalRenderer plays it.
+Set VanillaTD$Sound DigitalRenderer
+If "<VanillaTD$Sound>"="SharedSoundBuffer" Then RMEnsure SharedSound 1.07 IfThere System:Modules.SSound Then RMLoad System:Modules.SSound
+If "<VanillaTD$Sound>"="SharedSoundBuffer" Then RMEnsure StreamManager 0.03 IfThere System:Modules.StreamMan Then RMLoad System:Modules.StreamMan
+If "<VanillaTD$Sound>"="SharedSoundBuffer" Then RMEnsure SharedSoundBuffer 0.07 IfThere System:Modules.SSBuffer Then RMLoad System:Modules.SSBuffer
 WimpSlot -min 4000K -max 4000K
 Run <VanillaTD$Dir>.!RunImage %*0 >/<VanillaTD$Dir>/stdout 2>/<VanillaTD$Dir>/stderr

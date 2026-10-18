@@ -132,6 +132,17 @@ size of the original DOS version, which is about twice as fast on a Risc
 PC. It uses the game's own low-resolution graphics: less of the map
 fits on the screen and the sidebar is smaller.
 
+Sound alongside other programs: DigitalRenderer plays sound for one
+program at a time. To mix the game's sound with other programs' instead,
+set VanillaRA$Sound to SharedSoundBuffer in !VanillaRA.!Run. That needs
+SharedSound 1.07 or later (part of RISC OS 5), StreamManager and
+SharedSoundBuffer in !System. StreamManager and SharedSoundBuffer are John
+Duffell's freeware and aren't included; they are in ssb.zip on the
+RDPClient page, http://orac.co.uk/software/rdpclient/rdpclient.html.
+A program that plays through DigitalRenderer still takes the sound for
+itself while it plays. Without the modules, DigitalRenderer plays the
+game's sound as usual.
+
 Saved games are stored in !VanillaRA. They can be moved between RISC OS
 machines but can't be loaded by Vanilla Conquer on other platforms, or
 by the original game.

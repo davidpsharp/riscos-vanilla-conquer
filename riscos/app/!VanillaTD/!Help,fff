@@ -154,6 +154,17 @@ and units look exactly the same, but less of the map fits on the screen
 and the sidebar is smaller. The 320x200 sidebar and small fonts are made
 from the Windows 95 version's own graphics, so no other files are needed.
 
+Sound alongside other programs: DigitalRenderer plays sound for one
+program at a time. To mix the game's sound with other programs' instead,
+set VanillaTD$Sound to SharedSoundBuffer in !VanillaTD.!Run. That needs
+SharedSound 1.07 or later (part of RISC OS 5), StreamManager and
+SharedSoundBuffer in !System. StreamManager and SharedSoundBuffer are John
+Duffell's freeware and aren't included; they are in ssb.zip on the
+RDPClient page, http://orac.co.uk/software/rdpclient/rdpclient.html.
+A program that plays through DigitalRenderer still takes the sound for
+itself while it plays. Without the modules, DigitalRenderer plays the
+game's sound as usual.
+
 Saved games are stored in !VanillaTD (for example !VanillaTD.000.SAVEGAME
 for slot 0). They can be moved between RISC OS machines but can't be
 loaded by Vanilla Conquer on other platforms, or by the original game.

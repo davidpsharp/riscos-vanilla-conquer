@@ -20,6 +20,7 @@
 #include "ccfile.h"
 #include "gitinfo.h"
 #include "ini.h"
+#include "mixer_sdl1.h"
 #include "settings.h"
 
 #include <SDL.h>
@@ -461,7 +462,7 @@ static void Quit_Game(void)
 {
     fprintf(stderr, "desktop: quit from the icon bar\n");
     if (AudioPaused) {
-        SDL_PauseAudio(0);
+        Mixer_Pause(false);
     }
     Prog_End(nullptr, false); // exiting with the sound still open fails in SDL_Quit's audio
     exit(0); // SDL_Quit (atexit) closes the task, which takes the icon away
@@ -701,13 +702,13 @@ void RISCOS_Desktop_Start(void)
 
     if (IconHandle >= 0 && RISCOS_Desktop_Click_To_Start && !restarted && getenv("VC_NODESKTOP") == nullptr) {
         fprintf(stderr, "desktop: waiting for a click on the icon bar\n");
-        AudioPaused = SDL_GetAudioStatus() == SDL_AUDIO_PLAYING; // in case the sound is set up first
+        AudioPaused = Mixer_Is_Running(); // in case the sound is set up first
         if (AudioPaused) {
-            SDL_PauseAudio(1);
+            Mixer_Pause(true);
         }
         Wait_For_Icon_Click();
         if (AudioPaused) {
-            SDL_PauseAudio(0);
+            Mixer_Pause(false);
             AudioPaused = false;
         }
     }
@@ -733,15 +734,15 @@ void RISCOS_Desktop_Suspend(void)
     }
     fprintf(stderr, "desktop: left for the desktop\n");
     Focus_Loss();
-    AudioPaused = SDL_GetAudioStatus() == SDL_AUDIO_PLAYING;
+    AudioPaused = Mixer_Is_Running();
     if (AudioPaused) {
-        SDL_PauseAudio(1);
+        Mixer_Pause(true);
     }
     Video_Leave_For_Desktop();
     Wait_For_Icon_Click();
     Video_Return_From_Desktop();
     if (AudioPaused) {
-        SDL_PauseAudio(0);
+        Mixer_Pause(false);
         AudioPaused = false;
     }
     Focus_Restore();

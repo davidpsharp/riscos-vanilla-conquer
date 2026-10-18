@@ -36,6 +36,9 @@
 
 #include "function.h"
 #include "common/riscos_desktop.h"
+#ifdef __riscos__
+#include "common/mixer_sdl1.h"
+#endif
 #include "language.h"
 #include "settings.h"
 #include "common/gitinfo.h"
@@ -297,6 +300,9 @@ int main(int argc, char* argv[])
         // The icon bar icon and its Info window; any -AUTOSTART goes straight into the game.
         static const RISCOSDesktopApp app = {"!vanillara", "Vanilla RA", "C&C: Red Alert", "Electronic Arts; Vanilla Conquer", "REDALERT.INI", "VanillaRA"};
         RISCOS_Desktop_Set_App(app);
+        // VanillaRA$Sound SharedSoundBuffer (in !Run): mix with other programs' sound when those
+        // modules are loaded; otherwise, and by default, SDL and DigitalRenderer play it.
+        Mixer_Prefer_Output(getenv("VanillaRA$Sound"));
         for (int i = 1; i < argc; i++) {
             if (strncasecmp(argv[i], "-AUTOSTART", 10) == 0) {
                 RISCOS_Desktop_Click_To_Start = false;
