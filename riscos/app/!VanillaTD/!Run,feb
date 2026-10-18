@@ -1,12 +1,6 @@
 | !Run for Vanilla Conquer: Tiberian Dawn
 Set VanillaTD$Dir <Obey$Dir>
 IconSprites <VanillaTD$Dir>.!Sprites
-| The game data comes from the original CD images (ISO files), installed by Prepare.
-| Without it, open !Help, which says where to get them and how, and stop.
-Set VanillaTD$NoData 1
-IfThere <VanillaTD$Dir>.MIX.CONQUER Then Set VanillaTD$NoData 0
-If "<VanillaTD$NoData>"="1" Then Filer_Run <VanillaTD$Dir>.!Help
-If "<VanillaTD$NoData>"="1" Then Error Tiberian Dawn's game data isn't installed. It comes from the freeware C&C95 CD images (ISO files): !Help, now open, says where to get them and how to install them with Prepare.
 | Low resolution: 1 runs the game at 320x200 (the DOS version's size), about twice
 | as fast, for slower machines; 0 runs it at 640x400. The map and units look the same,
 | with less of the map on screen and a smaller sidebar.
@@ -15,6 +9,20 @@ Set VanillaTD$LowRes 0
 RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad System:Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 RMLoad <VanillaTD$Dir>.Modules.SharedULib
 RMEnsure SharedUnixLibrary 1.16 Error Vanilla Conquer needs SharedUnixLibrary 1.16 or later
+| The game data comes from the original CD images (ISO files), installed by Prepare.
+| Utils.vcprep checks that every file is there at its size (no checksums, so it's quick);
+| without it, that MIX.CONQUER is. If anything is wrong, open !Help, which says where to get
+| the images and how to install them, and stop. VanillaTD$NoDataCheck skips the check.
+WimpSlot -min 1000K -max 1000K
+Set VanillaTD$Checker 0
+IfThere <VanillaTD$Dir>.Utils.vcprep Then Set VanillaTD$Checker 1
+Set VanillaTD$DataProblem MIX.CONQUER is missing
+If <VanillaTD$Checker>=1 Then Run <VanillaTD$Dir>.Utils.vcprep -check td -app <VanillaTD$Dir>
+If <VanillaTD$Checker>=0 Then IfThere <VanillaTD$Dir>.MIX.CONQUER Then Unset VanillaTD$DataProblem
+Unset VanillaTD$Checker
+If "<VanillaTD$NoDataCheck>"<>"" Then Unset VanillaTD$DataProblem
+If "<VanillaTD$DataProblem>"<>"" Then Filer_Run <VanillaTD$Dir>.!Help
+If "<VanillaTD$DataProblem>"<>"" Then Error Tiberian Dawn's game data isn't installed, or is incomplete (<VanillaTD$DataProblem>). !Help, now open, says where to get the freeware C&C95 CD images (ISO files) and how to install them with Prepare.
 | DigitalRenderer plays the sound (via SDL). Without it the game runs silently.
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <VanillaTD$Dir>.Modules.DRenderer

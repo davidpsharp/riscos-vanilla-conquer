@@ -69,7 +69,15 @@ the ISO files (it also installs Tiberian Dawn's, if you have !VanillaTD):
 Prepare installs from every disc image it finds in its own directory,
 reading the ISO files directly (no CD drive or CDFS needed), and checks
 each file it writes against a known checksum. Files already installed
-are skipped, so it's safe to run it again.
+are skipped, so it's safe to run it again. Each file is only given its
+real name once it's right, so if Prepare is stopped part-way (Escape, a
+full disc, a power cut), running it again redoes the file it didn't
+finish.
+
+Every time the game starts, !Run checks that its files are all there at
+the right sizes (it takes a moment); if one isn't, it says which, opens
+this file and doesn't start the game. *Set VanillaRA$NoDataCheck 1 skips
+that check, for game data from elsewhere.
 
 From the command line you can also name the images and give options:
 

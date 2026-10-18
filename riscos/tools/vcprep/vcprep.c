@@ -5,10 +5,20 @@
 ** and checks every file it writes against a known CRC-32.
 **
 ** Usage: vcprep [-nomovies] [-force] [-app <app dir>] [-search <dir>] [<iso image>...]
+**        vcprep -check td -app <!VanillaTD dir> | -check ra -raapp <!VanillaRA dir>
 **   -nomovies  leave out MOVIES.MIX (about 430 MB per disc)
 **   -force     rewrite files that are already present with the right size
 **   -app       the !VanillaTD directory; defaults to <VanillaTD$Dir>
 **   -search    with no images named, install from every C&C95 CD image here
+**   -check     only check that a game's files are all there at their sizes (no
+**              checksums, so it takes a moment): !Run does this before every game.
+**              The first problem goes in VanillaTD$DataProblem or VanillaRA$DataProblem,
+**              which is unset when all is well; the exit code is 0 or 1.
+**
+** Each file is written under a temporary name and only given its own once its size
+** and CRC are right, so a file under its real name is always a whole, checked copy:
+** an interrupted run (Escape, a full disc, a power cut) leaves nothing that looks
+** installed, and running Prepare again redoes that file.
 **
 ** The shared files are identical on both discs; GENERAL and MOVIES go into
 ** the gdi or nod directory for each disc.
@@ -228,19 +238,49 @@ static int Already_Present(const struct Known* k, const char* path)
     return 0;
 }
 
-static void Check(const struct Known* k, unsigned long size, unsigned long crc)
+/* The temporary name a file is written under: its leaf with "_" added, still within the
+** 10 characters older filing systems allow, in the same directory so it can be renamed. */
+static void Temp_Path(const char* path, char* out, size_t outlen)
 {
-    if (size != k->size || crc != k->crc) {
-        printf("  %-12s CHECKSUM MISMATCH: got %lu bytes crc %08lx, expected %lu bytes crc %08lx\n",
+    snprintf(out, outlen, "%s_", path);
+}
+
+/* Removes what an interrupted run may have left under a file's temporary name. */
+static void Remove_Temp(const struct Known* k)
+{
+    char path[1024], temp[1040];
+    Dest_Path(k, path, sizeof(path));
+    Temp_Path(path, temp, sizeof(temp));
+    remove(temp);
+}
+
+/*
+** Gives a file written under its temporary name its real one, if it came out at the
+** right size and CRC; otherwise deletes it, so that nothing is left that looks
+** installed. failed says the copy already went wrong (and said so).
+*/
+static void Commit(const struct Known* k, const char* temp, const char* path, unsigned long size,
+                   unsigned long crc, int failed, int type)
+{
+    if (!failed && size == k->size && crc == k->crc) {
+        remove(path); /* RISC OS can't rename over an existing file */
+        if (rename(temp, path) == 0) {
+            Set_Type(path, type);
+            printf("  %-12s ok   \n", k->name); /* spaces cover the progress percentage */
+            return;
+        }
+        printf("  %-12s can't be given its name: %s\n", k->name, strerror(errno));
+    } else if (!failed) {
+        printf("  %-12s CHECKSUM MISMATCH: got %lu bytes crc %08lx, expected %lu bytes crc %08lx;"
+               " not installed\n",
                k->name,
                size,
                crc,
                k->size,
                k->crc);
-        ++Problems;
-    } else {
-        printf("  %-12s ok   \n", k->name); /* spaces cover the progress percentage */
     }
+    remove(temp);
+    ++Problems;
 }
 
 /* ---- ISO 9660 ---- */
@@ -316,10 +356,11 @@ static int Open_Root(struct Entry* root)
 
 static void Copy_Plain(const struct Entry* root, const struct Known* k)
 {
-    char path[1024];
+    char path[1024], temp[1040];
     struct Entry e;
     FILE* out;
     unsigned long left, crc = 0, done = 0, next_dot = 0;
+    int failed = 0;
 
     Dest_Path(k, path, sizeof(path));
     if (Already_Present(k, path)) {
@@ -335,9 +376,10 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     }
 
     Make_Dirs(path);
-    out = fopen(path, "wb");
+    Temp_Path(path, temp, sizeof(temp));
+    out = fopen(temp, "wb");
     if (out == NULL) {
-        printf("  %-12s can't create %s: %s\n", k->name, path, strerror(errno));
+        printf("  %-12s can't create %s: %s\n", k->name, temp, strerror(errno));
         ++Problems;
         return;
     }
@@ -348,11 +390,13 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     for (left = e.size; left > 0;) {
         size_t chunk = left < sizeof(Buffer) ? (size_t)left : sizeof(Buffer);
         if (fread(Buffer, 1, chunk, Iso) != chunk) {
-            printf("  %-12s read error\n", k->name);
+            printf("  %-12s read error; not installed\n", k->name);
+            failed = 1;
             break;
         }
         if (fwrite(Buffer, 1, chunk, out) != chunk) {
-            printf("  %-12s write error (disc full?)\n", k->name);
+            printf("  %-12s write error (disc full?); not installed\n", k->name);
+            failed = 1;
             break;
         }
         crc = Crc_Update(crc, Buffer, chunk);
@@ -364,9 +408,11 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
             next_dot = done + 10000000UL;
         }
     }
-    fclose(out);
-    Set_Type(path, FILETYPE_DATA);
-    Check(k, done, crc);
+    if (fclose(out) != 0 && !failed) {
+        printf("  %-12s write error (disc full?); not installed\n", k->name);
+        failed = 1;
+    }
+    Commit(k, temp, path, done, crc, failed, FILETYPE_DATA);
 }
 
 /* ---- InstallShield 3 archive (SETUP.Z) ---- */
@@ -466,9 +512,10 @@ static void Extract_Archive(const struct Entry* root)
 
                 for (k = 0; k < sizeof(Archive_Files) / sizeof(Archive_Files[0]); ++k) {
                     const struct Known* kn = &Archive_Files[k];
-                    char path[1024];
+                    char path[1024], temp[1040];
                     struct Blast_Io io;
                     FILE* out;
+                    int failed = 0;
 
                     if (found[k] || strcmp(name, kn->name) != 0) {
                         continue;
@@ -486,9 +533,10 @@ static void Extract_Archive(const struct Entry* root)
                     }
 
                     Make_Dirs(path);
-                    out = fopen(path, "wb");
+                    Temp_Path(path, temp, sizeof(temp));
+                    out = fopen(temp, "wb");
                     if (out == NULL) {
-                        printf("  %-12s can't create %s: %s\n", kn->name, path, strerror(errno));
+                        printf("  %-12s can't create %s: %s\n", kn->name, temp, strerror(errno));
                         ++Problems;
                         continue;
                     }
@@ -503,14 +551,23 @@ static void Extract_Archive(const struct Entry* root)
                         while ((n = Blast_In(&io, &buf)) > 0 && !Blast_Out(&io, buf, n)) {
                         }
                     } else if (blast(Blast_In, &io, Blast_Out, &io, NULL, NULL) != 0 && !io.write_error) {
-                        printf("  %-12s decompression failed\n", kn->name);
+                        printf("  %-12s decompression failed; not installed\n", kn->name);
+                        failed = 1;
                     }
-                    if (io.write_error) {
-                        printf("  %-12s write error (disc full?)\n", kn->name);
+                    if (fclose(out) != 0) {
+                        io.write_error = 1;
                     }
-                    fclose(out);
-                    Set_Type(path, strcmp(kn->name, "CONQUER.INI") == 0 ? FILETYPE_TEXT : FILETYPE_DATA);
-                    Check(kn, io.out_size, io.crc);
+                    if (io.write_error && !failed) {
+                        printf("  %-12s write error (disc full?); not installed\n", kn->name);
+                        failed = 1;
+                    }
+                    Commit(kn,
+                           temp,
+                           path,
+                           io.out_size,
+                           io.crc,
+                           failed,
+                           strcmp(kn->name, "CONQUER.INI") == 0 ? FILETYPE_TEXT : FILETYPE_DATA);
                 }
             }
         }
@@ -524,11 +581,11 @@ static void Extract_Archive(const struct Entry* root)
     }
 }
 
-/* Installs from one disc image. Returns 0 if it isn't a C&C95 GDI or Nod disc. */
-/* Checks a file already written, by size and CRC. */
-static void Check_File(const struct Known* k, const char* path)
+/* Checks a file another program wrote under its temporary name, by size and CRC, and
+** gives it its real name if it's right. */
+static void Check_File(const struct Known* k, const char* temp, const char* path)
 {
-    FILE* f = fopen(path, "rb");
+    FILE* f = fopen(temp, "rb");
     unsigned long crc = 0, size = 0;
     size_t n;
     if (f == NULL) {
@@ -541,8 +598,7 @@ static void Check_File(const struct Known* k, const char* path)
         size += n;
     }
     fclose(f);
-    Set_Type(path, FILETYPE_DATA);
-    Check(k, size, crc);
+    Commit(k, temp, path, size, crc, 0, FILETYPE_DATA);
 }
 
 static int Install_RA(const char* iso_name, const struct Entry* root, const struct Entry* main_mix, int movies)
@@ -568,13 +624,19 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
     }
     App_Dir = RA_Dir;
     printf("%s: Red Alert %s disc, installing into %s\n", iso_name, disc->name, App_Dir);
+    Remove_Temp(&RA_Redalert);
+    Remove_Temp(&RA_No_Movies);
+    for (k = 0; k < sizeof(RA_Discs) / sizeof(RA_Discs[0]); ++k) {
+        Remove_Temp(&RA_Discs[k].main);
+    }
     Copy_Plain(&install, &RA_Redalert);
     if (movies) {
         Copy_Plain(root, &disc->main);
     } else {
         /* MAIN.MIX without its movies, straight from the image. */
-        char path[1024], command[3072];
+        char path[1024], temp[1040], command[3072];
         Dest_Path(&RA_No_Movies, path, sizeof(path));
+        Temp_Path(path, temp, sizeof(temp));
         if (!Already_Present(&RA_No_Movies, path)) {
             Make_Dirs(path);
             printf("  %-12s without its movies (-nomovies)\n", RA_No_Movies.name);
@@ -585,12 +647,13 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
                      App_Dir,
                      iso_name,
                      main_mix->lba * SECTOR,
-                     path);
+                     temp);
             if (system(command) != 0) {
-                printf("  %-12s Utils.ramix failed\n", RA_No_Movies.name);
+                printf("  %-12s Utils.ramix failed; not installed\n", RA_No_Movies.name);
+                remove(temp);
                 ++Problems;
             } else {
-                Check_File(&RA_No_Movies, path);
+                Check_File(&RA_No_Movies, temp, path);
             }
         }
     }
@@ -655,6 +718,15 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
     Side_Dir = side->dir;
     App_Dir = TD_Dir;
     printf("%s: %s disc, installing into %s\n", iso_name, strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
+
+    for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
+        Remove_Temp(&Disc_Files[k]);
+    }
+    for (k = 0; k < sizeof(Archive_Files) / sizeof(Archive_Files[0]); ++k) {
+        Remove_Temp(&Archive_Files[k]);
+    }
+    Remove_Temp(&side->general);
+    Remove_Temp(&side->movies);
 
     for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
         Copy_Plain(&root, &Disc_Files[k]);
@@ -741,11 +813,108 @@ static const char* Canonical(const char* path)
 #define Canonical(path) (path)
 #endif
 
+/* ---- -check: is a game's data all there? ---- */
+
+static char Problem[200];
+
+/* The first problem found is the one reported. */
+static void Note_Problem(const struct Known* k, const char* what)
+{
+    const char* d = k->dest;
+    if (Problem[0] != '\0') {
+        return;
+    }
+    if (d[0] == '@') {
+        snprintf(Problem, sizeof(Problem), "%s%s %s", Side_Dir, d + 1, what);
+    } else {
+        snprintf(Problem, sizeof(Problem), "%s %s", d, what);
+    }
+}
+
+/* 1 if the file is there at its size; 0 if it's missing (a problem if required); -1, always a
+** problem, if it's there at the wrong size: a damaged or partly copied file. */
+static int Check_Present(const struct Known* k, int required)
+{
+    char path[1024];
+    long size;
+    Dest_Path(k, path, sizeof(path));
+    size = File_Size(path);
+    if (size < 0) {
+        if (required) {
+            Note_Problem(k, "is missing");
+        }
+        return 0;
+    }
+    if (size != (long)k->size) {
+        Note_Problem(k, "is the wrong size");
+        return -1;
+    }
+    return 1;
+}
+
+/* Tiberian Dawn: the files both discs share, and at least one disc's GENERAL. The movies
+** are optional, and so is CONQUER.INI (the game makes one; its size changes with the
+** settings in it). */
+static void Check_TD(void)
+{
+    size_t k;
+    int generals = 0;
+    App_Dir = TD_Dir;
+    for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
+        Check_Present(&Disc_Files[k], 1);
+    }
+    for (k = 0; k < sizeof(Archive_Files) / sizeof(Archive_Files[0]); ++k) {
+        if (strcmp(Archive_Files[k].name, "CONQUER.INI") != 0) {
+            Check_Present(&Archive_Files[k], 1);
+        }
+    }
+    for (k = 0; k < sizeof(Sides) / sizeof(Sides[0]); ++k) {
+        Side_Dir = Sides[k].dir;
+        generals += Check_Present(&Sides[k].general, 0) > 0;
+        Check_Present(&Sides[k].movies, 0);
+    }
+    if (generals == 0 && Problem[0] == '\0') {
+        snprintf(Problem, sizeof(Problem), "gdi" SEP "MIX" SEP "GENERAL or nod" SEP "MIX" SEP "GENERAL is missing");
+    }
+}
+
+/* Red Alert: REDALERT, and a MAIN, without movies or either disc's own. */
+static void Check_RA(void)
+{
+    size_t k;
+    int mains;
+    App_Dir = RA_Dir;
+    Check_Present(&RA_Redalert, 1);
+    mains = Check_Present(&RA_No_Movies, 0) > 0;
+    for (k = 0; k < sizeof(RA_Discs) / sizeof(RA_Discs[0]); ++k) {
+        mains += Check_Present(&RA_Discs[k].main, 0) > 0;
+    }
+    if (mains == 0 && Problem[0] == '\0') {
+        snprintf(Problem, sizeof(Problem), "MIX" SEP "MAIN is missing");
+    }
+}
+
+/* Puts the problem (or nothing) in the game's variable, for its !Run. */
+static void Report_Check(const char* var)
+{
+#ifdef __riscos__
+    if (Problem[0] != '\0') {
+        _swix(OS_SetVarVal, _INR(0, 4), var, Problem, (int)strlen(Problem), 0, 4);
+    } else {
+        _swix(OS_SetVarVal, _INR(0, 4), var, NULL, -1, 0, 0);
+    }
+#else
+    /* Nothing goes to the screen on RISC OS: !Run runs this in the desktop. */
+    printf("%s: %s\n", var, Problem[0] != '\0' ? Problem : "all there");
+#endif
+}
+
 static int Usage(void)
 {
     fprintf(stderr,
             "usage: vcprep [-nomovies] [-force] [-app <!VanillaTD dir>] [-raapp <!VanillaRA dir>] [-search <dir>]\n"
             "              [<CD image>...]\n"
+            "       vcprep -check td -app <!VanillaTD dir> | -check ra -raapp <!VanillaRA dir>\n"
             "  Installs from the C&C95 and Red Alert CD images given, or else every one in the -search\n"
             "  directory. The application directories default to <VanillaTD$Dir> and <VanillaRA$Dir>.\n");
     return 2;
@@ -757,6 +926,7 @@ int main(int argc, char** argv)
     const char* images[8];
     int num_images = 0, installed = 0;
     int movies = 1;
+    const char* check = NULL;
     int i;
 
     for (i = 1; i < argc; ++i) {
@@ -770,6 +940,8 @@ int main(int argc, char** argv)
             RA_Dir = argv[++i];
         } else if (strcmp(argv[i], "-search") == 0 && i + 1 < argc) {
             search = argv[++i];
+        } else if (strcmp(argv[i], "-check") == 0 && i + 1 < argc) {
+            check = argv[++i];
         } else if (argv[i][0] == '-' || num_images == (int)(sizeof(images) / sizeof(images[0]))) {
             return Usage();
         } else {
@@ -784,6 +956,19 @@ int main(int argc, char** argv)
     }
     TD_Dir = TD_Dir != NULL && *TD_Dir != '\0' ? Canonical(TD_Dir) : NULL;
     RA_Dir = RA_Dir != NULL && *RA_Dir != '\0' ? Canonical(RA_Dir) : NULL;
+    if (check != NULL) {
+        int td = strcmp(check, "td") == 0;
+        if ((!td && strcmp(check, "ra") != 0) || (td ? TD_Dir : RA_Dir) == NULL) {
+            return Usage();
+        }
+        if (td) {
+            Check_TD();
+        } else {
+            Check_RA();
+        }
+        Report_Check(td ? "VanillaTD$DataProblem" : "VanillaRA$DataProblem");
+        return Problem[0] != '\0';
+    }
     if ((TD_Dir == NULL && RA_Dir == NULL) || (num_images == 0 && search == NULL)) {
         return Usage();
     }

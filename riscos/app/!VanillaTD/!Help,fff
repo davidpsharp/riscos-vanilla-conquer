@@ -79,7 +79,15 @@ drive or CDFS needed), unpacks the game files into !VanillaTD and checks
 each one against a known checksum. It recognises the images by their
 contents, so it doesn't matter if RISC OS has shortened their names.
 The files both discs share are only written once, and files already
-installed are skipped, so it's safe to run it again.
+installed are skipped, so it's safe to run it again. Each file is checked
+as it's written and only given its real name once it's right, so if
+Prepare is stopped part-way (Escape, a full disc, a power cut), running
+it again redoes the file it didn't finish.
+
+Every time the game starts, !Run checks that its files are all there at
+the right sizes (it takes a moment); if one isn't, it says which, opens
+this file and doesn't start the game. *Set VanillaTD$NoDataCheck 1 skips
+that check, for game data from elsewhere.
 
 From the command line you can also name the images and give options:
 

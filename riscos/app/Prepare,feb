@@ -7,6 +7,9 @@
 | -nomovies leaves out the movies (about 430 MB per C&C95 disc, 370-415 MB per
 | Red Alert disc).
 | -force rewrites files that are already present.
+| Each file is only given its name once it's checked, so running Prepare again after an
+| interrupted run redoes the file it didn't finish. !Run checks the files before each game
+| with Utils.vcprep -check.
 If "<VanillaTD$Dir>"="" AND "<VanillaRA$Dir>"="" Then Error Prepare doesn't know where !VanillaTD or !VanillaRA is yet. Open the directory containing them, then run Prepare again.
 Set Prepare$Dir <VanillaTD$Dir>
 If "<Prepare$Dir>"="" Then Set Prepare$Dir <VanillaRA$Dir>
