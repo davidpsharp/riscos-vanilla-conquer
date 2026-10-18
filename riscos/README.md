@@ -129,10 +129,10 @@ Why it's this fast: on RISC OS the game skips `Resolve_File`'s case-fixing direc
 
 ## Installing the game data on RISC OS
 
-The game data isn't redistributable, so `!VanillaTD` ships without it. `Prepare`, which comes in the zip next to `!VanillaTD`, installs it from the freeware C&C95 (C&C Gold) CD images, on the RISC OS machine itself. Once the Filer has seen `!VanillaTD` (`!Boot` sets `VanillaTD$Dir`), copy `Prepare` next to the ISOs and double-click it. It installs from every C&C95 image in its own directory. The ISOs therefore don't have to be on the same disc as the game. From the command line:
+The game data isn't redistributable, so `!VanillaTD` ships without it. It's installed from the freeware C&C95 (C&C Gold) CD images on the RISC OS machine itself, by dragging the ISO files onto the game's icon-bar icon (`common/riscos_desktop.cpp`). The game identifies each file from its ISO 9660 directory (`riscos/tools/vcprep/discid.h`, shared with the OpenTS port, which knows all seven freeware discs and the MS-DOS C&C ones) and runs `Utils.vcprep -window` in a task window, which only opens if something goes wrong. From the command line:
 
 ```
-*Obey <path>.Prepare [<CD image>...] [-nomovies] [-force]
+*Run <VanillaTD$Dir>.Utils.vcprep -app <VanillaTD$Dir> [<CD image>...] [-nomovies] [-force]
 ```
 
 It runs `!VanillaTD.Utils.vcprep` (source in `tools/vcprep`), which:
@@ -290,7 +290,7 @@ riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-
 ```
 
 `make-release.sh` builds the game, then assembles `!VanillaTD` in `build/release`, with:
-- `!RunImage`, `Prepare` and `Utils.vcprep`
+- `!RunImage` and `Utils.vcprep`
 - `!Help`: the user documentation (requirements, installing the data, settings, network play, known issues)
 - `!Sprites`/`!Sprites22`: made from `resources/vanillatd_icon.svg` by `tools/make-sprites.py`
 - `Modules`: SharedUnixLibrary and DigitalRenderer
@@ -298,7 +298,7 @@ riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-
 
 It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype in the zip's Acorn extra field, which SparkFS, SparkPlug and Info-ZIP read.
 
-**Layout:** `Prepare` sits at the top level of the zip, next to `!VanillaTD`, so it can be copied to wherever the ISOs are. It finds the app through `VanillaTD$Dir`, which `!Boot` sets, and refuses to run if the Filer hasn't seen `!VanillaTD` yet.
+**Layout:** the zip holds only `!VanillaTD` (or `!VanillaRA`); the CD images are dragged onto its icon.
 
 **Tested on RO 3.71:** Prepare double-clicked in a directory holding the GDI ISO, the Nod ISO under a truncated name (`CNC95_Nod_`) and a DOS ISO. It installed both discs including the movies, skipped the DOS disc, and the intro then played. Before the Filer had seen `!VanillaTD`, it gave its error instead. From the command line, `-nomovies` and a bare image name both work.
 
