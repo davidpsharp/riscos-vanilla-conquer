@@ -112,7 +112,7 @@ the original game; F9 to F12 are map bookmarks (Ctrl+F9 to set one).
 Double-clicking !VanillaTD puts its icon on the icon bar; click the icon
 to start the game. Shift+F12 in the game goes back to the desktop, with
 the game paused where it was (sound too); click the icon again to carry
-on. The icon's menu has Info and Quit.
+on. The icon's menu has Info, Screen size (see below) and Quit.
 
 Settings are in !VanillaTD.INI.CONQUER, which the game creates the first
 time it runs. Settings that may be useful on RISC OS:
@@ -129,26 +129,30 @@ time it runs. Settings that may be useful on RISC OS:
   [Intro]
   PlayLogo=No            Skip the Westwood logo at start-up.
 
-Bigger screens: on a fast machine such as a Raspberry Pi, the game uses
-a bigger screen to show more of the battlefield, with a taller sidebar:
-the shape of the desktop, at most 1280 wide (1280x800 on a 1680x1050
-desktop). To choose another size, set it in !VanillaTD.INI.CONQUER (a
-text file; create it if it isn't there), for example:
+Screen size: the first time it runs, the game measures this machine's
+speed for under a second (the desktop pauses) and picks the largest
+screen in the shape of the desktop that it can keep smooth: the
+desktop's own size on a Raspberry Pi 4, 640x400 on a Risc PC. Bigger
+screens show more of the battlefield, with a taller sidebar; the menus,
+movies and briefings stay 640x400, in the middle of the screen.
+
+To choose another size, use Screen size on the icon's menu: Automatic
+(the size it picked, shown in brackets), the usual sizes the monitor
+can show, and 320x200 (low resolution). Choose it before clicking the
+icon to start, and the game starts at that size. The choice is saved
+for next time. Chosen while a game is in progress (after Shift+F12), it
+restarts the game, after asking: the game in progress is lost, so save
+it first. Any size from 640x400 up to 2048x2048 can also be set in
+!VanillaTD.INI.CONQUER (a text file), for example:
 
   [Video]
   Resolution=1024x768
 
-Any size from 640x400 up to 2048x2048 works; 640x400 gives the original
-view. The menus, movies and briefings stay 640x400, in the middle of the
-screen. A Risc PC uses 640x400.
-
 Low resolution: for slower machines, the game can run at 320x200, the
-size of the original DOS version, which is about twice as fast. Set
-VanillaTD$LowRes to 1 in !VanillaTD.!Run to use it (Shift-double-click
-!VanillaTD to open it, then load !Run into a text editor). The map and
-units look exactly the same, but less of the map fits on the screen and
-the sidebar is smaller. The 320x200 sidebar and small fonts are made from
-the Windows 95 version's own graphics, so no other files are needed.
+size of the original DOS version, which is about twice as fast. The map
+and units look exactly the same, but less of the map fits on the screen
+and the sidebar is smaller. The 320x200 sidebar and small fonts are made
+from the Windows 95 version's own graphics, so no other files are needed.
 
 Saved games are stored in !VanillaTD (for example !VanillaTD.000.SAVEGAME
 for slot 0). They can be moved between RISC OS machines but can't be

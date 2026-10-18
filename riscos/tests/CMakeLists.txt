@@ -14,6 +14,9 @@ endif()
 add_executable(dirprobe dirprobe.c)
 add_executable(bigalloc bigalloc.c)
 add_executable(readspeed readspeed.c)
+# The game's speed test alone, for calibrating it on real machines.
+add_executable(speedtest speedtest.cpp ../../common/riscos_speedtest.cpp)
+target_include_directories(speedtest PRIVATE ../../common)
 
 find_package(SDL REQUIRED)
 add_executable(sdltest sdltest.cpp)
@@ -30,7 +33,7 @@ target_include_directories(sdltest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(sdltest PRIVATE ${SDL_LIBRARY})
 
 if(RISCOS)
-    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest)
+    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest)
         riscos_make_aif(${t})
     endforeach()
 endif()

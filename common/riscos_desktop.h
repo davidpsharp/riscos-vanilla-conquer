@@ -1,7 +1,7 @@
 /*
 ** The game on the RISC OS desktop: an icon on the icon bar that starts the game, and a key (Shift+F12)
 ** that leaves it for the desktop, paused, until the icon is clicked again. The icon's menu has
-** the standard Info and Quit. Elsewhere these do nothing.
+** the standard Info and Quit, and Screen size between them. Elsewhere these do nothing.
 */
 #ifndef RISCOS_DESKTOP_H
 #define RISCOS_DESKTOP_H
@@ -13,18 +13,32 @@ struct RISCOSDesktopApp
     const char* name;    // menu title and Info's Name, e.g. "Vanilla TD"
     const char* purpose; // Info's Purpose
     const char* author;  // Info's Author
+    const char* ini;     // the settings file the screen size is saved in, e.g. "CONQUER.INI"
+    const char* prefix;  // of the application's variables, e.g. "VanillaTD" for VanillaTD$Dir
 };
 
 #ifdef __riscos__
+#include <string>
+
 void RISCOS_Desktop_Set_App(const RISCOSDesktopApp& app);
 
 // False to go straight into the game at the start (e.g. -AUTOSTART), without waiting for a
 // click on the icon; the icon is still put on the icon bar.
 extern bool RISCOS_Desktop_Click_To_Start;
 
-// Called once the game's Wimp task is running (SDL's video), before the game's screen mode is
-// set: puts the icon on the icon bar and, unless told not to, waits for a click on it.
+// Called by the game after reading its settings and before choosing its screen size: makes the
+// game a Wimp task (SDL's video), puts the icon on the icon bar and, unless told not to, waits
+// for a click on it. A screen size chosen from the icon's menu meanwhile is saved in the settings
+// (Settings.Video.Resolution and LowRes), so the game then starts at it.
 void RISCOS_Desktop_Start(void);
+
+// The screen size the game chose, and whether it was forced to 320x200 (a demo, the DOS files, or
+// the LowRes variable), for the menu while the game is on the desktop: choosing another size then
+// restarts the game, after asking.
+void RISCOS_Desktop_Set_Screen(int width, int height, bool forced_low_res);
+
+// The size Settings.Video.Resolution "auto" stands for (riscos_autosize.h), as "WxH".
+const std::string& RISCOS_Desktop_Auto_Resolution(void);
 
 // True for the key that leaves for the desktop: Shift+F12 (as on the desktop, where it brings
 // the icon bar to the front). F12 alone stays the game's (a map bookmark).

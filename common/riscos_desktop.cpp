@@ -9,11 +9,18 @@
 **
 ** The icon's menu and Info window follow the standard ones (Edit's, for instance): the menu has
 ** "Info" leading to "About this program" with Name, Purpose, Author and Version, then "Quit".
+** Between them, "Screen size" leads to the sizes the game can use on this monitor. At the start
+** a choice is only saved, as the game reads it after the click; once the game is running the
+** screen can't change size under it, so a different size restarts the game, after asking.
 */
 #ifdef __riscos__
 
 #include "riscos_desktop.h"
+#include "riscos_autosize.h"
+#include "ccfile.h"
 #include "gitinfo.h"
+#include "ini.h"
+#include "settings.h"
 
 #include <SDL.h>
 #include <kernel.h>
@@ -23,6 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 // SDL's RISC OS port, which keeps the task and the desktop's mode.
 extern "C" int RISCOS_GetTaskHandle(void);
@@ -40,10 +48,15 @@ void Video_Return_From_Desktop(void);
 
 bool RISCOS_Desktop_Click_To_Start = true;
 
-static RISCOSDesktopApp App = {"!vanillatd", "Vanilla", "", ""};
+static RISCOSDesktopApp App = {"!vanillatd", "Vanilla", "", "", "CONQUER.INI", "Vanilla"};
 static int IconHandle = -1;
 static int InfoWindow = -1;
 static bool AudioPaused = false; // by us, while on the desktop
+static bool InGame = false;      // past the click that starts the game
+
+// The screen the game runs at (RISCOS_Desktop_Set_Screen).
+static int ScreenW = 0, ScreenH = 0;
+static bool ForcedLowRes = false;
 
 void RISCOS_Desktop_Set_App(const RISCOSDesktopApp& app)
 {
@@ -175,54 +188,255 @@ static void Create_Info_Window(void)
 }
 
 /*
-** The icon bar menu: Info (leading to the Info window) and Quit.
+** Screen sizes. A choice is a string: "" for the automatic size (the largest this machine keeps
+** smooth, see riscos_autosize.cpp), "320x200" for low resolution, or "WxH".
 */
-static struct
+static const char LowResChoice[] = "320x200";
+
+static std::string App_Variable(const char* name)
+{
+    return std::string(App.prefix) + "$" + name;
+}
+
+const std::string& RISCOS_Desktop_Auto_Resolution(void)
+{
+    return RISCOS_Auto_Resolution(App.ini);
+}
+
+// The low resolution asked for by !Run's variable, which the menu can't override.
+static bool Low_Res_Variable(void)
+{
+    const char* value = getenv(App_Variable("LowRes").c_str());
+    return value != nullptr && *value != '\0' && strcmp(value, "0") != 0;
+}
+
+static std::string Saved_Choice(void)
+{
+    if (Settings.Video.LowRes || Settings.Video.DOSMode) {
+        return LowResChoice;
+    }
+    if (Settings.Video.Resolution == "auto") {
+        return "";
+    }
+    return Settings.Video.Resolution;
+}
+
+static void Choice_Size(const std::string& choice, int& w, int& h)
+{
+    std::string size = choice.empty() ? RISCOS_Desktop_Auto_Resolution() : choice;
+    w = h = 0;
+    sscanf(size.c_str(), "%dx%d", &w, &h);
+}
+
+static void Save_Choice(const std::string& choice)
+{
+    Settings.Video.LowRes = choice == LowResChoice;
+    if (!Settings.Video.LowRes) {
+        Settings.Video.DOSMode = false; // which is 320x200 too
+        Settings.Video.Resolution = choice.empty() ? "auto" : choice;
+    }
+    CCFileClass file(App.ini);
+    INIClass ini;
+    ini.Load(file);
+    Settings.Save(ini);
+    ini.Save(file);
+    fprintf(stderr, "desktop: screen size %s saved\n", choice.empty() ? "(automatic)" : choice.c_str());
+}
+
+/*
+** Menus as the Wimp takes them: a title, colours and sizes, then the items. Item text that fits
+** in 12 characters is held in the item; longer text is indirected.
+*/
+struct MenuItem
+{
+    unsigned flags;
+    int submenu;
+    unsigned icon_flags;
+    union
+    {
+        char text[12];
+        struct
+        {
+            const char* buffer;
+            int validation;
+            int length;
+        } ind;
+    } data;
+};
+
+static const unsigned ItemTicked = 1;
+static const unsigned ItemLast = 0x80;
+static const unsigned ItemText = 0x07000021;   // text, filled, black on white
+static const unsigned ItemIndirected = 0x100;
+static const unsigned ItemShaded = 0x400000;
+
+static const int MaxSizes = 12;
+
+template <int N> struct MenuBlock
 {
     char title[12];
     unsigned char colours[4];
     int width, height, gap;
-    struct
-    {
-        unsigned flags;
-        int submenu;
-        unsigned icon_flags;
-        char text[12];
-    } items[2];
-} Menu;
+    MenuItem items[N];
+};
 
+static MenuBlock<3> Menu;
+static MenuBlock<MaxSizes> SizeMenu;
+static std::string SizeChoices[MaxSizes];
+static char SizeText[MaxSizes][32];
+static int SizeCount = 0;
+
+static void Menu_Header(char* title, unsigned char* colours, int& width, int& height, int& gap, const char* text)
+{
+    strncpy(title, text, 12);
+    colours[0] = 7;
+    colours[1] = 2;
+    colours[2] = 7;
+    colours[3] = 0;
+    width = (int(strlen(text)) + 2) * 16;
+    if (width < 128) {
+        width = 128;
+    }
+    height = 44;
+    gap = 0;
+}
+
+static void Plain_Item(MenuItem& item, const char* text, int submenu)
+{
+    item.flags = 0;
+    item.submenu = submenu;
+    item.icon_flags = ItemText;
+    strncpy(item.data.text, text, sizeof(item.data.text));
+}
+
+// Whether SDL (so the screen) can use a mode of this size at 256 colours.
+static bool Have_Mode(SDL_Rect** modes, int w, int h)
+{
+    if (modes == nullptr || modes == reinterpret_cast<SDL_Rect**>(-1)) {
+        return true; // no list: offer them all
+    }
+    for (int i = 0; modes[i] != nullptr; ++i) {
+        if (modes[i]->w == w && modes[i]->h == h) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void Add_Size(const std::string& choice, const char* text)
+{
+    if (SizeCount == MaxSizes) {
+        return;
+    }
+    SizeChoices[SizeCount] = choice;
+    snprintf(SizeText[SizeCount], sizeof(SizeText[SizeCount]), "%s", text);
+    ++SizeCount;
+}
+
+static void Add_Size(int w, int h)
+{
+    char text[32];
+    snprintf(text, sizeof(text), "%d\xD7%d", w, h); // a multiplication sign, in Latin-1
+    Add_Size(std::to_string(w) + "x" + std::to_string(h), text);
+}
+
+/*
+** The sizes: the automatic one first, then those of the usual ones the monitor has, then low
+** resolution. A size set in the settings file by hand is kept in the list too.
+*/
+static void Build_Size_List(void)
+{
+    SizeCount = 0;
+    int dw, dh;
+    Choice_Size("", dw, dh);
+    char text[32];
+    snprintf(text, sizeof(text), "Automatic (%d\xD7%d)", dw, dh);
+    Add_Size("", text);
+
+    SDL_PixelFormat format;
+    memset(&format, 0, sizeof(format));
+    format.BitsPerPixel = 8;
+    format.BytesPerPixel = 1;
+    SDL_Rect** modes = SDL_ListModes(&format, SDL_FULLSCREEN | SDL_HWSURFACE);
+
+    static const int Presets[][2] = {{640, 400}, {640, 480}, {800, 600}, {1024, 768}, {1280, 800}, {1280, 1024}};
+    std::string saved = Saved_Choice();
+    bool saved_listed = saved.empty() || saved == LowResChoice;
+    for (const auto& size : Presets) {
+        std::string choice = std::to_string(size[0]) + "x" + std::to_string(size[1]);
+        if ((size[0] == dw && size[1] == dh) || !Have_Mode(modes, size[0], size[1])) {
+            continue;
+        }
+        Add_Size(size[0], size[1]);
+        saved_listed = saved_listed || choice == saved;
+    }
+    int sw, sh;
+    Choice_Size(saved, sw, sh);
+    if (!saved_listed && sw > 0 && sh > 0) {
+        Add_Size(sw, sh);
+    }
+    Add_Size(LowResChoice, "320\xD7" "200 (low res)");
+}
+
+// The size menu's ticks and shading, for the size in use now.
+static void Update_Size_Menu(void)
+{
+    std::string current = Saved_Choice();
+    bool forced = ForcedLowRes || Low_Res_Variable();
+    if (forced) {
+        current = LowResChoice;
+    }
+    for (int i = 0; i < SizeCount; ++i) {
+        MenuItem& item = SizeMenu.items[i];
+        item.flags = (SizeChoices[i] == current ? ItemTicked : 0) | (i == SizeCount - 1 ? ItemLast : 0);
+        item.icon_flags = ItemText | ItemIndirected | (forced && SizeChoices[i] != LowResChoice ? ItemShaded : 0);
+    }
+}
+
+static void Build_Size_Menu(void)
+{
+    Build_Size_List();
+    memset(&SizeMenu, 0, sizeof(SizeMenu));
+    Menu_Header(SizeMenu.title, SizeMenu.colours, SizeMenu.width, SizeMenu.height, SizeMenu.gap, "Screen size");
+    for (int i = 0; i < SizeCount; ++i) {
+        MenuItem& item = SizeMenu.items[i];
+        item.submenu = -1;
+        item.data.ind.buffer = SizeText[i];
+        item.data.ind.validation = -1;
+        item.data.ind.length = int(strlen(SizeText[i])) + 1;
+        int width = (int(strlen(SizeText[i])) + 2) * 16;
+        if (width > SizeMenu.width) {
+            SizeMenu.width = width;
+        }
+    }
+    Update_Size_Menu();
+}
+
+/*
+** The icon bar menu: Info (leading to the Info window), Screen size and Quit.
+*/
 static void Build_Menu(void)
 {
     memset(&Menu, 0, sizeof(Menu));
-    strncpy(Menu.title, App.name, sizeof(Menu.title));
-    Menu.colours[0] = 7;
-    Menu.colours[1] = 2;
-    Menu.colours[2] = 7;
-    Menu.colours[3] = 0;
-    Menu.width = (int(strlen(App.name)) + 2) * 16;
-    if (Menu.width < 128) {
-        Menu.width = 128;
+    Menu_Header(Menu.title, Menu.colours, Menu.width, Menu.height, Menu.gap, App.name);
+    Plain_Item(Menu.items[0], "Info", InfoWindow);
+    Plain_Item(Menu.items[1], "Screen size", reinterpret_cast<int>(&SizeMenu));
+    Plain_Item(Menu.items[2], "Quit", -1);
+    Menu.items[2].flags = ItemLast;
+    int width = (int(strlen("Screen size")) + 3) * 16; // and the submenu arrow
+    if (width > Menu.width) {
+        Menu.width = width;
     }
-    Menu.height = 44;
-    Menu.gap = 0;
-
-    Menu.items[0].flags = 0;
-    Menu.items[0].submenu = InfoWindow;
-    Menu.items[0].icon_flags = 0x07000021; // text, filled, black on white
-    strncpy(Menu.items[0].text, "Info", sizeof(Menu.items[0].text));
-
-    Menu.items[1].flags = 0x80; // the last item
-    Menu.items[1].submenu = -1;
-    Menu.items[1].icon_flags = 0x07000021;
-    strncpy(Menu.items[1].text, "Quit", sizeof(Menu.items[1].text));
+    Build_Size_Menu();
 }
 
 static void Open_Menu(int mouse_x)
 {
+    Update_Size_Menu();
     _kernel_swi_regs regs;
     regs.r[1] = reinterpret_cast<int>(&Menu);
     regs.r[2] = mouse_x - 64;
-    regs.r[3] = 96 + 2 * 44; // an icon bar menu sits just above the icon bar
+    regs.r[3] = 96 + 3 * 44; // an icon bar menu sits just above the icon bar
     Swi(Wimp_CreateMenu, regs);
 }
 
@@ -251,6 +465,81 @@ static void Quit_Game(void)
     }
     Prog_End(nullptr, false); // exiting with the sound still open fails in SDL_Quit's audio
     exit(0); // SDL_Quit (atexit) closes the task, which takes the icon away
+}
+
+/*
+** Quits, and has the Filer start the game again. Filer_Run only queues the run: the Filer
+** starts it when it next gets control, after this task has gone, so the two copies are never
+** in memory together. The new one goes straight into the game (RISCOS_Desktop_Start).
+*/
+static void Restart_Game(void)
+{
+    const char* dir = getenv(App_Variable("Dir").c_str());
+    if (dir == nullptr) {
+        fprintf(stderr, "desktop: no %s to restart from\n", App_Variable("Dir").c_str());
+        Quit_Game();
+    }
+    std::string command = std::string("Filer_Run ") + dir;
+    fprintf(stderr, "desktop: restarting (%s)\n", command.c_str());
+    _kernel_swi_regs regs;
+    std::string restart = App_Variable("Restart");
+    regs.r[0] = reinterpret_cast<int>(restart.c_str());
+    regs.r[1] = reinterpret_cast<int>("1");
+    regs.r[2] = 1;
+    regs.r[3] = 0;
+    regs.r[4] = 0; // a string
+    Swi(OS_SetVarVal, regs);
+    regs.r[0] = reinterpret_cast<int>(command.c_str());
+    Swi(OS_CLI, regs);
+    Quit_Game();
+}
+
+// Asks before restarting for a new screen size: true for Restart.
+static bool Ask_Restart(void)
+{
+    struct
+    {
+        int number;
+        char message[252];
+    } error;
+    error.number = 0;
+    snprintf(error.message, sizeof(error.message),
+             "Changing the screen size restarts the game, and the game in progress will be lost. "
+             "Save it first if you want to keep it.");
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(&error);
+    regs.r[1] = 2 | (1 << 8) | (4 << 9); // Cancel, new style, a question
+    regs.r[2] = reinterpret_cast<int>(App.name);
+    regs.r[3] = reinterpret_cast<int>(App.sprite);
+    regs.r[4] = 1; // the Wimp's sprite area
+    regs.r[5] = reinterpret_cast<int>("Restart");
+    if (!Swi(Wimp_ReportError, regs)) {
+        return false;
+    }
+    return regs.r[1] == 3; // the first extra button
+}
+
+// A size chosen from the menu: saved at the start; once in the game, a restart if it differs.
+static void Choose_Size(int index)
+{
+    if (index < 0 || index >= SizeCount || ForcedLowRes || Low_Res_Variable()) {
+        return;
+    }
+    const std::string& choice = SizeChoices[index];
+    if (!InGame) {
+        Save_Choice(choice);
+        return;
+    }
+    int w, h;
+    Choice_Size(choice, w, h);
+    if (w == ScreenW && h == ScreenH) {
+        Save_Choice(choice); // the same screen, e.g. the default chosen by its size
+        return;
+    }
+    if (Ask_Restart()) {
+        Save_Choice(choice);
+        Restart_Game();
+    }
 }
 
 /*
@@ -346,9 +635,12 @@ static void Wait_For_Icon_Click(void)
             }
             break;
 
-        case 9: // Menu_Selection
-            if (block[0] == 1) {
+        case 9: // Menu_Selection: the item, then the submenu's
+            if (block[0] == 2) {
                 Quit_Game();
+            }
+            if (block[0] == 1) {
+                Choose_Size(block[1]);
             }
             {
                 // Adjust keeps the menu open.
@@ -376,16 +668,40 @@ static void Wait_For_Icon_Click(void)
 void RISCOS_Desktop_Start(void)
 {
     static bool started = false;
-    if (started || RISCOS_GetTaskHandle() == 0) {
+    if (started) {
         return;
     }
     started = true;
+    if (Settings.Video.Windowed) {
+        InGame = true;
+        return;
+    }
+    // SDL's video makes the game a Wimp task (the game's Set_Video_Mode does this again later).
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
+    if (RISCOS_GetTaskHandle() == 0) {
+        InGame = true;
+        return;
+    }
     Create_Info_Window();
     Build_Menu();
     Put_Icon_On_Bar();
-    if (IconHandle >= 0 && RISCOS_Desktop_Click_To_Start && getenv("VC_NODESKTOP") == nullptr) {
+
+    // A restart for a new screen size goes straight back into the game.
+    std::string restart = App_Variable("Restart");
+    bool restarted = getenv(restart.c_str()) != nullptr;
+    if (restarted) {
+        _kernel_swi_regs regs;
+        regs.r[0] = reinterpret_cast<int>(restart.c_str());
+        regs.r[1] = 0;
+        regs.r[2] = -1; // delete it
+        regs.r[3] = 0;
+        regs.r[4] = 0;
+        _kernel_swi(OS_SetVarVal, &regs, &regs);
+    }
+
+    if (IconHandle >= 0 && RISCOS_Desktop_Click_To_Start && !restarted && getenv("VC_NODESKTOP") == nullptr) {
         fprintf(stderr, "desktop: waiting for a click on the icon bar\n");
-        AudioPaused = SDL_GetAudioStatus() == SDL_AUDIO_PLAYING; // the sound is set up first
+        AudioPaused = SDL_GetAudioStatus() == SDL_AUDIO_PLAYING; // in case the sound is set up first
         if (AudioPaused) {
             SDL_PauseAudio(1);
         }
@@ -395,6 +711,14 @@ void RISCOS_Desktop_Start(void)
             AudioPaused = false;
         }
     }
+    InGame = true;
+}
+
+void RISCOS_Desktop_Set_Screen(int width, int height, bool forced_low_res)
+{
+    ScreenW = width;
+    ScreenH = height;
+    ForcedLowRes = forced_low_res;
 }
 
 bool RISCOS_Desktop_Is_Leave_Key(int sdl_key, int sdl_mod)

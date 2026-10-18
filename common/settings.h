@@ -35,6 +35,8 @@ public:
         int InterpolationMode;
         bool HardwareCursor;
         bool DOSMode;
+        // The DOS version's 320x200 screen (TD and RA), with the rest of the game as usual.
+        bool LowRes;
         int ButtonStyle;
         std::string Scaler;
         std::string Driver;
