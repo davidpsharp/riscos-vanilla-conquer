@@ -47,10 +47,15 @@ that Electronic Arts released in 2008: the Allied disc and/or the Soviet
 disc. Make sure you get the Windows 95 versions. The expansion packs
 (Counterstrike and Aftermath) aren't supported yet.
 
-The images are available from Command & Conquer fan sites such as
-cnc-comm.com and CNCNZ.com. Prepare has been checked with the images
-named CD1_ALLIES.iso and CD2_SOVIET.iso. Unzip the downloads first: each
-holds one .iso file of about 600 MB.
+As of October 2026 they can be downloaded from cnc-comm.com:
+
+  Allied disc:  https://cnc-comm.com/red-alert/downloads/the-game/allies-disc
+  Soviet disc:  https://cnc-comm.com/red-alert/downloads/the-game/soviet-disc
+
+The downloads are zip files (RA_Allies.zip and RA_Soviet.zip), each
+holding one .iso file of about 600 MB (CD1_ALLIES.iso and CD2_SOVIET.iso).
+Unzip them first; that's easiest on a modern computer. Prepare has been
+checked with these images, and every file matched.
 
 The Prepare file that comes next to !VanillaRA installs the data from
 the ISO files (it also installs Tiberian Dawn's, if you have !VanillaTD):
@@ -120,10 +125,25 @@ machines but can't be loaded by Vanilla Conquer on other platforms, or
 by the original game.
 
 
+Network play
+------------
+
+Choose Multiplayer Game, then Network. Players on the same local network
+see each other's games. A Risc PC and a Raspberry Pi can play each other,
+each at its own screen size; this has been tried with a 45-minute game
+with computer players between a Pi 3 and a Risc PC.
+
+  * All the machines must be on the same subnet.
+  * Wired Ethernet is recommended: some wireless networks drop the
+    broadcast messages that the game uses to find other players.
+  * If the machines still can't see each other, set VC_NETPEER to the
+    other players' IP addresses before starting the game, e.g.
+      *Set VC_NETPEER 192.168.1.20,192.168.1.21
+
+
 Known issues
 ------------
 
-  * Network play is built in but hasn't been tested on RISC OS yet.
   * Campaign missions have only been tried in part: Allied and Soviet
     missions 1 to 7 run on the Risc PC and the Pi 4, and Allied 1 has been
     started from the menus and played a little on the Risc PC.
@@ -153,10 +173,11 @@ from other people:
   UnixLib        SharedUnixLibrary and the C library in !RunImage
                  (BSD/LGPL)
   DRenderer      the DigitalRenderer module (GPL-2)
+  SDL            SDL 1.2, built into !RunImage (LGPL-2.1)
 
 The GPL means you can have the source code: it's at the GitHub address
 above. The sources of SharedUnixLibrary, DigitalRenderer and SDL 1.2
-(LGPL-2.1, built into !RunImage) are from the GCCSDK project at
+are from the GCCSDK project at
 https://www.riscos.info/.
 
 Command & Conquer and Red Alert are trademarks of Electronic Arts. This

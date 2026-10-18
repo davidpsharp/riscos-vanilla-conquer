@@ -3,9 +3,9 @@ Vanilla Conquer: Tiberian Dawn for RISC OS
 
 Preview release
 
-Command & Conquer (1995) for the Risc PC, built from the Vanilla Conquer
-source code, which is based on the game's source code as released by
-Electronic Arts under the GNU GPL.
+Command & Conquer (1995) for the Risc PC and the Raspberry Pi, built from
+the Vanilla Conquer source code, which is based on the game's source code
+as released by Electronic Arts under the GNU GPL.
 
 Source code, updates and bug reports:
   https://github.com/davidpsharp/riscos-vanilla-conquer
@@ -16,13 +16,15 @@ The title screen shows the version and when it was built.
 Requirements
 ------------
 
-  * A StrongARM Risc PC (or RPCEmu set up as one). ARM610, ARM710 and
+  * A StrongARM Risc PC (or RPCEmu set up as one), or a Raspberry Pi
+    with RISC OS 5. The same !VanillaTD runs on both. ARM610, ARM710 and
     ARM7500 machines (including the A7000) are not supported: the game
     will not run on them.
-  * RISC OS 3.7 or later. Tested on RISC OS 3.71 and 5.30 in RPCEmu and
-    on RISC OS 3.7 on a real StrongARM Risc PC.
-  * 1 MB or 2 MB of VRAM. The game uses a 640x400 (or 640x480) 256-colour
-    screen mode.
+  * RISC OS 3.7 or later. Tested on RISC OS 3.71, 4.39 and 5.30 in
+    RPCEmu, on RISC OS 3.7 and 4.39 on a real StrongARM Risc PC, and on
+    RISC OS 5.30 on a Raspberry Pi 3 and 4.
+  * On a Risc PC, 1 MB or 2 MB of VRAM. The game uses a 640x400 (or
+    640x480) 256-colour screen mode.
   * About 24 MB of free memory.
   * About 65 MB of disc space for the game data, plus about 430 MB for
     each disc's movies if you want them.
@@ -151,7 +153,8 @@ Network play
 Choose Multiplayer Game, then Network. Players on the same local network
 see each other's games. Other players can use RISC OS or the official
 Vanilla Conquer builds for Windows, macOS or Linux, as long as they are
-the same version.
+the same version. A Risc PC and a Raspberry Pi can play each other, each
+at its own screen size.
 
   * All the machines must be on the same subnet.
   * Wired Ethernet is recommended: some wireless networks drop the
@@ -170,6 +173,10 @@ Known issues
   * Typing your name on the high-score table and the colouring-in of the
     campaign map are slow on a real Risc PC.
   * The TV-static effect on the GDI/Nod selection screen is a bit jerky.
+  * Once, a network game between a Pi 4 and a Risc PC went out of sync
+    after about five minutes; it hasn't happened again since. If it
+    happens to you, please send the CRC files the game writes in
+    !VanillaTD, and stderr, from both machines.
   * Red Alert is a separate application, !VanillaRA. Prepare installs
     both games' data.
 
@@ -197,10 +204,11 @@ from other people:
   UnixLib        SharedUnixLibrary and the C library in !RunImage
                  (BSD/LGPL)
   DRenderer      the DigitalRenderer module (GPL-2)
+  SDL            SDL 1.2, built into !RunImage (LGPL-2.1)
 
 The GPL means you can have the source code: it's at the GitHub address
 above. The sources of SharedUnixLibrary, DigitalRenderer and SDL 1.2
-(LGPL-2.1, built into !RunImage) are from the GCCSDK project at
+are from the GCCSDK project at
 https://www.riscos.info/.
 
 Command & Conquer is a trademark of Electronic Arts. This project is not
