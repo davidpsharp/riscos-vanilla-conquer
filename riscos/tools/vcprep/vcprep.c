@@ -1270,10 +1270,12 @@ int main(int argc, char** argv)
             images[num_images++] = argv[i];
         }
     }
-    if (TD_Dir == NULL) {
+    /* The other game's directory from its variable, but not when the game runs this (-window
+    ** or -check): then only the one it names is installed or checked, whatever else has run. */
+    if (TD_Dir == NULL && !window && check == NULL) {
         TD_Dir = getenv("VanillaTD$Dir");
     }
-    if (RA_Dir == NULL) {
+    if (RA_Dir == NULL && !window && check == NULL) {
         RA_Dir = getenv("VanillaRA$Dir");
     }
     TD_App = TD_Dir != NULL && *TD_Dir != '\0' ? Canonical(TD_Dir) : NULL;
@@ -1317,8 +1319,10 @@ int main(int argc, char** argv)
     if ((TD_Dir == NULL && RA_Dir == NULL) || (num_images == 0 && search == NULL)) {
         return Usage();
     }
-    Migrate(TD_App != NULL);
-    if (RA_App != NULL && TD_App != NULL) {
+    if (TD_App != NULL) {
+        Migrate(1);
+    }
+    if (RA_App != NULL) {
         Migrate(0);
     }
     if (window) {

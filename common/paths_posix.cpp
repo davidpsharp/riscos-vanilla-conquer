@@ -127,14 +127,15 @@ namespace
 ** On RISC OS the application directory is found through the <App$Dir> system
 ** variable that !Run sets. UnixLib maps "/<Var$Dir>/file" to "<Var$Dir>.file".
 */
-#define RISCOS_APP_DIR "/<VanillaTD$Dir>"
+#define RISCOS_APP_DIR(suffix) ((suffix) == "vanillara" ? "/<VanillaRA$Dir>" : "/<VanillaTD$Dir>")
 #endif
 
 const char* PathsClass::Program_Path()
 {
 #if defined(__riscos__)
+    // Each game's own directory, by the suffix Paths.Init was given ("vanillatd", "vanillara").
     if (ProgramPath.empty()) {
-        ProgramPath = RISCOS_APP_DIR;
+        ProgramPath = RISCOS_APP_DIR(Suffix);
     }
     return ProgramPath.c_str();
 #endif
