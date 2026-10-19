@@ -917,7 +917,8 @@ void Do_Win(void)
                          TPF_CENTER | TPF_VCR | TPF_USE_GRAD_PAL | TPF_DROPSHADOW);
         CountDownTimer = TIMER_SECOND * 3;
         while (Is_Speaking()) {
-        };
+            Call_Back(); // feeds the speech sound its next chunks, or it can never finish
+        }
         Speak(VOX_ACCOMPLISHED);
         while (CountDownTimer || Is_Speaking()) {
             Call_Back();
@@ -1189,7 +1190,8 @@ void Do_Lose(void)
                      TPF_CENTER | TPF_VCR | TPF_USE_GRAD_PAL | TPF_DROPSHADOW);
     CountDownTimer = TIMER_SECOND * 3;
     while (Is_Speaking()) {
-    };
+        Call_Back(); // feeds the speech sound its next chunks, or it can never finish
+    }
     Speak(VOX_FAIL);
     while (CountDownTimer || Is_Speaking()) {
         Call_Back();
@@ -1285,7 +1287,8 @@ void Do_Draw(void)
                      TPF_CENTER | TPF_VCR | TPF_USE_GRAD_PAL | TPF_DROPSHADOW);
     CountDownTimer = TIMER_SECOND * 3;
     while (Is_Speaking()) {
-    };
+        Call_Back(); // feeds the speech sound its next chunks, or it can never finish
+    }
     Speak(VOX_CONTROL_EXIT);
     while (CountDownTimer || Is_Speaking()) {
         Call_Back();
