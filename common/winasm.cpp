@@ -1,4 +1,5 @@
 #include "winasm.h"
+#include <stdint.h>
 #include <string.h>
 
 struct InterpolationTable* InterpolationTable = NULL;
@@ -40,35 +41,97 @@ void Asm_Interpolate_Line_Double(void* src, void* dst, int src_height, int src_w
     }
 }
 
+/*
+** A word at a time where the byte order allows (little-endian: the first pixel is the low byte),
+** with the same output as a byte at a time:
+** - the table's base is held in a local, where the old byte loop reloaded it through the global
+**   after every byte store (which might have changed it, as far as the compiler knew);
+** - 4 source pixels are read as a word and the 8 output bytes are stored as 2 words;
+** - 4 pixels all one colour, with the next one the same too (common in movies), are copied
+**   without any table look-up.
+** It was 8-12 instructions a pixel with two byte stores, and is now about 9 per pixel where the
+** neighbours differ and 2 where they don't.
+*/
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define INTERPOLATE_BY_WORD 1
+typedef unsigned int __attribute__((may_alias)) InterpolateWord;
+#endif
+
+// The colour between a and b: a if they're the same, else from the table.
+#define INTERPOLATE_BLEND(table, a, b) ((a) == (b) ? (a) : (table)[((a) << 8) | (b)])
+
 static void Interpolate_X_Axis(void* src, void* dst, int src_width)
 {
-    unsigned char* dptr = (unsigned char*)(dst);
-    unsigned char* sptr = (unsigned char*)(src);
+    const unsigned char* s = (const unsigned char*)(src);
+    unsigned char* d = (unsigned char*)(dst);
+    const unsigned char* table = &InterpolationTable->PaletteInterpolationTable[0][0];
+    int n = src_width - 1; // pixels followed by a neighbour
 
-    unsigned char* wptr = dptr;
-
-    for (int i = 0; i < src_width - 1; ++i) {
-        unsigned char a = sptr[0], b = sptr[1];
-        *wptr++ = a;
+#ifdef INTERPOLATE_BY_WORD
+    // Each source pixel makes two output bytes, so once the source is word-aligned the output is
+    // too, if it started at twice the source's alignment (the line buffers and frames do).
+    if ((((uintptr_t)d - 2 * (uintptr_t)s) & 3) == 0) {
+        for (; n > 0 && ((uintptr_t)s & 3) != 0; --n, ++s, d += 2) {
+            unsigned a = s[0], b = s[1];
+            d[0] = (unsigned char)a;
+            d[1] = INTERPOLATE_BLEND(table, a, b);
+        }
+        for (; n >= 4; n -= 4, s += 4, d += 8) {
+            unsigned w = *(const InterpolateWord*)s;
+            unsigned p0 = w & 0xff, p4 = s[4];
+            if (w == ((w << 8) | (w >> 24)) && p4 == p0) { // all 5 the same
+                ((InterpolateWord*)d)[0] = w;
+                ((InterpolateWord*)d)[1] = w;
+                continue;
+            }
+            unsigned p1 = (w >> 8) & 0xff, p2 = (w >> 16) & 0xff, p3 = w >> 24;
+            ((InterpolateWord*)d)[0] =
+                p0 | (INTERPOLATE_BLEND(table, p0, p1) << 8) | (p1 << 16) | (INTERPOLATE_BLEND(table, p1, p2) << 24);
+            ((InterpolateWord*)d)[1] =
+                p2 | (INTERPOLATE_BLEND(table, p2, p3) << 8) | (p3 << 16) | (INTERPOLATE_BLEND(table, p3, p4) << 24);
+        }
+    }
+#endif
+    for (; n > 0; --n, ++s, d += 2) {
+        unsigned a = s[0], b = s[1];
+        d[0] = (unsigned char)a;
         // Neighbours are often the same colour; skip the table (and a likely cache miss).
-        *wptr++ = a == b ? a : InterpolationTable->PaletteInterpolationTable[a][b];
-        ++sptr;
+        d[1] = INTERPOLATE_BLEND(table, a, b);
     }
 
-    *wptr++ = *sptr;
-    *wptr = 0;
+    d[0] = *s;
+    d[1] = 0;
 }
 
 static void Interpolate_Y_Axis(void* top_line, void* bottom_line, void* middle_line, int src_width)
 {
-    unsigned char* tlp = (unsigned char*)(top_line);
+    const unsigned char* tlp = (const unsigned char*)(top_line);
+    const unsigned char* blp = (const unsigned char*)(bottom_line);
     unsigned char* mlp = (unsigned char*)(middle_line);
-    unsigned char* blp = (unsigned char*)(bottom_line);
-    int dst_width = 2 * src_width;
+    const unsigned char* table = &InterpolationTable->PaletteInterpolationTable[0][0];
+    int n = 2 * src_width;
 
-    for (int i = 0; i < dst_width; ++i) {
-        unsigned char a = *tlp++, b = *blp++;
-        *mlp++ = a == b ? a : InterpolationTable->PaletteInterpolationTable[a][b];
+#ifdef INTERPOLATE_BY_WORD
+    if ((((uintptr_t)tlp | (uintptr_t)blp | (uintptr_t)mlp) & 3) == 0) {
+        for (; n >= 4; n -= 4, tlp += 4, blp += 4, mlp += 4) {
+            unsigned x = *(const InterpolateWord*)tlp, y = *(const InterpolateWord*)blp;
+            if (x != y) { // else all 4 are copied as they are
+                unsigned a = x & 0xff, b = y & 0xff;
+                unsigned r = INTERPOLATE_BLEND(table, a, b);
+                a = (x >> 8) & 0xff, b = (y >> 8) & 0xff;
+                r |= INTERPOLATE_BLEND(table, a, b) << 8;
+                a = (x >> 16) & 0xff, b = (y >> 16) & 0xff;
+                r |= INTERPOLATE_BLEND(table, a, b) << 16;
+                a = x >> 24, b = y >> 24;
+                x = r | (INTERPOLATE_BLEND(table, a, b) << 24);
+            }
+            *(InterpolateWord*)mlp = x;
+        }
+    }
+#endif
+    for (; n > 0; --n) {
+        unsigned a = *tlp++, b = *blp++;
+        *mlp++ = INTERPOLATE_BLEND(table, a, b);
     }
 }
 
