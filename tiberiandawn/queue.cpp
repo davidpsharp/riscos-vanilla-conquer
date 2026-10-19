@@ -3291,6 +3291,13 @@ static void Compute_Game_CRC(void)
 
 } /* end of Compute_Game_CRC */
 
+// VC_BENCH: the game's state CRC at the end of a benchmark, to compare builds and machines.
+unsigned Bench_Game_CRC()
+{
+    Compute_Game_CRC();
+    return unsigned(GameCRC);
+}
+
 /***************************************************************************
  * Add_CRC -- Adds a value to a CRC                                        *
  *                                                                         *

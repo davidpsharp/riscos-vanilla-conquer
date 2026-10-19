@@ -1718,6 +1718,34 @@ static void Sync_Delay(void)
     Call_Back();
 }
 
+/*
+** VC_FRAMEHASH: hash what HidPage shows, read from its surface without locking it (a
+** lock would count as unmarked drawing and change what the presents do).
+*/
+static void Bench_Hash_HidPage()
+{
+    GraphicBufferClass* buffer = HidPage.Get_Graphic_Buffer();
+    if (buffer == nullptr) {
+        return;
+    }
+    VideoSurface* surface = buffer->Get_DD_Surface();
+    const unsigned char* pixels;
+    int pitch;
+    if (surface != nullptr) {
+        pixels = static_cast<const unsigned char*>(surface->GetData());
+        pitch = surface->GetPitch();
+    } else {
+        pixels = reinterpret_cast<const unsigned char*>(buffer->Get_Offset());
+        pitch = buffer->Get_Width() + buffer->Get_XAdd() + buffer->Get_Pitch();
+    }
+    if (pixels != nullptr) {
+        Bench_Frame_Hash(pixels + HidPage.Get_YPos() * pitch + HidPage.Get_XPos(),
+                         HidPage.Get_Width(),
+                         HidPage.Get_Height(),
+                         pitch);
+    }
+}
+
 /***********************************************************************************************
  * Main_Loop -- This is the main game loop (as a single loop).                                 *
  *                                                                                             *
@@ -2035,6 +2063,9 @@ bool Main_Loop()
         }
     }
     if (Bench_Frames > 0) {
+        if (Bench_Frame_Hashing) {
+            Bench_Hash_HidPage();
+        }
         if (++Bench_Frames_Done >= Bench_Frames) {
             Bench_Finish(nullptr);
         }
@@ -3349,6 +3380,8 @@ void Bench_Finish(const char* why)
         fprintf(stderr, "bench: mission %s after %d game frames\n", why, Bench_Frames_Done);
     }
     Phase_Bench_Report(Bench_Frames_Done > 0 ? Bench_Frames_Done : 1);
+    unsigned Bench_Game_CRC(); // queue.cpp
+    fprintf(stderr, "bench state at the end: frame %ld, game CRC %08x\n", long(Frame), Bench_Game_CRC());
     fprintf(stderr,
             "bench objects at the end: units %d infantry %d buildings %d aircraft %d vessels %d bullets %d "
             "anims %d\n",

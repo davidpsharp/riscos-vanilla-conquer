@@ -277,6 +277,29 @@ void Phase_Startup(const char* step)
 #endif
 }
 
+bool Bench_Frame_Hashing = Bench_Frames > 0 && getenv("VC_FRAMEHASH") != nullptr;
+static const bool Bench_Hash_Each = Bench_Frame_Hashing && atoi(getenv("VC_FRAMEHASH")) == 2;
+static unsigned Bench_Hash = 2166136261u, Bench_Hashed = 0;
+
+void Bench_Frame_Hash(const unsigned char* pixels, int width, int height, int pitch)
+{
+    // FNV-1a over the bytes, row by row (no memcpy or other library code in the way).
+    unsigned h = 2166136261u;
+    for (int y = 0; y < height; ++y) {
+        const unsigned char* p = pixels + y * pitch;
+        for (int x = 0; x < width; ++x) {
+            h = (h ^ p[x]) * 16777619u;
+        }
+    }
+    Bench_Hash = (Bench_Hash ^ h) * 16777619u;
+    ++Bench_Hashed;
+    // VC_FRAMEHASH=2: each frame's own hash too, to find the frames where two runs differ
+    // (anything drawn by the clock rather than the game, such as how long a message stays).
+    if (Bench_Hash_Each) {
+        fprintf(stderr, "framehash %u %08x\n", Bench_Hashed, h);
+    }
+}
+
 unsigned Phase_Bench_Started_Us()
 {
     return Bench_Started;
@@ -320,6 +343,9 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_MISSION] * per,
             Bench_Us[PHASE_THREAT] * per,
             Bench_Us[PHASE_SIGHT] * per);
+    if (Bench_Frame_Hashing) {
+        fprintf(stderr, "bench frame hash: %u frames, %08x\n", Bench_Hashed, Bench_Hash);
+    }
 #ifdef __riscos__
     {
         // Memory: the application slot, and the heap's dynamic area if it has one.

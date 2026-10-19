@@ -73,6 +73,14 @@ void Phase_Set_Rtti_Names(const char* const* names, int count);
 void Phase_Bench_Report(unsigned frames);      // the totals since the first game frame
 void Phase_Startup(const char* step);          // logs the time since start-up, when timing
 unsigned Phase_Bench_Started_Us();
+/*
+** VC_FRAMEHASH=1, with VC_BENCH: a hash of the page drawn in every game frame, printed
+** with the totals, to show that a change to the drawing or copying code draws exactly
+** the same (the game's own state CRC, also printed, shows it plays the same).
+** VC_FRAMEHASH=2 also prints each frame's hash.
+*/
+extern bool Bench_Frame_Hashing;
+void Bench_Frame_Hash(const unsigned char* pixels, int width, int height, int pitch);
 extern unsigned Phase_Counts[COUNT_MAX];
 unsigned Phase_Now_Us();
 void Phase_Add(PhaseId id, unsigned us);
