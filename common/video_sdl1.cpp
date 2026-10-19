@@ -50,6 +50,9 @@
 #include "wwmouse.h"
 #include "settings.h"
 #include "debugstring.h"
+#ifdef __riscos__
+#include "riscos_memory.h"
+#endif
 
 #include <SDL.h>
 #ifdef __APPLE__
@@ -96,10 +99,15 @@ static void Scale_Rect(SDL_Rect r)
     for (int y = r.y; y < r.y + r.h; ++y) {
         const Uint8* from = static_cast<const Uint8*>(window->pixels) + y * window->pitch + r.x;
         Uint8* to = static_cast<Uint8*>(Screen->pixels) + (2 * y) * Screen->pitch + 2 * r.x;
+#if defined(__riscos__) && defined(__arm__)
+        // Both rows from registers, a word at a time: the screen isn't read back.
+        VC_Double_Row(to, to + Screen->pitch, from, r.w);
+#else
         for (int x = 0; x < r.w; ++x) {
             to[2 * x] = to[2 * x + 1] = from[x];
         }
         memcpy(to + Screen->pitch, to, size_t(2 * r.w));
+#endif
     }
     SDL_UnlockSurface(Screen);
     SDL_UnlockSurface(window);
@@ -152,7 +160,6 @@ static struct
 } MouseArea = {0, 0, 0, 0};
 
 #ifdef __riscos__
-#include "riscos_memory.h"
 #include <kernel.h>
 #include <swis.h>
 
@@ -311,10 +318,15 @@ SurfaceMonitorClass& AllSurfaces = AllSurfacesDummy; // List of all direct draw 
 ** True if no 8 bpp screen mode is near w x h, the nearest that holds it being at least twice as
 ** big each way (a Pi has nothing like 320x200; a Risc PC has 320x256). VC_NODOUBLE turns it off.
 */
+// VC_NODOUBLE: never double. VC_DOUBLE: double even where a mode near the size exists (for
+// testing and timing the doubling on a machine that has one).
 static bool Wants_Doubling(int w, int h)
 {
     if (getenv("VC_NODOUBLE") != nullptr || w > 400 || h > 300) {
         return false;
+    }
+    if (getenv("VC_DOUBLE") != nullptr) {
+        return true;
     }
     SDL_PixelFormat format;
     memset(&format, 0, sizeof(format));

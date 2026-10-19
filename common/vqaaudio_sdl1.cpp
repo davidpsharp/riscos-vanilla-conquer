@@ -15,6 +15,11 @@
 #include "vqafile.h"
 #include "vqaloader.h"
 #include "vqatask.h"
+#ifdef __riscos__
+#include "vqaclock.h"
+#include <kernel.h>
+#include <swis.h>
+#endif
 #include <algorithm>
 #include <chrono>
 #include <stdio.h>
@@ -391,6 +396,41 @@ void VQA_SetTimer(VQAHandle* handle, int time, int method)
     TickOffset = time - VQA_GetTime(handle);
 }
 
+#ifdef __riscos__
+/*
+** The movie clock, in ticks of 1/60 s. It's read all the time while a movie plays (each wait for
+** the next frame polls it), and steady_clock went through UnixLib's gettimeofday to OS_Word 14
+** (the real-time clock, in centiseconds) and three 64-bit divides: about half of a movie's time on
+** RPCEmu. Now it reads OS_Word 14 itself and works out the ticks in 32 bits (vqaclock.h) from the
+** centiseconds since its first reading, so the counter's wrap (after 497 days) is just a
+** difference. The ticks advance as before, 3 every 5 centiseconds, from the same clock.
+**
+** Not OS_ReadMonotonicTime: on a real machine the two keep together, but on RPCEmu the monotonic
+** ticker ran 6.5% slow against the real-time clock (which follows the host's), and the movie's
+** sound plays in real time, so the pictures would have fallen behind it.
+*/
+static unsigned Realtime_Cs()
+{
+    unsigned char block[8] = {3}; // OS_Word 14, 3: the 5-byte real time, in centiseconds
+    _kernel_swi_regs regs;
+    regs.r[0] = 14;
+    regs.r[1] = reinterpret_cast<int>(block);
+    _kernel_swi(OS_Word, &regs, &regs);
+    return unsigned(block[0]) | unsigned(block[1]) << 8 | unsigned(block[2]) << 16 | unsigned(block[3]) << 24;
+}
+
+unsigned VQA_GetTime(VQAHandle* handle)
+{
+    static bool started = false;
+    static unsigned first_cs;
+    unsigned now = Realtime_Cs();
+    if (!started) {
+        started = true;
+        first_cs = now;
+    }
+    return unsigned(TickOffset) + VQA_Ticks_From_Cs(now - first_cs);
+}
+#else
 unsigned VQA_GetTime(VQAHandle* handle)
 {
     auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -399,6 +439,7 @@ unsigned VQA_GetTime(VQAHandle* handle)
 
     return result_time;
 }
+#endif
 
 int VQA_TimerMethod()
 {

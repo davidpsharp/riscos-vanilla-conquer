@@ -1605,7 +1605,7 @@ static const char* const Movie_Names[] = {
 ** VC_MOVIETEST=<seconds>: after start-up, play every movie the game can find, each for
 ** that many seconds (0: all of it), logging each one (Play_Movie), then quit. For
 ** checking the movies on a machine. VC_MOVIETEST_FROM=<name> starts at that movie
-** (on the first installed disc).
+** (on the first installed disc), and VC_MOVIETEST_LAST=<name> stops after that one.
 */
 static void Movie_Test()
 {
@@ -1614,9 +1614,11 @@ static void Movie_Test()
     }
     GameInFocus = true; // play even when the window isn't focused (the Mac)
     const char* from = getenv("VC_MOVIETEST_FROM");
+    const char* last = getenv("VC_MOVIETEST_LAST");
     bool started = from == nullptr || *from == '\0';
+    bool done = false;
     static const char* const disc_names[] = {"GDI", "Nod"};
-    for (int cd = 0; cd < 2; cd++) { // each installed disc's movies in turn
+    for (int cd = 0; cd < 2 && !done; cd++) { // each installed disc's movies in turn
         if (!Use_Local_Disc(cd)) {
             fprintf(stderr, "movietest: %s disc not installed\n", disc_names[cd]);
             continue;
@@ -1636,6 +1638,10 @@ static void Movie_Test()
             }
             Play_Movie(Movie_Names[i], THEME_NONE);
             ++played;
+            if (last != nullptr && strcasecmp(Movie_Names[i], last) == 0) {
+                done = true;
+                break;
+            }
         }
         fprintf(stderr, "movietest: %s disc, %d played, %d not found\n", disc_names[cd], played, missing);
     }

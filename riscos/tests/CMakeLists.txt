@@ -22,6 +22,10 @@ target_include_directories(speedtest PRIVATE ../../common)
 # beside UnixLib's.
 add_executable(memtest memtest.cpp)
 add_executable(memspeed memspeed.cpp)
+# The 320x200 pixel doubling and movie interpolation against the code they replaced, and the
+# movie clock's arithmetic; and the sound mixer over fixed inputs, hashed (its SDL calls stubbed).
+add_executable(scaletest scaletest.cpp)
+add_executable(mixtest mixtest.cpp)
 
 find_package(SDL REQUIRED)
 add_executable(sdltest sdltest.cpp)
@@ -29,6 +33,7 @@ add_executable(paltest paltest.cpp)
 add_executable(audiotest audiotest.cpp)
 add_executable(modetest modetest.cpp)
 target_include_directories(modetest PRIVATE ${SDL_INCLUDE_DIR})
+target_include_directories(mixtest PRIVATE ${SDL_INCLUDE_DIR} ../../common)
 target_link_libraries(modetest PRIVATE ${SDL_LIBRARY})
 target_include_directories(audiotest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(audiotest PRIVATE ${SDL_LIBRARY})
@@ -38,7 +43,7 @@ target_include_directories(sdltest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(sdltest PRIVATE ${SDL_LIBRARY})
 
 if(RISCOS)
-    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest memtest memspeed)
+    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest memtest memspeed scaletest mixtest)
         riscos_make_aif(${t})
     endforeach()
 endif()

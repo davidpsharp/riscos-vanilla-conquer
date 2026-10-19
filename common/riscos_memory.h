@@ -16,6 +16,41 @@ extern "C" {
 ** source to a destination whose pitch is a multiple of 4, either of any alignment.
 */
 void VC_Stamp_Rows_24(void* dst, const void* src, int dst_pitch, int rows);
+/*
+** Each source pixel twice across, into two rows at once, for "blocks" (at least 1) blocks of
+** 8 source pixels: dst0, dst1 and src word-aligned. See VC_Double_Row.
+*/
+void VC_Double_Row_8s(void* dst0, void* dst1, const void* src, int blocks);
+}
+
+/*
+** One row of n source pixels doubled into two destination rows (2n bytes each), of any
+** alignment: up to 3 pixels a byte at a time until the source is word-aligned (which, with
+** destinations whose alignment is twice the source's, aligns them too), then 8 pixels at a
+** time in VC_Double_Row_8s, then the rest. The destinations are only written, so this can go
+** straight to the screen. Rows that can't all be aligned together go a byte at a time.
+*/
+static inline void VC_Double_Row(void* dst0, void* dst1, const void* src, int n)
+{
+    unsigned char* d0 = static_cast<unsigned char*>(dst0);
+    unsigned char* d1 = static_cast<unsigned char*>(dst1);
+    const unsigned char* s = static_cast<const unsigned char*>(src);
+    for (; n > 0 && (reinterpret_cast<uintptr_t>(s) & 3) != 0; --n, d0 += 2, d1 += 2) {
+        unsigned char c = *s++;
+        d0[0] = d0[1] = d1[0] = d1[1] = c;
+    }
+    if (n >= 8 && ((reinterpret_cast<uintptr_t>(d0) | reinterpret_cast<uintptr_t>(d1)) & 3) == 0) {
+        int blocks = n >> 3;
+        VC_Double_Row_8s(d0, d1, s, blocks);
+        s += 8 * blocks;
+        d0 += 16 * blocks;
+        d1 += 16 * blocks;
+        n &= 7;
+    }
+    for (; n > 0; --n, d0 += 2, d1 += 2) {
+        unsigned char c = *s++;
+        d0[0] = d0[1] = d1[0] = d1[1] = c;
+    }
 }
 
 /*

@@ -3160,7 +3160,44 @@ void Trap_Object(void)
  *=============================================================================================*/
 void Check_VQ_Palette_Set(void);
 
-int VQ_Call_Back(unsigned char*, int)
+/*
+** VC_MOVIEHASH: for each movie frame, prints hashes of the decoded frame and of that frame scaled
+** again, in the same mode, into a buffer of its own ("moviehash <movie frame> <decoded> <scaled>"),
+** to check that a change to the scaling leaves every frame the same: the same decoded picture must
+** scale to the same output in both builds. (The screen buffer itself also holds the pointer and
+** whatever is round the movie, and which pictures a run shows depends on its timing, so pictures
+** are matched by the decoded one.) It costs a scaling and two hashes a frame.
+*/
+static unsigned Movie_Hash_Buffer(GraphicViewPortClass& buffer)
+{
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(buffer.Get_Offset());
+    int w = buffer.Get_Width(), h = buffer.Get_Height();
+    int stride = w + buffer.Get_XAdd() + buffer.Get_Pitch();
+    unsigned hash = 2166136261u;
+    for (int y = 0; y < h; ++y, p += stride) {
+        for (int x = 0; x < w; ++x) {
+            hash = (hash ^ p[x]) * 16777619u; // FNV-1a
+        }
+    }
+    return hash;
+}
+
+static void Movie_Hash_Frame(int frame)
+{
+    static const bool on = getenv("VC_MOVIEHASH") != nullptr;
+    if (!on) {
+        return;
+    }
+    static GraphicBufferClass* scaled = nullptr;
+    if (scaled == nullptr) {
+        scaled = new GraphicBufferClass(2 * SysMemPage.Get_Width(), 2 * SysMemPage.Get_Height());
+    }
+    scaled->Clear();
+    Interpolate_2X_Scale(&SysMemPage, scaled, NULL, Settings.Video.InterpolationMode);
+    fprintf(stderr, "moviehash %d %08x %08x\n", frame, Movie_Hash_Buffer(SysMemPage), Movie_Hash_Buffer(*scaled));
+}
+
+int VQ_Call_Back(unsigned char*, int frame)
 {
 #ifndef REMASTER_BUILD
     int key = 0;
@@ -3183,6 +3220,7 @@ int VQ_Call_Back(unsigned char*, int)
 
     Interpolate_2X_Scale(&SysMemPage, &SeenBuff, NULL, Settings.Video.InterpolationMode);
     Clock::time_point t1 = Clock::now();
+    Movie_Hash_Frame(frame);
     Frame_Limiter();
 
     if (trace) {
