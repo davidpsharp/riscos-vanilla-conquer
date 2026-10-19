@@ -18,6 +18,11 @@ add_executable(readspeed readspeed.c)
 add_executable(speedtest speedtest.cpp ../../common/riscos_speedtest.cpp)
 target_include_directories(speedtest PRIVATE ../../common)
 
+# The program's memcpy, memmove and memset (common/riscos_memory.cpp), tested and timed
+# beside UnixLib's.
+add_executable(memtest memtest.cpp)
+add_executable(memspeed memspeed.cpp)
+
 find_package(SDL REQUIRED)
 add_executable(sdltest sdltest.cpp)
 add_executable(paltest paltest.cpp)
@@ -33,7 +38,7 @@ target_include_directories(sdltest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(sdltest PRIVATE ${SDL_LIBRARY})
 
 if(RISCOS)
-    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest)
+    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest memtest memspeed)
         riscos_make_aif(${t})
     endforeach()
 endif()

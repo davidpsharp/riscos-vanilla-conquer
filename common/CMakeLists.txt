@@ -87,6 +87,7 @@ set(COMMON_SRC
     riscos_autosize.cpp
     riscos_desktop.cpp
     riscos_fs.cpp
+    riscos_memory.cpp
     riscos_speedtest.cpp
     rndstraw.cpp
     settings.cpp
