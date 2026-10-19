@@ -27,6 +27,11 @@ if [ "${2:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/$DEPLOY"
 fi
 [ -f "$WORK/hostfs/modules/SDL-Copyright" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
+# Everything shipped must run on an ARM610/710/7500 as well as a StrongARM.
+ELVES="$ROOT/${IMAGE%,ff8} $ROOT/build/riscos-tools/vcprep"
+[ "$NAME" = VanillaRA ] && ELVES="$ELVES $ROOT/build/riscos-ra/ramix"
+# shellcheck disable=SC2086
+"$ROOT/riscos/scripts/check-armv3.sh" $ELVES
 
 rm -rf "$PKG"
 mkdir -p "$APP/Utils" "$APP/Modules" "$APP/Licences"

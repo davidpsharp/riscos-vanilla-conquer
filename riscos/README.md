@@ -7,7 +7,7 @@ Vanilla Conquer for RISC OS: Tiberian Dawn (`!VanillaTD`) and Red Alert (`!Vanil
 | Path | Purpose |
 | --- | --- |
 | `docker/Dockerfile` | Cross-build image: GCCSDK 4.7.4 (`arm-unknown-riscos`), CMake, Ninja, SDL 1.2 |
-| `cmake/riscos-gccsdk.cmake` | CMake toolchain file (`-march=armv3m -mtune=strongarm -fsigned-char`, static link, `riscos_make_aif()`) |
+| `cmake/riscos-gccsdk.cmake` | CMake toolchain file (`-march=armv3 -mtune=strongarm -fsigned-char`, static link, `riscos_make_aif()`) |
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |
 | `scripts/setup-rpcemu-machines.sh` | Create the `VC SA RO371` and `VC SA RO530` StrongARM machines in RPCEmu Extended |
@@ -48,7 +48,7 @@ riscos/scripts/screenshot.sh 5920 build/shot.png
 - An unaligned `LDR` on StrongARM returns the word **rotated** and raises no fault, and RPCEmu does the same. Misaligned accesses therefore corrupt data silently. Find them with the macOS UBSan build (`-DBUILD_WITH_UBSAN=ON`).
 - GCCSDK's libstdc++ is built without `_GLIBCXX_USE_C99`. `compat/cxx11_compat.h` covers the gap.
 - `sdltest` in RPCEmu, 640×480×8 full screen with a full software redraw every frame: 24.5 fps on RO 3.71 and 19.9 fps on RO 5.30.
-- **No halfword instructions on a real Risc PC.** On a real Kinetic StrongARM Risc PC, `STRH` to heap memory left the upper byte unwritten. The keyboard queue then returned mouse clicks with garbage in the high byte, so most clicks were ignored. RPCEmu emulates `LDRH`/`STRH` correctly, so only real hardware showed it. The toolchain now builds for `-march=armv3m -mtune=strongarm`, like GCCSDK's own libraries, so no `LDRH`/`STRH` is generated. Check with `objdump -d | grep -E '(ldr|str)[a-z]*h'`.
+- **No halfword instructions on a real Risc PC.** On a real Kinetic StrongARM Risc PC, `STRH` to heap memory left the upper byte unwritten. The keyboard queue then returned mouse clicks with garbage in the high byte, so most clicks were ignored. RPCEmu emulates `LDRH`/`STRH` correctly, so only real hardware showed it. The toolchain builds for ARMv3 (`-march=armv3 -mtune=strongarm`), like GCCSDK's own libraries, so no `LDRH`/`STRH` is generated (and no long multiply: see [ARMv3 CPUs](#armv3-cpus-arm610-arm710-arm7500)). Check with `scripts/check-armv3.sh <elf>`; `make-release.sh` runs it on everything it ships.
 - GCCSDK defaults to `-mstructure-size-boundary=32` (APCS), which pads every struct to a multiple of 4 bytes. The game depends on x86 struct sizes, so the toolchain sets `=8`. Without it, GDI 1 crashed within seconds with a zeroed object.
 - The RISC OS SDL 1.2 port queues a mouse motion event on every pump. `WWKeyboardClassSDL1::Fill_Buffer_From_System` therefore pumps once and then drains the queue.
 - RISC OS SDL switches to relative mouse mode when the cursor is hidden in fullscreen, so on RISC OS the game uses a transparent cursor instead.
@@ -74,6 +74,38 @@ The frame limiter's sleep ends on a centisecond tick, so the centisecond clock w
 - **Unchanged frames aren't copied:** the game presents about twice per frame it draws, so presents copy only the cursor's old and new areas, or nothing, when nothing has drawn on the visible page. `VC_FULLPRESENT` turns this off.
 - **The hidden page is presented directly:** `Blit_Display` makes the visible surface mirror the hidden one, instead of copying it (`video_sdl1.cpp`). The visible surface is filled in only when something actually uses it, such as a dialog. `VC_NODEFERBLIT` turns this off.
 - **Pacing:** waiting for the next game frame no longer oversleeps it. The old sleeps ran to the next present slot, so each frame took three slots instead of two, which is why the game ran at 12.4 fps. `VC_SIMLOAD=<ms>` adds that much work per game frame, to reproduce a slow machine on RPCEmu. At 55 ms it gave 12.3–12.5 fps before the fix and 15.2–15.6 after.
+
+## ARMv3 CPUs (ARM610, ARM710, ARM7500)
+
+The games and their tools are built for ARMv3, so the same `!RunImage` runs on a StrongARM, an ARM610 or ARM710 Risc PC, an A7000 (ARM7500) and a Raspberry Pi.
+
+**Why:** `-march=armv3m` (what the toolchain used before) lets GCC use the long multiplies `UMULL`, `SMULL`, `UMLAL` and `SMLAL`: 255 of them in TD and 368 in RA. They come from dividing by a constant (GCC multiplies by a reciprocal and keeps the high word), from 64-bit fixed-point maths, and from the sound mixer. The ARM610, ARM710 and ARM7500 don't have them, and they don't trap there either: RPCEmu's ARM710 runs `UMULL` as an `ADD` with a register shift (the encoding falls in the data-processing space), so the results are just wrong. On RPCEmu set up as an ARM710 with RISC OS 3.71, the armv3m TD hung the machine between the title and the game (stuck at the prefetch abort vector), and RA stopped with `Alloc: 2147483578 bytes not available` in `Get_Radar_Icon`. The armv3 builds of the same source played the battle benchmark and Allied 1 to the end, ending exactly as on a StrongARM. TD was also started from the icon bar, through the menus, into GDI 1. (RPCEmu's timings for an ARM710 mean nothing; a real ARM610/710 will be several times slower than a StrongARM, so 320x200 is the size to use there.)
+
+**What ARMv3 costs:** without the long multiplies, GCC calls `__divsi3` to divide by a constant and `__muldi3` for a 64-bit multiply. Counting those calls by call site (a build with `-Wl,--wrap` wrappers, run on a Pi 3, which plays the benchmarks exactly as a Risc PC does) found the busy ones:
+
+| Calls per game frame (RA battle) | armv3, as is | after the fixes |
+| --- | --- | --- |
+| `__muldi3` in the sound mixer (a sample times its gain, per sample) | 1,820 | 0 |
+| `__divsi3` in `Coord_To_Pixel` (four `Pixel_To_Lepton`: divide by 24) | 4,080 | 0 |
+| `__divsi3` in `Coord_Spillage_List` (`Pixel_To_Lepton` again) | 950 | 0 |
+| the rest (`Shape_Number`, `Sort_Y`, `Desired_Facing256`, ...) | about 400 | about 400 |
+
+The mixer now multiplies in 32 bits (a 16-bit sample times a gain of at most 0x10000 fits), and `Pixel_To_Lepton` multiplies by a reciprocal for pixels below 3072 (exact: checked against the division for every pixel from -2^23 to 2^23), in both games. Neither changes any result: all three builds end the benchmarks the same way.
+
+Raspberry Pi 3, RISC OS 5.30, ms per game frame, 2 to 4 runs each (`vcport-work/armv3/armv3-bench.sh`):
+
+| | armv3m | armv3 | armv3 with the fixes |
+| --- | --- | --- | --- |
+| TD battle | 5.21 | 5.30 (+1.6%) | 5.29 (+1.4%) |
+| TD battle, no sound | 4.95 | 5.00 (+1.0%) | 5.00 (+0.9%) |
+| RA battle | 15.07 | 15.54 (+3.1%) | 15.19 (+0.7%) |
+| RA battle, no sound | 14.28 | 14.69 (+2.9%) | 14.31 (+0.2%) |
+| RA Allied 1 | 5.28 | 5.34 (+1.2%) | 5.28 (0.0%) |
+| RA Allied 2 | 5.70 | 5.79 (+1.6%) | 5.72 (+0.4%) |
+
+TD's remaining 1.5% is in drawing, and isn't in the helper calls (about 200 a frame are left): apart from the functions that had long multiplies, the code is the same, so it is probably where the code now falls in the cache. The StrongARM Risc PC's figures are still to be measured (it was off): `vcport-work/armv3/README.md` has the builds and the one command that does it.
+
+**If one binary ever costs too much on a StrongARM:** two `!RunImage`s (armv3m and armv3) would each add about 0.9 MB (TD) or 1.2 MB (RA) to the zip, which is 1.1 MB and 1.5 MB now. `tools/cpuprobe.s` is a 436-byte absolute for `!Run` that sets `VanillaConquer$LongMul` to 1 only if `UMULL` gives the right answer, and to 0 if it gives a wrong one (RPCEmu's ARM610/710) or traps (it catches the undefined instruction with its own error handler). Tested on RISC OS 3.11 (ARM3, Arculator), 3.71 (ARM710, RPCEmu), 4.39 (StrongARM, RPCEmu) and 5.30 (Pi 3).
 
 ## Playtest status (RISC OS 3.71, StrongARM, RPCEmu)
 

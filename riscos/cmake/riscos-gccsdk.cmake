@@ -1,8 +1,9 @@
 # CMake toolchain file for GCCSDK 4.7.4 (arm-unknown-riscos), used inside the
 # vc-riscos-sdk container (see riscos/docker/Dockerfile).
 #
-# RISCOS_ARCH and RISCOS_TUNE select code generation: ARMv3M instructions,
-# scheduled for the StrongARM, the fastest CPU in a Risc PC.
+# RISCOS_ARCH and RISCOS_TUNE select code generation: ARMv3 instructions, so the
+# same binaries run on every Risc PC CPU and the A7000, scheduled for the
+# StrongARM, the fastest of them.
 set(CMAKE_SYSTEM_NAME RISCOS)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
@@ -14,13 +15,22 @@ set(CMAKE_C_COMPILER ${GCCSDK_CROSSBIN}/arm-unknown-riscos-gcc)
 set(CMAKE_CXX_COMPILER ${GCCSDK_CROSSBIN}/arm-unknown-riscos-g++)
 set(RISCOS_ELF2AIF ${GCCSDK_CROSSBIN}/elf2aif)
 
-# -march=armv3m: no halfword loads/stores (LDRH/STRH, ARMv4). The Risc PC's
-#   memory system predates them: on a real StrongARM Risc PC, STRH to heap
-#   memory left the upper byte unwritten, corrupting 16-bit data (the keyboard
-#   queue returned garbage mouse clicks). RPCEmu emulates halfwords correctly,
-#   so only real hardware showed it. GCCSDK's own libraries are built the same way.
+# -march=armv3:
+#   - No halfword loads/stores (LDRH/STRH, ARMv4). The Risc PC's memory system
+#     predates them: on a real StrongARM Risc PC, STRH to heap memory left the
+#     upper byte unwritten, corrupting 16-bit data (the keyboard queue returned
+#     garbage mouse clicks). RPCEmu emulates halfwords correctly, so only real
+#     hardware showed it. GCCSDK's own libraries are built the same way.
+#   - No long multiplies (UMULL/SMULL/UMLAL/SMLAL, ARMv3M), which the ARM610,
+#     ARM710 and ARM7500 lack. They don't trap there: RPCEmu's ARM710 runs UMULL
+#     as an ADD, and an armv3m build hung or failed to allocate 2 GB. Without them
+#     GCC divides by a constant with a call to __divsi3 and does 64-bit multiplies
+#     with __muldi3; the hot cases (the sound mixer, Pixel_To_Lepton) are written
+#     not to need either. On a Pi 3 that leaves Red Alert 0-0.7% slower than an
+#     armv3m build and Tiberian Dawn about 1.5% (riscos/README.md, "ARMv3 CPUs").
+#   Check a binary with riscos/scripts/check-armv3.sh.
 # -mtune=strongarm still schedules for the StrongARM.
-set(RISCOS_ARCH armv3m CACHE STRING "Target architecture passed to -march")
+set(RISCOS_ARCH armv3 CACHE STRING "Target architecture passed to -march")
 set(RISCOS_TUNE strongarm CACHE STRING "CPU to tune for, passed to -mtune")
 # Extra C/C++ flags, e.g. -Wcast-align. Use this rather than CMAKE_CXX_FLAGS,
 # which would replace the flags below.
