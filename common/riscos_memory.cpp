@@ -483,7 +483,45 @@ asm(
     "    VC_TILE_DST 1\n"
     ".Lvc_t_dst2:\n"
     "    VC_TILE_DST 2\n"
-    ".size VC_Stamp_Rows_24, . - VC_Stamp_Rows_24\n");
+    ".size VC_Stamp_Rows_24, . - VC_Stamp_Rows_24\n"
+
+    // void VC_Double_Row_8s(void* dst0, void* dst1, const void* src, int blocks): each
+    // source pixel twice across, into two rows (for 320x200 doubled to a 640x400 screen),
+    // "blocks" (at least 1) blocks of 8 source pixels, all three word-aligned. Two source
+    // words p0 p1 p2 p3 become p0 p0 p1 p1 and p2 p2 p3 p3 in registers (8 operations a
+    // word, with 0x00FF00FF in r9 and 0x0000FFFF in ip), and each row gets one STM of 4
+    // words: the screen is only written, never read back.
+    ".global VC_Double_Row_8s\n"
+    ".type VC_Double_Row_8s, %function\n"
+    "VC_Double_Row_8s:\n"
+    "    stmfd   sp!, {r4-r9, lr}\n"
+    "    mov     r9, #0xFF\n"
+    "    orr     r9, r9, #0xFF0000\n"     // 0x00FF00FF
+    "    mov     ip, #0xFF\n"
+    "    orr     ip, ip, #0xFF00\n"       // 0x0000FFFF
+    "1:  ldmia   r2!, {r5, r7}\n"
+    "    and     r8, r5, r9\n"            // p0 . p2 .
+    "    eor     r5, r5, r8\n"            // . p1 . p3
+    "    orr     r8, r8, r8, lsl #8\n"    // p0 p0 p2 p2
+    "    orr     r5, r5, r5, lsr #8\n"    // p1 p1 p3 p3
+    "    and     r4, r8, ip\n"
+    "    orr     r4, r4, r5, lsl #16\n"   // p0 p0 p1 p1
+    "    bic     r5, r5, ip\n"
+    "    orr     r5, r5, r8, lsr #16\n"   // p2 p2 p3 p3
+    "    and     r8, r7, r9\n"
+    "    eor     r7, r7, r8\n"
+    "    orr     r8, r8, r8, lsl #8\n"
+    "    orr     r7, r7, r7, lsr #8\n"
+    "    and     r6, r8, ip\n"
+    "    orr     r6, r6, r7, lsl #16\n"
+    "    bic     r7, r7, ip\n"
+    "    orr     r7, r7, r8, lsr #16\n"
+    "    stmia   r0!, {r4-r7}\n"
+    "    stmia   r1!, {r4-r7}\n"
+    "    subs    r3, r3, #1\n"
+    "    bgt     1b\n"
+    "    ldmfd   sp!, {r4-r9, pc}\n"
+    ".size VC_Double_Row_8s, . - VC_Double_Row_8s\n");
 // clang-format on
 
 #endif

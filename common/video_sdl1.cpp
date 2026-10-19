@@ -50,6 +50,9 @@
 #include "wwmouse.h"
 #include "settings.h"
 #include "debugstring.h"
+#ifdef __riscos__
+#include "riscos_memory.h"
+#endif
 
 #include <SDL.h>
 #ifdef __APPLE__
@@ -96,10 +99,15 @@ static void Scale_Rect(SDL_Rect r)
     for (int y = r.y; y < r.y + r.h; ++y) {
         const Uint8* from = static_cast<const Uint8*>(window->pixels) + y * window->pitch + r.x;
         Uint8* to = static_cast<Uint8*>(Screen->pixels) + (2 * y) * Screen->pitch + 2 * r.x;
+#if defined(__riscos__) && defined(__arm__)
+        // Both rows from registers, a word at a time: the screen isn't read back.
+        VC_Double_Row(to, to + Screen->pitch, from, r.w);
+#else
         for (int x = 0; x < r.w; ++x) {
             to[2 * x] = to[2 * x + 1] = from[x];
         }
         memcpy(to + Screen->pitch, to, size_t(2 * r.w));
+#endif
     }
     SDL_UnlockSurface(Screen);
     SDL_UnlockSurface(window);
@@ -152,7 +160,6 @@ static struct
 } MouseArea = {0, 0, 0, 0};
 
 #ifdef __riscos__
-#include "riscos_memory.h"
 #include <kernel.h>
 #include <swis.h>
 
