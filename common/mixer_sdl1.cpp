@@ -3,6 +3,7 @@
 #include "phasetime.h"
 #include "riscos_ssb.h"
 #include <SDL.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +76,19 @@ static bool UseSSB = false;
 static bool PreferSSB = false;
 static SDL_mutex* SSBLock = nullptr;
 
+/*
+** Sample data and the output a word at a time where the byte order allows (little-endian, as
+** on RISC OS): the first sample of a pair is the low half.
+*/
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define MIXER_BY_WORD 1
+typedef unsigned int __attribute__((may_alias)) MixerWord;
+#else
+#define MIXER_BY_WORD 0
+#endif
+
+static void Mix_Output(const int* mix, Uint8* stream, int frames);
+
 static void Update_Step(MixerChannel* ch)
 {
     ch->Step = (unsigned)(((unsigned long long)ch->Rate << 16) / (unsigned)OutputRate);
@@ -144,13 +158,34 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
             if (unsigned(n) > slot_frames - frame) {
                 n = int(slot_frames - frame);
             }
-            for (int k = 0; k < n; ++k, p += 2) {
-                int v = int(((short)(p[0] | (p[1] << 8)) * gain) >> 16);
-                mix[i * 2] += v;
-                mix[i * 2 + 1] += v;
-                ++i;
-            }
             frame += unsigned(n);
+            int* m = mix + i * 2;
+            i += n;
+#if MIXER_BY_WORD
+            // Two samples a word once the data is word-aligned (no halfword loads on ARMv3).
+            if (n > 0 && (uintptr_t(p) & 2) != 0) {
+                int v = int(((short)(p[0] | (p[1] << 8)) * gain) >> 16);
+                m[0] += v;
+                m[1] += v;
+                m += 2;
+                p += 2;
+                --n;
+            }
+            for (; n >= 2; n -= 2, p += 4, m += 4) {
+                unsigned w = *reinterpret_cast<const MixerWord*>(p);
+                int v0 = (int(w << 16) >> 16) * gain >> 16;
+                int v1 = (int(w) >> 16) * gain >> 16;
+                m[0] += v0;
+                m[1] += v0;
+                m[2] += v1;
+                m[3] += v1;
+            }
+#endif
+            for (; n > 0; --n, p += 2, m += 2) {
+                int v = int(((short)(p[0] | (p[1] << 8)) * gain) >> 16);
+                m[0] += v;
+                m[1] += v;
+            }
         } else {
             for (; i < frames && frame < slot_frames; ++i) {
                 int left, right;
@@ -270,6 +305,52 @@ static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
         MaxPlaying = playing;
     }
 
+    Mix_Output(mix, stream, frames);
+}
+
+/*
+** The mix to 16 bit stereo, through the soft limiter, noting the peak level. Usually nothing
+** reaches the limiter's knee, and then each frame is just packed into a word (no halfword
+** stores on ARMv3, where two 16 bit samples were four byte stores) while the highest and
+** lowest values are tracked, and the peak comes from those. Only if the knee was crossed is
+** the block done again a sample at a time, as it always was. The output is the same.
+*/
+static void Mix_Output(const int* mix, Uint8* stream, int frames)
+{
+#if MIXER_BY_WORD
+    if ((uintptr_t(stream) & 3) == 0) {
+        MixerWord* out = reinterpret_cast<MixerWord*>(stream);
+        int hi = 0, lo = 0;
+        const int* m = mix;
+        const int* end = mix + 2 * frames;
+        if (!ReverseChannels) {
+            for (; m < end; m += 2, ++out) {
+                int l = m[0], r = m[1];
+                hi = l > hi ? l : hi;
+                lo = l < lo ? l : lo;
+                hi = r > hi ? r : hi;
+                lo = r < lo ? r : lo;
+                *out = (unsigned(l) & 0xFFFF) | (unsigned(r) << 16);
+            }
+        } else {
+            for (; m < end; m += 2, ++out) {
+                int l = m[1], r = m[0];
+                hi = l > hi ? l : hi;
+                lo = l < lo ? l : lo;
+                hi = r > hi ? r : hi;
+                lo = r < lo ? r : lo;
+                *out = (unsigned(l) & 0xFFFF) | (unsigned(r) << 16);
+            }
+        }
+        if (hi <= LIMIT_KNEE && lo >= -LIMIT_KNEE) {
+            int level = hi > -lo ? hi : -lo;
+            if (level > PeakLevel) {
+                PeakLevel = level;
+            }
+            return;
+        }
+    }
+#endif
     Sint16* out = (Sint16*)stream;
     for (int i = 0; i < frames; ++i) {
         int l = mix[i * 2];
