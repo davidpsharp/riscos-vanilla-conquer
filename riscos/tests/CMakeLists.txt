@@ -26,6 +26,11 @@ add_executable(memspeed memspeed.cpp)
 # movie clock's arithmetic; and the sound mixer over fixed inputs, hashed (its SDL calls stubbed).
 add_executable(scaletest scaletest.cpp)
 add_executable(mixtest mixtest.cpp)
+# Inner-loop timings for judging hand-written ARM code (see membench.cpp).
+add_executable(membench membench.cpp ../../common/lcw.cpp)
+target_include_directories(membench PRIVATE ../../common)
+add_executable(profoff profoff.cpp ../../common/riscos_profile.cpp)
+target_include_directories(profoff PRIVATE ../../common)
 
 find_package(SDL REQUIRED)
 add_executable(sdltest sdltest.cpp)
@@ -43,7 +48,7 @@ target_include_directories(sdltest PRIVATE ${SDL_INCLUDE_DIR})
 target_link_libraries(sdltest PRIVATE ${SDL_LIBRARY})
 
 if(RISCOS)
-    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest memtest memspeed scaletest mixtest)
+    foreach(t hello unaligned sdltest dirprobe paltest audiotest bigalloc readspeed modetest speedtest memtest memspeed scaletest mixtest membench profoff)
         riscos_make_aif(${t})
     endforeach()
 endif()

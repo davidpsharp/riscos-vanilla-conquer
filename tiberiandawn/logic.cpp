@@ -208,7 +208,7 @@ void LogicClass::AI(void)
         ObjectClass* obj = (*this)[index];
         int count = Count();
 
-        if (Phase_Timing) {
+        if (Phase_Fine_Timing) {
             unsigned started = Phase_Now_Us();
             int rtti = obj->What_Am_I();
             obj->AI();

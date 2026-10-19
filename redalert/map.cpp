@@ -576,7 +576,7 @@ void MapClass::Set_Map_Dimensions(int x, int y, int w, int h)
  *=============================================================================================*/
 void MapClass::Sight_From(CELL cell, int sightrange, HouseClass* house, bool incremental)
 {
-    PhaseTimer phase_timer(PHASE_SIGHT);
+    FinePhaseTimer phase_timer(PHASE_SIGHT);
     int xx;         // Center cell X coordinate (bounds checking).
     int const* ptr; // Offset pointer.
     int count;      // Counter for number of offsets to process.

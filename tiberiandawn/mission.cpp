@@ -245,7 +245,7 @@ void MissionClass::AI(void)
     **	This is the script AI equivalent processing.
     */
     if (Timer.Expired() && Strength > 0) {
-        PhaseTimer timer(PHASE_MISSION);
+        FinePhaseTimer timer(PHASE_MISSION);
         switch (Mission) {
         default:
         case MISSION_STICKY:

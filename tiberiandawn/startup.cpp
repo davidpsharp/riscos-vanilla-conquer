@@ -37,6 +37,7 @@
 #include "riscos_fs.h"
 #include "function.h"
 #include "common/riscos_desktop.h"
+#include "common/riscos_profile.h"
 #ifdef __riscos__
 #include "common/mixer_sdl1.h"
 #endif
@@ -244,6 +245,7 @@ int main(int argc, char** argv)
         static char stderr_buffer[16384];
         setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
     }
+    Profile_Start(); // VC_PROFILE: sample where the time goes (riscos_profile.h)
 #ifdef USE_SHORT_FILENAMES
     if (getenv("VC_FSTEST") != nullptr) {
         void RISCOS_Fs_Self_Test();

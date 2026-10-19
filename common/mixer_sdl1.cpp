@@ -1,6 +1,7 @@
 #include "mixer_sdl1.h"
 
 #include "phasetime.h"
+#include "riscos_profile.h"
 #include "riscos_ssb.h"
 #include <SDL.h>
 #include <stdint.h>
@@ -206,7 +207,7 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
 // SDL_LockAudio, timed: the game waits here while the mixer thread runs (VC_FPSLOG stalls).
 static void Lock_Audio()
 {
-    PhaseTimer lock_timer(PHASE_CB_AUDIO_LOCK);
+    FinePhaseTimer lock_timer(PHASE_CB_AUDIO_LOCK);
     if (UseSSB) {
         SDL_mutexP(SSBLock);
     } else {
@@ -264,6 +265,7 @@ static inline int Soft_Limit(int x)
 static void SDLCALL Mixer_Callback(void* userdata, Uint8* stream, int len)
 {
     (void)userdata;
+    Profile_Register_Thread(1); // VC_PROFILE: the mixer's thread too
     int frames = len / 4; // 16 bit stereo output.
     static int* mix = nullptr;
     static int mix_frames = 0;

@@ -2126,7 +2126,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
      *=============================================================================================*/
     TARGET TechnoClass::Greatest_Threat(ThreatType method) const
     {
-    PhaseTimer timer(PHASE_THREAT);
+    FinePhaseTimer timer(PHASE_THREAT);
         assert(IsActive);
 
         BStart(BENCH_GREATEST_THREAT);

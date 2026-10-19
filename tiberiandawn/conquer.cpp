@@ -1955,7 +1955,7 @@ bool Main_Loop()
     if (Bench_Frames > 0) {
         /*
         ** VC_BENCHSCROLL=<leptons>: scroll the map that far each frame, round a box of 40 frames
-        ** a side, to measure drawing while scrolling.
+        ** a side, to measure drawing while scrolling (riscos/scripts/rorth-profile.sh).
         */
         static const int scroll = getenv("VC_BENCHSCROLL") != nullptr ? atoi(getenv("VC_BENCHSCROLL")) : 0;
         if (scroll > 0) {

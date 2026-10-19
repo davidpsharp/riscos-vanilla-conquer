@@ -49,6 +49,7 @@ static struct ForgetBenchVariables
 } Forget_Bench_Variables;
 #endif
 bool Phase_Timing = getenv("VC_FPSLOG") != nullptr || Bench_Frames > 0;
+bool Phase_Fine_Timing = Phase_Timing && getenv("VC_PROFILE") == nullptr;
 
 static volatile unsigned Phase_Us[PHASE_COUNT];
 static unsigned Frame_Us[PHASE_COUNT]; // the current game frame's share
@@ -200,8 +201,11 @@ void Phase_Stream_Read(unsigned us)
     }
 }
 
+volatile unsigned Profile_Game_Frames = 0; // for VC_PROFILE's samples (riscos_profile.cpp)
+
 void Phase_Frame_Begin()
 {
+    ++Profile_Game_Frames;
     if (!Phase_Timing) {
         return;
     }

@@ -281,7 +281,7 @@ void MissionClass::AI(void)
     */
     BStart(BENCH_MISSION);
     if (Timer == 0 && Strength > 0) {
-        PhaseTimer timer(PHASE_MISSION);
+        FinePhaseTimer timer(PHASE_MISSION);
         switch (Mission) {
         default:
             Timer = Mission_Sleep();

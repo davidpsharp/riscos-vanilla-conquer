@@ -61,6 +61,12 @@ enum PhaseCountId
 extern unsigned long long Radar_Draws, Radar_Full_Draws, Radar_Pixels, Radar_Active_Draws;
 
 extern bool Phase_Timing;
+/*
+** The timers around frequent, small things (each object's AI and mission, each path,
+** target search and sight, the audio lock): off under VC_PROFILE, as each costs about
+** 8.6 us on a Risc PC and would show up in the profile as time of its own.
+*/
+extern bool Phase_Fine_Timing;
 
 /*
 ** Benchmark (VC_BENCH=<game frames>): run uncapped for that many game frames from
@@ -114,6 +120,26 @@ public:
     ~PhaseTimer()
     {
         if (Phase_Timing) {
+            Phase_Add(Id, Phase_Now_Us() - Start);
+        }
+    }
+
+private:
+    PhaseId Id;
+    unsigned Start;
+};
+
+class FinePhaseTimer
+{
+public:
+    explicit FinePhaseTimer(PhaseId id)
+        : Id(id)
+        , Start(Phase_Fine_Timing ? Phase_Now_Us() : 0)
+    {
+    }
+    ~FinePhaseTimer()
+    {
+        if (Phase_Fine_Timing) {
             Phase_Add(Id, Phase_Now_Us() - Start);
         }
     }

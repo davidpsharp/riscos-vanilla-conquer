@@ -1642,8 +1642,15 @@ static void Movie_Test()
                 done = true;
                 break;
             }
+            // VC_MOVIETEST_COUNT=<n>: stop after n movies (riscos/scripts/rorth-profile.sh).
+            if (getenv("VC_MOVIETEST_COUNT") != nullptr && played >= atoi(getenv("VC_MOVIETEST_COUNT"))) {
+                break;
+            }
         }
         fprintf(stderr, "movietest: %s disc, %d played, %d not found\n", disc_names[cd], played, missing);
+        if (getenv("VC_MOVIETEST_COUNT") != nullptr && played >= atoi(getenv("VC_MOVIETEST_COUNT"))) {
+            break;
+        }
     }
     fflush(stderr);
     Sound_End();

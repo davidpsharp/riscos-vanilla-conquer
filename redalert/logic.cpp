@@ -362,7 +362,7 @@ void LogicClass::AI(void)
         int count = Count();
 
         BStart(BENCH_AI);
-        if (Phase_Timing) {
+        if (Phase_Fine_Timing) {
             unsigned started = Phase_Now_Us();
             int rtti = obj->What_Am_I();
             obj->AI();

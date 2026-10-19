@@ -1601,7 +1601,7 @@ bool TechnoClass::Evaluate_Cell(ThreatType method,
  *=============================================================================================*/
 TARGET TechnoClass::Greatest_Threat(ThreatType method) const
 {
-    PhaseTimer timer(PHASE_THREAT);
+    FinePhaseTimer timer(PHASE_THREAT);
     ObjectClass const* bestobject = NULL;
     int bestval = -1;
 

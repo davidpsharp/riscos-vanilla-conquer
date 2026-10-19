@@ -2136,7 +2136,7 @@ bool Main_Loop()
     if (Bench_Frames > 0) {
         /*
         ** VC_BENCHSCROLL=<leptons>: scroll the map that far each frame, round a box of 40 frames
-        ** a side, to measure drawing while scrolling.
+        ** a side, to measure drawing while scrolling (riscos/scripts/rorth-profile.sh).
         */
         static const int scroll = getenv("VC_BENCHSCROLL") != nullptr ? atoi(getenv("VC_BENCHSCROLL")) : 0;
         if (scroll > 0) {
@@ -3526,6 +3526,10 @@ void Movie_Test()
         }
         Play_Movie(movie, THEME_NONE);
         ++played;
+        // VC_MOVIETEST_COUNT=<n>: stop after n movies (riscos/scripts/rorth-profile.sh).
+        if (getenv("VC_MOVIETEST_COUNT") != nullptr && played >= atoi(getenv("VC_MOVIETEST_COUNT"))) {
+            break;
+        }
     }
     fprintf(stderr, "movietest: %d played, %d not found\n", played, missing);
     fflush(stderr);

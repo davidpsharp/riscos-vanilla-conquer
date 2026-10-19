@@ -550,12 +550,12 @@ struct PathTimer
 {
     unsigned Started;
     PathTimer()
-        : Started(Phase_Timing ? Phase_Now_Us() : 0)
+        : Started(Phase_Fine_Timing ? Phase_Now_Us() : 0)
     {
     }
     ~PathTimer()
     {
-        if (Phase_Timing) {
+        if (Phase_Fine_Timing) {
             Phase_Path(Phase_Now_Us() - Started);
         }
     }
