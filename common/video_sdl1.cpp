@@ -152,6 +152,7 @@ static struct
 } MouseArea = {0, 0, 0, 0};
 
 #ifdef __riscos__
+#include "riscos_memory.h"
 #include <kernel.h>
 #include <swis.h>
 
@@ -815,22 +816,15 @@ void Video_Queue_Shake(int dy)
 // colours between 8 bit palettes).
 #if defined(__riscos__) && defined(__arm__)
 /*
-** Copies "bytes" (a multiple of 32) between word-aligned buffers, 32 bytes per
-** LDM/STM pair. ARM (ARMv3 and later) only; r9-r11 are left alone for the APCS.
+** Presents copy each row (or each span of changed tiles) with VC_Copy_Span
+** (riscos_memory.h): LDM/STM of 32 bytes at a time, then 16, 8, 4 and the last bytes, for
+** any width (the Pi's 1680, the spans at the right edge). VC_PRESENTMEMCPY uses memcpy
+** instead, for comparison (now the program's own, riscos_memory.cpp).
 */
-static void Copy_32(void* dst, const void* src, unsigned bytes)
+static bool Present_With_Memcpy()
 {
-    register unsigned r0 asm("r0") = reinterpret_cast<unsigned>(dst);
-    register unsigned r1 asm("r1") = reinterpret_cast<unsigned>(src);
-    register unsigned r2 asm("r2") = bytes;
-    asm volatile("1:\n"
-                 "ldmia r1!, {r3, r4, r5, r6, r7, r8, r12, lr}\n"
-                 "stmia r0!, {r3, r4, r5, r6, r7, r8, r12, lr}\n"
-                 "subs r2, r2, #32\n"
-                 "bgt 1b\n"
-                 : "+r"(r0), "+r"(r1), "+r"(r2)
-                 :
-                 : "r3", "r4", "r5", "r6", "r7", "r8", "r12", "lr", "cc", "memory");
+    static const bool use_memcpy = getenv("VC_PRESENTMEMCPY") != nullptr;
+    return use_memcpy;
 }
 #endif
 
@@ -1078,17 +1072,13 @@ static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
     SDL_LockSurface(from);
     SDL_LockSurface(to);
 #if defined(__riscos__) && defined(__arm__)
-    // The LDM/STM loop copied a frame to the screen in 10.9 ms on a StrongARM Risc PC,
-    // against 15.2 ms with memcpy. VC_PRESENTMEMCPY switches back, for comparison.
-    static const bool use_asm = getenv("VC_PRESENTMEMCPY") == nullptr;
-    if (use_asm && (w & 31) == 0 && ((reinterpret_cast<uintptr_t>(to->pixels) | reinterpret_cast<uintptr_t>(from->pixels)
-                                      | unsigned(to->pitch) | unsigned(from->pitch))
-                                     & 3)
-                                        == 0) {
+    // An LDM/STM loop copied a frame to the screen in 10.9 ms on a StrongARM Risc PC,
+    // against 15.2 ms with UnixLib's memcpy.
+    if (!Present_With_Memcpy()) {
         for (int row = 0; row < h; ++row) {
-            Copy_32(static_cast<Uint8*>(to->pixels) + row * to->pitch,
-                    static_cast<const Uint8*>(from->pixels) + row * from->pitch,
-                    unsigned(w));
+            VC_Copy_Span(static_cast<Uint8*>(to->pixels) + row * to->pitch,
+                         static_cast<const Uint8*>(from->pixels) + row * from->pitch,
+                         unsigned(w));
         }
         SDL_UnlockSurface(to);
         SDL_UnlockSurface(from);
@@ -1705,8 +1695,8 @@ private:
                     Uint8* to = static_cast<Uint8*>(window->pixels) + (span.y + row) * window->pitch + span.x;
                     const Uint8* from = static_cast<const Uint8*>(frame->pixels) + (span.y + row) * frame->pitch + span.x;
 #if defined(__riscos__) && defined(__arm__)
-                    if ((span.w & 31) == 0 && ((reinterpret_cast<uintptr_t>(to) | reinterpret_cast<uintptr_t>(from)) & 3) == 0) {
-                        Copy_32(to, from, unsigned(span.w));
+                    if (!Present_With_Memcpy()) {
+                        VC_Copy_Span(to, from, unsigned(span.w));
                         continue;
                     }
 #endif
