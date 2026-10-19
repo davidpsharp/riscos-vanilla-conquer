@@ -38,7 +38,7 @@ struct MixerChannel
     unsigned Frame; // Current frame within the head slot.
     unsigned Frac;  // Fractional part of the position, 16 bits.
 
-    unsigned Gain; // 16.16 fixed point.
+    unsigned Gain; // 16.16 fixed point, at most 0x10000 (so a sample times the gain fits in an int).
     bool Playing;
     bool Paused;
     bool Starved; // Stopped because it ran out of data; resumes when more is queued.
@@ -134,7 +134,9 @@ static void Mix_Channel(MixerChannel* ch, int* mix, int frames)
         unsigned frame = ch->Frame;
         unsigned frac = ch->Frac;
         const unsigned step = ch->Step;
-        const long long gain = ch->Gain;
+        // In 32 bits: a 16 bit sample times a gain of at most 0x10000 fits in an int, and
+        // a 64 bit multiply would be a call to __muldi3 per sample on an ARMv3 (no SMULL).
+        const int gain = int(ch->Gain);
 
         if (ch->BitsPerSample == 16 && ch->Channels == 1 && step == 0x10000) {
             const unsigned char* p = slot->Data + frame * 2;
@@ -536,7 +538,7 @@ void Mixer_Set_Format(MixerChannel* ch, int bits_per_sample, int channels, int r
 void Mixer_Set_Gain(MixerChannel* ch, unsigned gain)
 {
     Lock_Audio();
-    ch->Gain = gain;
+    ch->Gain = gain > 0x10000 ? 0x10000 : gain;
     Unlock_Audio();
 }
 
