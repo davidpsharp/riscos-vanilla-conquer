@@ -883,6 +883,17 @@ inline int Lepton_To_Pixel(int lepton)
 
 inline int Pixel_To_Lepton(int pixel)
 {
+#if ICON_PIXEL_W == 24 && ICON_LEPTON_W == 256
+    // Without a division: an ARMv3 has no long multiply, so GCC can't divide by a constant with
+    // one and calls __divsi3, and this is called several times for every object drawn.
+    // (256p + 12) / 24 is sign(p) * ((32|p| + 1) / 3), and v / 3 is (v * 0xAAAB) >> 17 for every v
+    // up to 32 * 3071 + 1 (checked against the expression below for every p that doesn't overflow).
+    unsigned const a = pixel < 0 ? 0u - unsigned(pixel) : unsigned(pixel);
+    if (a < 3072) {
+        int const q = int(((32 * a + 1) * 0xAAABu) >> 17);
+        return pixel < 0 ? -q : q;
+    }
+#endif
     return ((pixel * ICON_LEPTON_W) + (ICON_PIXEL_W / 2) - ((pixel < 0) ? (ICON_PIXEL_W - 1) : 0)) / ICON_PIXEL_W;
 }
 
