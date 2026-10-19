@@ -890,6 +890,187 @@ static void Dirty_Stat(SDL_Surface* frame)
     }
 }
 
+/*
+** VC_PARTIALVERIFY: after every present, compare what is really on the screen (the
+** display memory, read back) with the whole frame it should show, cursor and all,
+** and report any difference: which present, the area and how many pixels. Slow (a
+** full read of the screen each present), for testing partial presents.
+** VC_PARTIALVERIFY=2 also saves the first few mismatching screens as PPM files.
+*/
+static struct
+{
+    std::vector<Uint8> expected; // what the screen should show now, in game pixels
+    std::vector<Uint8> ref;      // the last frame presented, without the cursor
+    int w = 0, h = 0;            // of both
+    bool ref_valid = false;
+    unsigned checked = 0, bad = 0, skipped = 0, dumps = 0;
+    unsigned long long bad_pixels = 0;
+    unsigned kind_checked[4] = {0, 0, 0, 0}, kind_bad[4] = {0, 0, 0, 0};
+} PV;
+
+static const char* const PV_Kinds[4] = {"full", "partial", "cursor", "cursor-on-screen"};
+
+static bool PV_Enabled()
+{
+    static const bool on = getenv("VC_PARTIALVERIFY") != nullptr;
+    return on;
+}
+
+static void PV_Totals(void)
+{
+    fprintf(stderr,
+            "partialverify: totals: %u presents checked, %u mismatched (%llu pixels), %u skipped; "
+            "full %u/%u, partial %u/%u, cursor %u/%u, cursor-on-screen %u/%u (bad/checked)\n",
+            PV.checked,
+            PV.bad,
+            PV.bad_pixels,
+            PV.skipped,
+            PV.kind_bad[0],
+            PV.kind_checked[0],
+            PV.kind_bad[1],
+            PV.kind_checked[1],
+            PV.kind_bad[2],
+            PV.kind_checked[2],
+            PV.kind_bad[3],
+            PV.kind_checked[3]);
+}
+
+// Copies a surface's pixels (top left w x h) into "to", raw.
+static void PV_Grab(SDL_Surface* from, std::vector<Uint8>& to, int w, int h)
+{
+    to.resize(size_t(w) * h);
+    SDL_LockSurface(from);
+    for (int y = 0; y < h; ++y) {
+        memcpy(&to[size_t(y) * w], static_cast<const Uint8*>(from->pixels) + y * from->pitch, w);
+    }
+    SDL_UnlockSurface(from);
+}
+
+/*
+** Where the game's top left pixel is in the memory being displayed, and its line length.
+** On RISC OS that's read from the VDU (DisplayStart), not from SDL's surface, so a back
+** buffer that SDL failed to copy would show up too.
+*/
+static const Uint8* PV_Display(SDL_Surface* shown, int& pitch)
+{
+#ifdef __riscos__
+    int vars[3] = {149, 6, -1}; // DisplayStart, LineLength
+    int out[2] = {0, 0};
+    _kernel_swi_regs regs;
+    regs.r[0] = reinterpret_cast<int>(vars);
+    regs.r[1] = reinterpret_cast<int>(out);
+    _kernel_swi(OS_ReadVduVariables, &regs, &regs);
+    static bool told = false;
+    if (!told) {
+        told = true;
+        fprintf(stderr,
+                "partialverify: display at %p, line %d; SDL screen surface pixels %p, pitch %d, offset %d, flags %x\n",
+                reinterpret_cast<void*>(out[0]),
+                out[1],
+                shown->pixels,
+                shown->pitch,
+                shown->offset,
+                unsigned(shown->flags));
+        atexit(PV_Totals);
+    }
+    pitch = out[1];
+    return reinterpret_cast<const Uint8*>(out[0]) + shown->offset;
+#else
+    static bool told = false;
+    if (!told) {
+        told = true;
+        atexit(PV_Totals);
+    }
+    pitch = shown->pitch;
+    return static_cast<const Uint8*>(shown->pixels) + shown->offset;
+#endif
+}
+
+static void PV_Dump(const char* name, const Uint8* pixels, int w, int h, int pitch, int step, SDL_Color* pal)
+{
+    FILE* f = fopen(name, "wb");
+    if (f == nullptr) {
+        return;
+    }
+    fprintf(f, "P6\n%d %d\n255\n", w, h);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const SDL_Color& c = pal[pixels[size_t(y) * step * pitch + size_t(x) * step]];
+            fputc(c.r, f);
+            fputc(c.g, f);
+            fputc(c.b, f);
+        }
+    }
+    fclose(f);
+}
+
+// Compares the screen with PV.expected, after a present of the given kind.
+static void PV_Compare(SDL_Surface* shown, int scale, int kind)
+{
+    int pitch = 0;
+    int w = PV.w, h = PV.h;
+    if (shown->w < w * scale || shown->h < h * scale) {
+        ++PV.skipped;
+        return;
+    }
+    SDL_LockSurface(shown);
+    const Uint8* screen = PV_Display(shown, pitch);
+    unsigned long long n = 0;
+    int x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (int y = 0; y < h; ++y) {
+        const Uint8* want = &PV.expected[size_t(y) * w];
+        const Uint8* row = screen + size_t(y) * scale * pitch;
+        if (scale == 1 && memcmp(row, want, w) == 0) {
+            continue;
+        }
+        for (int x = 0; x < w; ++x) {
+            bool same = row[x * scale] == want[x];
+            if (scale == 2) {
+                same = same && row[x * 2 + 1] == want[x] && row[pitch + x * 2] == want[x] && row[pitch + x * 2 + 1] == want[x];
+            }
+            if (!same) {
+                ++n;
+                x0 = x < x0 ? x : x0;
+                x1 = x > x1 ? x : x1;
+                y0 = y < y0 ? y : y0;
+                y1 = y > y1 ? y : y1;
+            }
+        }
+    }
+    ++PV.checked;
+    ++PV.kind_checked[kind];
+    if (n != 0) {
+        ++PV.bad;
+        ++PV.kind_bad[kind];
+        PV.bad_pixels += n;
+        if (PV.bad <= 50 || (PV.bad % 100) == 0) {
+            fprintf(stderr,
+                    "partialverify: MISMATCH at present %u (game frame %u, %s): %llu pixels in %d,%d %dx%d\n",
+                    PV.checked,
+                    Logic_Frame_Count,
+                    PV_Kinds[kind],
+                    n,
+                    x0,
+                    y0,
+                    x1 - x0 + 1,
+                    y1 - y0 + 1);
+        }
+        static const bool dump = getenv("VC_PARTIALVERIFY") != nullptr && atoi(getenv("VC_PARTIALVERIFY")) == 2;
+        if (dump && PV.dumps < 4) {
+            char name[64];
+            snprintf(name, sizeof(name), "pvscreen%u", PV.dumps);
+            PV_Dump(name, screen, w, h, pitch, scale, physpal);
+            snprintf(name, sizeof(name), "pvwant%u", PV.dumps);
+            PV_Dump(name, &PV.expected[0], w, h, w, 1, physpal);
+            ++PV.dumps;
+        }
+    }
+    SDL_UnlockSurface(shown);
+    if ((PV.checked % 2000) == 0) {
+        PV_Totals();
+    }
+}
+
 static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
 {
     int w = from->w < to->w ? from->w : to->w;
@@ -1152,6 +1333,8 @@ public:
         SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
         SDL_Rect drawn = area;
         SDL_Rect dirty = {0, 0, 0, 0};
+        int pv_kind = -1; // VC_PARTIALVERIFY: what kind of present to check, if any
+        bool copied_changed = false;
 
         if (!full && mirror != nullptr && mirror_shown) {
             /*
@@ -1169,6 +1352,21 @@ public:
                 }
             }
             dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
+            if (PV_Enabled()) {
+                if (PV.ref_valid) {
+                    PV.expected = PV.ref;
+                    if (cursor) {
+                        SDL_Surface* want = SDL_CreateRGBSurfaceFrom(&PV.expected[0], PV.w, PV.h, 8, PV.w, 0, 0, 0, 0);
+                        if (want != nullptr) {
+                            Draw_Cursor(want, area);
+                            SDL_FreeSurface(want);
+                        }
+                    }
+                    pv_kind = 3;
+                } else {
+                    ++PV.skipped;
+                }
+            }
         } else {
             /*
             ** Draw the software cursor into the frame before copying it to the screen,
@@ -1188,7 +1386,8 @@ public:
                 if (dirty_stat) {
                     Dirty_Stat(frame);
                 }
-                if (!Copy_Changed(frame, drawn, cursor, force_full)) {
+                copied_changed = Copy_Changed(frame, drawn, cursor, force_full);
+                if (!copied_changed) {
                     static const bool check = getenv("VC_DIRTYCHECK") != nullptr;
                     if (check && mirror != nullptr) {
                         Check_Marks(frame, drawn, cursor, false); // just take a copy
@@ -1204,8 +1403,18 @@ public:
                 }
             }
 
+            if (PV_Enabled()) {
+                PV.w = frame->w < window->w ? frame->w : window->w;
+                PV.h = frame->h < window->h ? frame->h : window->h;
+                PV_Grab(frame, PV.expected, PV.w, PV.h);
+                pv_kind = !full ? 2 : copied_changed ? 1 : 0;
+            }
             if (cursor) {
                 Put_Under(frame, drawn);
+            }
+            if (PV_Enabled()) {
+                PV_Grab(frame, PV.ref, PV.w, PV.h);
+                PV.ref_valid = true;
             }
             if (mirror != nullptr) {
                 mirror_shown = true;
@@ -1226,6 +1435,9 @@ public:
             Show_All();
         } else if (dirty.w > 0 && dirty.h > 0) {
             Show_Rects(1, &dirty);
+        }
+        if (pv_kind >= 0) {
+            PV_Compare(Shown(), Scale, pv_kind);
         }
 
         changed = false;
@@ -1273,6 +1485,7 @@ private:
             mirror = nullptr;
         }
         Shake_Undo = true;
+        PV.ref_valid = false;
         last_cursor = false;
         presented = true;
         screen_holds = nullptr;
@@ -1467,6 +1680,11 @@ private:
             ++Presents;
         }
 
+        // VC_PARTIALBREAK=<n> (to test VC_PARTIALVERIFY): every n-th partial present leaves out its first span.
+        static const int break_every = getenv("VC_PARTIALBREAK") != nullptr ? atoi(getenv("VC_PARTIALBREAK")) : 0;
+        static unsigned break_count = 0;
+        bool leave_out = break_every > 0 && (++break_count % unsigned(break_every)) == 0;
+
         SDL_LockSurface(frame);
         SDL_LockSurface(window);
         int tw = mirror->tiles_w;
@@ -1483,7 +1701,7 @@ private:
                 SDL_Rect span = Make_SDL_Rect(start * TILE, ty * TILE, (tx - start) * TILE, TILE);
                 span.w = span.x + span.w > frame->w ? frame->w - span.x : span.w;
                 span.h = span.y + span.h > frame->h ? frame->h - span.y : span.h;
-                for (int row = 0; row < span.h; ++row) {
+                for (int row = 0; row < span.h && !leave_out; ++row) {
                     Uint8* to = static_cast<Uint8*>(window->pixels) + (span.y + row) * window->pitch + span.x;
                     const Uint8* from = static_cast<const Uint8*>(frame->pixels) + (span.y + row) * frame->pitch + span.x;
 #if defined(__riscos__) && defined(__arm__)
@@ -1496,6 +1714,7 @@ private:
                 }
                 spans.push_back(span);
                 Dirty_Tiles_Copied += tx - start;
+                leave_out = false;
             }
         }
         SDL_UnlockSurface(window);

@@ -216,6 +216,8 @@ The Risc PC, the Pi 4 and the Mac end the battle the same way with the same seed
 - `Nearby_Location` bounded by the map edge and by each zone's bounding box.
 - Region threat kept per owner and added up when a house reads it, rather than written to 19 houses' regions for every cell a unit enters. A grand total makes reads quick: the first version summed 20 owners on every read and made roundabout teams' searches take 100 ms in Allied 2. Checked against the old way for every house and region every frame.
 - Partial presents work in every mission: the empty map, objects and power bar passes now mark that they drew nothing (0 tiles missed with `VC_DIRTYCHECK`).
+  - `VC_PARTIALVERIFY=1` checks what reaches the screen. After every present it reads the display memory back (from `DisplayStart`, not SDL's surface) and compares it with the whole frame, cursor included. Any difference is logged with its area and pixel count; `=2` also saves the first few as PPM files. `VC_PARTIALBREAK=<n>` leaves a span out of every n-th partial present, to show that the check catches it.
+  - Playtested with both on, on RPCEmu (RISC OS 5.30). TD ran at 320x200, 640x480, 800x600 and 1024x768: GDI 3, 4 and 7, Nod 3, the battle, menus, movies, score screens and Shift+F12. RA ran at 800x600 and 1024x768: Soviet 2 and 3 and the score screen. About 40,000 TD presents and 70,000 RA presents were checked, with 0 mismatches.
 - `As_Pointer` cached.
 
 ## Screen size
