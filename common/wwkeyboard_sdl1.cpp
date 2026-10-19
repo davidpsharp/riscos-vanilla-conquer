@@ -115,6 +115,16 @@ void WWKeyboardClassSDL1::Poll_RISCOS_Wheel(void)
     if (failed) {
         return;
     }
+    if (!started) {
+        // RISC OS 3.x doesn't check OS_Pointer's reason code, and 2 jumps to garbage there
+        // (a crash on entering a game on RISC OS 3.71). OS_Byte 129 gives &A8 or more for
+        // RISC OS 4 and later, which return an error or the wheel.
+        int const os = _kernel_osbyte(129, 0, 255);
+        if (os < 0 || (os & 0xFF) < 0xA8) {
+            failed = true;
+            return;
+        }
+    }
     _kernel_swi_regs regs;
     regs.r[0] = 2;
     if (_kernel_swi(OS_Pointer, &regs, &regs) != nullptr) {
