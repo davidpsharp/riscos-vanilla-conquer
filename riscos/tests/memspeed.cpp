@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <swis.h>
+#include "poll_once.h"
 
 extern "C" {
 void* vc_memcpy(void* dst, const void* src, size_t n);
@@ -83,6 +84,7 @@ static void Copy_32(void* dst, const void* src, unsigned bytes)
 
 int main(int argc, char** argv)
 {
+    Poll_Once_At_Start(); // see poll_once.h: uncached until the first Wimp_Poll on the Risc PC
     bool screen = true;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-noscreen") == 0) {

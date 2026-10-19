@@ -28,6 +28,7 @@
 #include <kernel.h>
 #include <swis.h>
 #endif
+#include "poll_once.h"
 
 extern "C" {
 void* vc_memcpy(void* dst, const void* src, size_t n);
@@ -243,6 +244,7 @@ static void Report(unsigned start)
 
 int main(int argc, char** argv)
 {
+    Poll_Once_At_Start(); // see poll_once.h: uncached until the first Wimp_Poll on the Risc PC
     bool quick = argc > 1 && strcmp(argv[1], "-quick") == 0;
     const size_t BIG = 1024 * 1024;
     const size_t SIZE = BIG + 4 * 1024;
