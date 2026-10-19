@@ -80,6 +80,7 @@ for s in "$@"; do
     result=timeout
     while [ $(($(date +%s) - started)) -lt "$WAIT" ]; do
         sleep 5
+        if ! ls "$app"/ProfErr* >/dev/null 2>&1 && [ $(($(date +%s) - started)) -gt 90 ]; then result=did-not-start; break; fi
         if cat "$app"/ProfErr* 2>/dev/null | grep -q "^profile: .* written"; then result=ok; break; fi
         if cat "$app"/ProfErr* 2>/dev/null | grep -qE "^bench objects at the end|^movietest:"; then [ "${NO_PROFILE:-0}" = 1 ] && { result=ok; break; }; fi
         if cat "$app"/ProfErr* 2>/dev/null | grep -qE "Fatal signal|Uncaught|Abort"; then result=crashed; sleep 5; break; fi
