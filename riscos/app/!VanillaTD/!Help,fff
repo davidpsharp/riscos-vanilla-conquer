@@ -96,6 +96,10 @@ wrong, or a copy that is stopped part-way (a full disc, a power cut),
 leaves nothing that looks installed: drag the image onto the icon again
 to finish. Files already installed are skipped, so that's always safe.
 
+If installing goes wrong, the file InstallLog in the gamedata directory
+records what happened; to see it, Shift-double-click !VanillaTD to open
+the application. Please include it when you report the problem.
+
 The game recognises each disc by its contents, and says so if it's the
 wrong one: a Red Alert or Tiberian Sun disc, for instance, goes on the
 !VanillaRA or !OpenTS icon, and an MS-DOS disc won't do. It spots a

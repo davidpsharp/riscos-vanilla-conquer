@@ -23,6 +23,8 @@ for dir in "$BDIR" build/riscos-tools; do
     fi
 done
 
+# The build vcprep names in its install log (git can't see the repo from inside the container).
+TOOLS_BUILD=$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || date +%Y%m%d)
 if [ "${1:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/sdk.sh" bash -c "
         cmake -S . -B $BDIR -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake \
@@ -31,7 +33,8 @@ if [ "${1:-}" != --no-build ]; then
         cmake --build $BDIR &&
         elf2aif $BDIR/vanillatd $BDIR/vanillatd,ff8 &&
         cmake -S riscos/tools -B build/riscos-tools -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake -DCMAKE_BUILD_TYPE=Release >/dev/null &&
+            -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake -DCMAKE_BUILD_TYPE=Release \
+            -DTOOLS_BUILD=$TOOLS_BUILD >/dev/null &&
         cmake --build build/riscos-tools"
 fi
 

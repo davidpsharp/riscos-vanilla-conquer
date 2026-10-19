@@ -141,6 +141,7 @@ It runs `!VanillaTD.Utils.vcprep` (source in `tools/vcprep`), which:
 - unpacks the files in `INSTALL/SETUP.Z` (InstallShield 3, PKWARE implode; decompressed with Mark Adler's `blast.c`);
 - writes the short-filename layout below, with filetypes set;
 - checks every file against a known CRC-32 and says which disc it is from `GENERAL.MIX`.
+- writes what happened to `gamedata.InstallLog` (a Text file, replaced by each install; `-check` adds one line to it): the build, the OS version and memory, each image with its size and the disc it was found to be, a line per file with its expected size, its result (skipped, copied with the CRC right, a CRC mismatch with both values, a read, write, create or rename error with the OS's text) and how long it took, the free space before and after, and the outcome. If gamedata can't take it, it goes in `<Wimp$ScrapDir>.VanillaTDInstallLog` (or `VanillaRAInstallLog`), and the task window says so.
 
 **Licences:** `vcprep.c` is GPL v3, like the rest of the project. `blast.c`/`blast.h` are Mark Adler's, under the zlib licence, and are included unmodified. The `SETUP.Z` layout follows [unshieldv3](https://github.com/wfr/unshieldv3) (Apache 2.0), used only as a format reference. All of these are compatible with GPL v3.
 

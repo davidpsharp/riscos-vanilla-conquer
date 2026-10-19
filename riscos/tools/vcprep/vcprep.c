@@ -23,6 +23,9 @@
 **   -identify  says which disc a file is (discid.h), in VCPrep$Disc ("td-gdi", ...,
 **              "unknown", "not-iso") and VCPrep$DiscCut (set if the image is cut short)
 **
+** Every install (not -check) records what happened in the game's gamedata.InstallLog, for
+** when it goes wrong (the install log, below).
+**
 ** Each file is written under a temporary name and only given its own once its size
 ** and CRC are right, so a file under its real name is always a whole, checked copy:
 ** an interrupted run (Escape, a full disc, a power cut) leaves nothing that looks
@@ -51,6 +54,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef __riscos__
@@ -61,7 +65,14 @@
 int __riscosify_control = __RISCOSIFY_NO_PROCESS;
 #define SEP "."
 #else
+#include <sys/statvfs.h>
+#include <sys/time.h>
 #define SEP "/"
+#endif
+
+/* Which build this is, for the install log: git describe, passed in by the deploy scripts. */
+#ifndef TOOLS_BUILD
+#define TOOLS_BUILD "unknown"
 #endif
 
 #define SECTOR 2048
@@ -103,6 +114,244 @@ static void Release_Held(void)
     Held_Len = 0;
 }
 #define printf Say
+
+/*
+** ---- The install log ----
+** Every install (not -check) writes what happened to gamedata.InstallLog (a Text file),
+** replacing the last one, so that an install that went wrong where nobody saw the window can
+** still be looked into: the machine, the images and what each was found to be, and a line per
+** file with its result. Each line is flushed as it's written, so a crash or a power cut leaves
+** what was done so far. Nothing here can make an install fail: if the log can't be written,
+** it simply isn't (or it goes in the scrap directory if gamedata can't take it).
+*/
+#define LOG_LEAF "InstallLog"
+#define LOG_MAX 2 /* run from the command line, vcprep may install both games */
+static FILE* Logs[LOG_MAX];
+static char Log_Paths[LOG_MAX][1100];
+static const char* Log_Data_Dirs[LOG_MAX]; /* the gamedata each log is for */
+static int Log_Count = 0;
+static int Log_In_Scrap = 0; /* gamedata couldn't take the log: it's in the scrap directory */
+
+static void Log(const char* format, ...)
+{
+    int i;
+    for (i = 0; i < Log_Count; ++i) {
+        va_list args;
+        if (Logs[i] == NULL) {
+            continue;
+        }
+        va_start(args, format);
+        vfprintf(Logs[i], format, args);
+        va_end(args);
+        fputc('\n', Logs[i]);
+        fflush(Logs[i]);
+    }
+}
+
+/* The time in centiseconds, for how long things took. */
+static unsigned long Now_Cs(void)
+{
+#ifdef __riscos__
+    unsigned t = 0;
+    _swix(OS_ReadMonotonicTime, _OUT(0), &t);
+    return t;
+#else
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (unsigned long)tv.tv_sec * 100 + (unsigned long)tv.tv_usec / 10000;
+#endif
+}
+
+/* The last error a file operation got, as the OS put it, for the log. */
+static const char* Error_Text(void)
+{
+    static char text[300];
+#ifdef __riscos__
+    const _kernel_oserror* e = _kernel_last_oserror();
+    if (e != NULL) {
+        snprintf(text, sizeof(text), "%s (error &%X)", e->errmess, (unsigned)e->errnum);
+        return text;
+    }
+#endif
+    snprintf(text, sizeof(text), "%s", errno != 0 ? strerror(errno) : "no error given");
+    return text;
+}
+
+/* Forgets the last error, before an operation whose error is to be logged. */
+static void Clear_Error(void)
+{
+    errno = 0;
+#ifdef __riscos__
+    (void)_kernel_last_oserror();
+#endif
+}
+
+/* Free space on the disc holding path, in bytes, or -1. */
+static double Free_Space(const char* path)
+{
+#ifdef __riscos__
+    unsigned lo = 0, hi = 0;
+    if (_swix(OS_FSControl, _INR(0, 1) | _OUTR(0, 1), 55, path, &lo, &hi) == NULL) { /* FreeSpace64 */
+        return (double)lo + (double)hi * 4294967296.0;
+    }
+    if (_swix(OS_FSControl, _INR(0, 1) | _OUT(0), 49, path, &lo) == NULL) { /* FreeSpace (RISC OS 3, 4) */
+        return (double)lo;
+    }
+    return -1;
+#else
+    struct statvfs s;
+    return statvfs(path, &s) == 0 ? (double)s.f_bavail * (double)s.f_frsize : -1;
+#endif
+}
+
+static void Log_Free_Space(const char* when, const char* path)
+{
+    double free = Free_Space(path);
+    if (free >= 0) {
+        Log("free space %s: %.1f MB", when, free / (1024 * 1024));
+    } else {
+        Log("free space %s: unknown", when);
+    }
+}
+
+static void Set_Type(const char* path, int type);
+static char* Read_Var(const char* name);
+
+/* Opens the log in a gamedata directory (made if need be), or else in the scrap directory. */
+static void Log_Open(const char* data_dir, const char* app_name)
+{
+    FILE* f;
+    char* path;
+    if (Log_Count == LOG_MAX) {
+        return;
+    }
+    path = Log_Paths[Log_Count];
+    mkdir(data_dir, 0755);
+    snprintf(path, sizeof(Log_Paths[0]), "%s" SEP LOG_LEAF, data_dir);
+    f = fopen(path, "w");
+    if (f == NULL) {
+        const char* scrap = Read_Var("Wimp$ScrapDir");
+#ifndef __riscos__
+        if (scrap == NULL) {
+            scrap = "/tmp";
+        }
+#endif
+        if (scrap == NULL || *scrap == '\0') {
+            return;
+        }
+        snprintf(path, sizeof(Log_Paths[0]), "%s" SEP "%s" LOG_LEAF, scrap, app_name);
+        f = fopen(path, "w");
+        if (f == NULL) {
+            return;
+        }
+        Log_In_Scrap = 1;
+    }
+    Set_Type(path, FILETYPE_TEXT);
+    Log_Data_Dirs[Log_Count] = data_dir;
+    Logs[Log_Count++] = f;
+}
+
+static void Log_Close(void)
+{
+    int i;
+    for (i = 0; i < Log_Count; ++i) {
+        if (Logs[i] != NULL) {
+            fclose(Logs[i]);
+            Logs[i] = NULL;
+            Set_Type(Log_Paths[i], FILETYPE_TEXT);
+        }
+    }
+}
+
+/* Where the log is, for the window: !VanillaTD.gamedata.InstallLog, or its whole path. */
+static void Say_Where_Log_Is(void)
+{
+    const char* path = Log_Paths[0];
+    const char* leaf = path;
+    const char* p;
+    int dots = 0;
+    if (Log_Count == 0) {
+        printf("No install log could be written.\n");
+        return;
+    }
+    if (Log_In_Scrap) {
+        printf("Details are in %s (gamedata couldn't take them).\n", path);
+        return;
+    }
+    /* The application's own name onwards. */
+    for (p = path + strlen(path); p > path; --p) {
+        if (strncmp(p - 1, SEP, 1) == 0 && ++dots == 3) {
+            leaf = p;
+            break;
+        }
+    }
+    printf("Details are in %s.\n", leaf);
+}
+
+/* The machine, for the log's header. */
+static void Log_System(void)
+{
+#ifdef __riscos__
+    char version[200];
+    const _kernel_oserror* e = _swix(OS_Byte, _INR(0, 1), 0, 0); /* the version, as an error */
+    int slot = 0, next = 0, free = 0;
+    size_t len;
+    snprintf(version, sizeof(version), "%s", e != NULL ? e->errmess : "RISC OS (version unknown)");
+    for (len = strlen(version); len > 0 && (unsigned char)version[len - 1] < ' '; --len) {
+        version[len - 1] = '\0';
+    }
+    Log("system: %s", version);
+    if (_swix(Wimp_SlotSize, _INR(0, 1) | _OUTR(0, 2), -1, -1, &slot, &next, &free) == NULL) {
+        Log("memory: wimpslot %dK, free %dK", slot / 1024, free / 1024);
+    }
+#else
+    Log("system: not RISC OS (a test build)");
+#endif
+}
+
+static void Log_Header(int argc, char** argv)
+{
+    char when[40];
+    time_t now = time(NULL);
+    int i;
+    strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    Log("vcprep install log");
+    Log("build: %s, compiled %s %s", TOOLS_BUILD, __DATE__, __TIME__);
+    Log("started: %s", when);
+    Log_System();
+    for (i = 0; i < Log_Count; ++i) {
+        if (Logs[i] != NULL) {
+            int a;
+            fputs("command:", Logs[i]);
+            for (a = 0; a < argc; ++a) {
+                fprintf(Logs[i], " %s", argv[a]);
+            }
+            fputc('\n', Logs[i]);
+            fflush(Logs[i]);
+        }
+    }
+}
+
+/*
+** -check: a line at the end of the last install's log, if there is one (it isn't made, and the
+** log isn't replaced): "check 2026-10-19 21:04:11: all there". !Run checks on every start, so
+** the lines stop once the log reaches a few KB.
+*/
+static void Log_Check(const char* data_dir, const char* problem)
+{
+    char path[1100], when[40];
+    struct stat st;
+    time_t now = time(NULL);
+    FILE* f;
+    snprintf(path, sizeof(path), "%s" SEP LOG_LEAF, data_dir);
+    if (stat(path, &st) != 0 || st.st_size > 16 * 1024 || (f = fopen(path, "a")) == NULL) {
+        return;
+    }
+    strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    fprintf(f, "check %s: %s\n", when, problem[0] != '\0' ? problem : "all there");
+    fclose(f);
+    Set_Type(path, FILETYPE_TEXT);
+}
 
 /* ---- CRC-32 (the zlib polynomial, so zlib.crc32 gives the same values) ---- */
 
@@ -200,6 +449,33 @@ static void Dest_Path(const struct Known* k, char* out, size_t outlen)
     }
 }
 
+/*
+** A file's line in the log: where it goes in gamedata, the size it should be, and what happened,
+** with how long it took if it was copied: "  MIX.CONQUER  2345678  copied, CRC ok, 3.1 s".
+*/
+static unsigned long File_Started = 0; /* when the file being copied was started, or 0 */
+
+static void Log_File(const struct Known* k, const char* format, ...)
+{
+    char name[64], result[400];
+    va_list args;
+    const char* d = k->dest;
+    if (d[0] == '@') {
+        snprintf(name, sizeof(name), "%s%s", Side_Dir, d + 1);
+    } else {
+        snprintf(name, sizeof(name), "%s", d);
+    }
+    va_start(args, format);
+    vsnprintf(result, sizeof(result), format, args);
+    va_end(args);
+    if (File_Started != 0) {
+        Log("  %-16s %10lu  %s, %.1f s", name, k->size, result, (Now_Cs() - File_Started) / 100.0);
+        File_Started = 0;
+    } else {
+        Log("  %-16s %10lu  %s", name, k->size, result);
+    }
+}
+
 /* Creates each directory along the path of a file, below base (which must exist). */
 static void Make_Dirs_Below(const char* base, const char* path)
 {
@@ -243,6 +519,7 @@ static int Already_Present(const struct Known* k, const char* path)
 {
     if (!Force && File_Size(path) == (long)k->size) {
         printf("  %-12s already present, skipped\n", k->name);
+        Log_File(k, "already present, skipped");
         return 1;
     }
     return 0;
@@ -274,11 +551,14 @@ static void Commit(const struct Known* k, const char* temp, const char* path, un
 {
     if (!failed && size == k->size && crc == k->crc) {
         remove(path); /* RISC OS can't rename over an existing file */
+        Clear_Error();
         if (rename(temp, path) == 0) {
             Set_Type(path, type);
             printf("  %-12s ok   \n", k->name); /* spaces cover the progress percentage */
+            Log_File(k, "copied, CRC ok");
             return;
         }
+        Log_File(k, "RENAME ERROR, from %s: %s", temp, Error_Text());
         printf("  %-12s can't be given its name: %s\n", k->name, strerror(errno));
     } else if (!failed) {
         printf("  %-12s CHECKSUM MISMATCH: got %lu bytes crc %08lx, expected %lu bytes crc %08lx;"
@@ -288,6 +568,7 @@ static void Commit(const struct Known* k, const char* temp, const char* path, un
                crc,
                k->size,
                k->crc);
+        Log_File(k, "CRC MISMATCH: expected %lu bytes crc %08lx, got %lu bytes crc %08lx", k->size, k->crc, size, crc);
     }
     remove(temp);
     ++Problems;
@@ -429,6 +710,7 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     }
     if (!Source_Find(root, k->name, &e) || e.is_dir) {
         printf("  %-12s NOT FOUND on this disc\n", k->name);
+        Log_File(k, "NOT FOUND on the disc");
         ++Problems;
         return;
     }
@@ -437,11 +719,14 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     }
     ++Copying;
     Progress(k, 0);
+    File_Started = Now_Cs();
 
     Make_Dirs(path);
     Temp_Path(path, temp, sizeof(temp));
+    Clear_Error();
     out = fopen(temp, "wb");
     if (out == NULL) {
+        Log_File(k, "CREATE ERROR, %s: %s", temp, Error_Text());
         printf("  %-12s can't create %s: %s\n", k->name, temp, strerror(errno));
         ++Problems;
         return;
@@ -449,13 +734,20 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
 
     for (left = e.size; left > 0;) {
         size_t chunk = left < sizeof(Buffer) ? (size_t)left : sizeof(Buffer);
+        Clear_Error(); /* so that an error logged is this chunk's */
         if (!Source_Read(&e, done, Buffer, chunk)) {
             printf("  %-12s read error; not installed\n", k->name);
+            {
+                const char* why = Error_Text();
+                Log_File(k, "READ ERROR at byte %lu of %lu: %s", done, e.size,
+                         strcmp(why, "no error given") == 0 ? "the image ends there (cut short?)" : why);
+            }
             failed = 1;
             break;
         }
         if (fwrite(Buffer, 1, chunk, out) != chunk) {
             printf("  %-12s write error (disc full?); not installed\n", k->name);
+            Log_File(k, "WRITE ERROR at byte %lu: %s", done, Error_Text());
             failed = 1;
             break;
         }
@@ -476,6 +768,7 @@ static void Copy_Plain(const struct Entry* root, const struct Known* k)
     }
     if (fclose(out) != 0 && !failed) {
         printf("  %-12s write error (disc full?); not installed\n", k->name);
+        Log_File(k, "WRITE ERROR on closing: %s", Error_Text());
         failed = 1;
     }
     Commit(k, temp, path, done, crc, failed, FILETYPE_DATA);
@@ -542,12 +835,14 @@ static void Extract_Archive(const struct Entry* root)
 
     if (!Source_Find(root, "INSTALL", &install) || !install.is_dir || !Source_Find(&install, "SETUP.Z", &setup)) {
         printf("  INSTALL/SETUP.Z NOT FOUND on this disc\n");
+        Log("  INSTALL/SETUP.Z NOT FOUND on the disc");
         ++Problems;
         return;
     }
     base = 0; /* offsets below are in SETUP.Z */
     if (!Source_Read(&setup, base, hdr, sizeof(hdr)) || Get32(hdr) != 0x8C655D13UL || Get32(hdr + 4) != 0x02013AUL) {
         printf("  SETUP.Z is not an InstallShield 3 archive\n");
+        Log("  INSTALL/SETUP.Z is not an InstallShield 3 archive (or can't be read)");
         ++Problems;
         return;
     }
@@ -606,6 +901,7 @@ static void Extract_Archive(const struct Entry* root)
                     /* Keep an existing INI: it holds the player's settings. */
                     if (strcmp(kn->name, "CONQUER.INI") == 0 && File_Size(path) >= 0) {
                         printf("  %-12s already present, kept\n", kn->name);
+                        Log_File(kn, "already present, kept (the player's settings)");
                         continue;
                     }
                     if (Already_Present(kn, path)) {
@@ -615,9 +911,12 @@ static void Extract_Archive(const struct Entry* root)
                     Make_Dirs(path);
                     ++Copying;
                     Progress(kn, 0);
+                    File_Started = Now_Cs();
                     Temp_Path(path, temp, sizeof(temp));
+                    Clear_Error();
                     out = fopen(temp, "wb");
                     if (out == NULL) {
+                        Log_File(kn, "CREATE ERROR, %s: %s", temp, Error_Text());
                         printf("  %-12s can't create %s: %s\n", kn->name, temp, strerror(errno));
                         ++Problems;
                         continue;
@@ -636,6 +935,7 @@ static void Extract_Archive(const struct Entry* root)
                         }
                     } else if (blast(Blast_In, &io, Blast_Out, &io, NULL, NULL) != 0 && !io.write_error) {
                         printf("  %-12s decompression failed; not installed\n", kn->name);
+                        Log_File(kn, "UNPACKING FAILED (SETUP.Z damaged or cut short?)");
                         failed = 1;
                     }
                     if (fclose(out) != 0) {
@@ -643,6 +943,7 @@ static void Extract_Archive(const struct Entry* root)
                     }
                     if (io.write_error && !failed) {
                         printf("  %-12s write error (disc full?); not installed\n", kn->name);
+                        Log_File(kn, "WRITE ERROR: %s", Error_Text());
                         failed = 1;
                     }
                     Commit(kn,
@@ -660,6 +961,7 @@ static void Extract_Archive(const struct Entry* root)
     for (k = 0; k < sizeof(Archive_Files) / sizeof(Archive_Files[0]); ++k) {
         if (!found[k]) {
             printf("  %-12s NOT FOUND in SETUP.Z\n", Archive_Files[k].name);
+            Log_File(&Archive_Files[k], "NOT FOUND in INSTALL/SETUP.Z");
             ++Problems;
         }
     }
@@ -674,6 +976,7 @@ static void Check_File(const struct Known* k, const char* temp, const char* path
     size_t n;
     if (f == NULL) {
         printf("  %-12s wasn't made\n", k->name);
+        Log_File(k, "NOT MADE by Utils.ramix");
         ++Problems;
         return;
     }
@@ -703,12 +1006,14 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
         printf("%s: Red Alert %s disc, but !VanillaRA hasn't been seen (double-click it first)\n",
                iso_name,
                disc->name);
+        Log("  not installed: a Red Alert disc, and this run is for Tiberian Dawn");
         ++Problems;
         return 0;
     }
     App_Dir = RA_Dir;
     mkdir(App_Dir, 0755); /* gamedata, the first time */
     printf("%s: Red Alert %s disc, installing into %s\n", iso_name, disc->name, App_Dir);
+    Log("  Red Alert %s disc, installing into %s", disc->name, App_Dir);
     Remove_Temp(&RA_Redalert);
     Remove_Temp(&RA_No_Movies);
     for (k = 0; k < sizeof(RA_Discs) / sizeof(RA_Discs[0]); ++k) {
@@ -720,6 +1025,7 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
     } else {
         /* MAIN.MIX without its movies, straight from the image. */
         char path[1024], temp[1040], command[3072];
+        int status;
         Dest_Path(&RA_No_Movies, path, sizeof(path));
         Temp_Path(path, temp, sizeof(temp));
         if (!Already_Present(&RA_No_Movies, path)) {
@@ -728,6 +1034,7 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
             fflush(stdout);
             ++Copying;
             Progress_Growing(&RA_No_Movies, temp);
+            File_Started = Now_Cs();
             snprintf(command,
                      sizeof(command),
                      "%s" SEP "Utils" SEP "ramix copy %s@%ld %s MOVIES1.MIX MOVIES2.MIX",
@@ -737,9 +1044,11 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
                      temp);
             if (Source_Offset(main_mix) < 0) {
                 printf("  %-12s can't be made from this kind of source; not installed\n", RA_No_Movies.name);
+                Log_File(&RA_No_Movies, "can't be made from this kind of source");
                 ++Problems;
-            } else if (system(command) != 0) {
+            } else if ((status = system(command)) != 0) {
                 printf("  %-12s Utils.ramix failed; not installed\n", RA_No_Movies.name);
+                Log_File(&RA_No_Movies, "Utils.ramix FAILED (it returned %d): %s", status, command);
                 remove(temp);
                 ++Problems;
             } else {
@@ -750,19 +1059,38 @@ static int Install_RA(const char* iso_name, const struct Entry* root, const stru
     return 1;
 }
 
+/* An image's line in the log: its size, and the disc it is (discid.h). */
+static void Log_Image(const char* path)
+{
+    int cut = 0;
+    char volume[40];
+    int d = Disc_Identify(path, &cut, volume, sizeof(volume));
+    Log("image: %s, %ld bytes: %s%s%s%s",
+        path,
+        File_Size(path),
+        d >= 0 ? Disc_Types[d].name : d == DISC_NOT_ISO ? "not a CD image (or can't be read)" : "a CD image of no disc known",
+        volume[0] != '\0' ? ", volume " : "",
+        volume,
+        cut ? ", CUT SHORT (the download or copy didn't finish?)" : "");
+}
+
 static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
 {
     struct Entry root, general;
     const struct Side* side = NULL;
     size_t k;
 
+    Log_Image(iso_name);
+    Clear_Error();
     if (!Source_Open(iso_name)) {
+        Log("  not installed: it can't be opened: %s", Error_Text());
         printf("can't open %s: %s\n", iso_name, strerror(errno));
         ++Problems;
         return 0;
     }
     if (!Source_Root(&root)) {
         Source_Close();
+        Log("  not installed: not an ISO 9660 CD image");
         if (!quiet_if_not_cnc) {
             printf("%s is not an ISO 9660 CD image\n", iso_name);
             ++Problems;
@@ -774,6 +1102,9 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
     if (Source_Find(&root, "MAIN.MIX", &general) && !general.is_dir) {
         int done = Install_RA(iso_name, &root, &general, movies);
         Source_Close();
+        if (!done && RA_Dir != NULL) {
+            Log("  not installed: not the Red Alert Allied or Soviet disc this was made for");
+        }
         if (!done && !quiet_if_not_cnc) {
             printf("%s is not a Red Alert Allied or Soviet disc this was made for\n", iso_name);
             ++Problems;
@@ -792,10 +1123,12 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
     if (side == NULL || TD_Dir == NULL) {
         Source_Close();
         if (side != NULL) {
+            Log("  not installed: a C&C95 disc, and this run is for Red Alert");
             printf("%s: C&C95 disc, but !VanillaTD hasn't been seen (double-click it first)\n", iso_name);
             ++Problems;
             return 0;
         }
+        Log("  not installed: not a C&C95 GDI or Nod disc, nor a Red Alert one");
         printf("%s is not the C&C95 (C&C Gold) GDI or Nod disc this was made for%s\n",
                iso_name,
                quiet_if_not_cnc ? ", skipped" : "");
@@ -808,6 +1141,7 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
     App_Dir = TD_Dir;
     mkdir(App_Dir, 0755); /* gamedata, the first time */
     printf("%s: %s disc, installing into %s\n", iso_name, strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
+    Log("  C&C95 %s disc, installing into %s", strcmp(side->dir, "gdi") == 0 ? "GDI" : "Nod", App_Dir);
 
     for (k = 0; k < sizeof(Disc_Files) / sizeof(Disc_Files[0]); ++k) {
         Remove_Temp(&Disc_Files[k]);
@@ -827,6 +1161,7 @@ static int Install_From(const char* iso_name, int movies, int quiet_if_not_cnc)
         Copy_Plain(&root, &side->movies);
     } else {
         printf("  %-12s left out (-nomovies)\n", side->movies.name);
+        Log_File(&side->movies, "left out (no movies)");
     }
     Source_Close();
     return 1;
@@ -1182,6 +1517,28 @@ static int Usage(void)
     return 2;
 }
 
+/* The log's last lines: the free space left, the time taken and how it went. */
+static unsigned long Started = 0;
+
+static void Log_Finish(const char* failure)
+{
+    if (Log_Count > 0) {
+        Log_Free_Space("after", Log_Data_Dirs[0]);
+    }
+    Log("time taken: %.1f s", (Now_Cs() - Started) / 100.0);
+    if (failure != NULL) {
+        Log("result: FAILED: %s", failure);
+    } else if (Problems != 0 || Problem[0] != '\0') {
+        Log("result: FAILED: %d problem(s)%s%s",
+            Problems,
+            Problem[0] != '\0' ? "; the game's data is still incomplete: " : "",
+            Problem);
+    } else {
+        Log("result: OK");
+    }
+    Log_Close();
+}
+
 /*
 ** -window: installs the images the game was given, then checks the game's files as -check does,
 ** for the game to read. Run in a task window, which only opens once something is printed: so the
@@ -1214,6 +1571,7 @@ static int Window_Install(const char** images, int num_images, int movies)
         Check_RA();
         Report_Check("VanillaRA$DataProblem");
     }
+    Log_Finish(NULL);
     if (Problems == 0 && Problem[0] == '\0') {
         return 0; /* the held messages aren't printed: nothing to see */
     }
@@ -1224,6 +1582,7 @@ static int Window_Install(const char** images, int num_images, int movies)
     if (Problem[0] != '\0') {
         printf("The game's data is still incomplete: %s.\n", Problem);
     }
+    Say_Where_Log_Is();
     printf("\nPress a key when you have read this, then close this window.\n");
     fflush(stdout);
 #ifdef __riscos__
@@ -1300,6 +1659,7 @@ int main(int argc, char** argv)
             Check_RA();
         }
         Report_Check(td ? "VanillaTD$DataProblem" : "VanillaRA$DataProblem");
+        Log_Check(td ? TD_Dir : RA_Dir, Problem);
         return Problem[0] != '\0';
     }
     if (images_var != NULL) {
@@ -1319,12 +1679,47 @@ int main(int argc, char** argv)
     if ((TD_Dir == NULL && RA_Dir == NULL) || (num_images == 0 && search == NULL)) {
         return Usage();
     }
+    Started = Now_Cs();
+    {
+        /* Run from the command line with both games seen, the log goes only to the games the
+        ** images are for (both if that can't be told). */
+        int td = TD_Dir != NULL, ra = RA_Dir != NULL;
+        if (td && ra && num_images > 0) {
+            int any_td = 0, any_ra = 0;
+            for (i = 0; i < num_images; ++i) {
+                int cut;
+                int d = Disc_Identify(images[i], &cut, NULL, 0);
+                any_td |= d >= 0 && strncmp(Disc_Types[d].id, "td-", 3) == 0;
+                any_ra |= d >= 0 && strncmp(Disc_Types[d].id, "ra-", 3) == 0;
+            }
+            if (any_td || any_ra) {
+                td = any_td;
+                ra = any_ra;
+            }
+        }
+        if (td) {
+            Log_Open(TD_Dir, "VanillaTD");
+        }
+        if (ra) {
+            Log_Open(RA_Dir, "VanillaRA");
+        }
+    }
+    Log_Header(argc, argv);
+    for (i = 0; i < num_images; ++i) {
+        Log("image given: %s", images[i]);
+    }
+    if (search != NULL) {
+        Log("images from: %s", search);
+    }
+    Log("movies: %s%s", movies ? "included" : "left out (-nomovies)", Force ? "; -force: files rewritten" : "");
+    Log_Free_Space("before", TD_Dir != NULL ? TD_Dir : RA_Dir);
     if (TD_App != NULL) {
         Migrate(1);
     }
     if (RA_App != NULL) {
         Migrate(0);
     }
+    Log("moved from an earlier layout: %d file(s)", Moved);
     if (window) {
         return Window_Install(images, num_images, movies);
     }
@@ -1353,12 +1748,16 @@ int main(int argc, char** argv)
                    "Mac discs won't work. !VanillaTD.!Help and !VanillaRA.!Help say where to\n"
                    "download them.\n",
                    search);
+            Log_Finish("no C&C95 or Red Alert CD images found");
+            Say_Where_Log_Is();
             return 1;
         }
     }
 
+    Log_Finish(NULL);
     if (Problems) {
         printf("%d problem(s): the disc image may be a different version or damaged.\n", Problems);
+        Say_Where_Log_Is();
         return 1;
     }
     printf("Done.\n");

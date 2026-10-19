@@ -1394,7 +1394,8 @@ static void Install_Finished(void)
     if (failed != 0) {
         text += (text.empty() ? "" : " ") + std::string("The data from ") + Disc_List(failed)
                 + " didn't install completely" + (problem.empty() ? "" : " (" + problem + ")")
-                + ". The install window said why. Drag the CD image onto this icon to try again: what's already "
+                + ". The install window said why, and InstallLog in the game's gamedata directory keeps the details. "
+                  "Drag the CD image onto this icon to try again: what's already "
                   "installed is kept.";
     } else if (missing != 0) {
         text += " You can also install " + Disc_List(missing) + ": drag its CD image onto this icon.";
