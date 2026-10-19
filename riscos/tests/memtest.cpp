@@ -451,7 +451,7 @@ int main(int argc, char** argv)
         for (unsigned p = 0; p < sizeof(pitches) / sizeof(pitches[0]); ++p) {
             int pitch = pitches[p];
             for (unsigned sa = 0; sa < 4; ++sa) {
-                for (unsigned dofs = 0; dofs < 12; dofs += 4) {
+                for (unsigned dofs = 0; dofs < 12; ++dofs) { // every destination alignment
                     for (int rows = 1; rows <= 24; ++rows) {
                         size_t total = size_t(rows) * pitch + 2 * GUARD + 32;
                         Random_Fill(a, 24 * 24 + 2 * GUARD);

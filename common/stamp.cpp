@@ -14,6 +14,9 @@
 #include "graphicsviewport.h"
 #include <string.h>
 #include <stdint.h>
+#if defined(__riscos__) && defined(__arm__)
+#include "riscos_memory.h"
+#endif
 
 #define TD_TILESET_CHECK 0x20
 
@@ -159,6 +162,13 @@ void Buffer_Draw_Stamp(void* thisptr, void* icondata, int icon, int x, int y, co
                 dst += blitpitch;
             }
         } else {
+#if defined(__riscos__) && defined(__arm__)
+            // An opaque tile: a 6-register LDM/STM a row, rather than a memcpy call a row.
+            if (IconWidth == 24 && IconHeight > 0 && (fullpitch & 3) == 0) {
+                VC_Stamp_Rows_24(dst, src, fullpitch, IconHeight);
+                return;
+            }
+#endif
             for (int32_t i = 0; i < IconHeight; ++i) {
                 memcpy(dst, src, IconWidth);
                 dst += fullpitch;
@@ -260,6 +270,13 @@ void Buffer_Draw_Stamp_Clip(void const* thisptr,
                 }
 
             } else {
+#if defined(__riscos__) && defined(__arm__)
+                // Clipped only above or below: whole rows, as in Buffer_Draw_Stamp.
+                if (blit_width == 24 && IconWidth == 24 && blit_height > 0 && (full_pitch & 3) == 0) {
+                    VC_Stamp_Rows_24(dst, src, full_pitch, blit_height);
+                    return;
+                }
+#endif
                 for (int i = 0; i < blit_height; ++i) {
                     memcpy(dst, src, blit_width);
                     dst += full_pitch;

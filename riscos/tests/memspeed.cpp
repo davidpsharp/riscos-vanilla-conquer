@@ -240,6 +240,19 @@ int main(int argc, char** argv)
                  }
              }) / 100,
              576);
+        for (int dof = 1; dof < 4; ++dof) {
+            char what[80];
+            snprintf(what, sizeof(what), "VC_Stamp_Rows_24, destination +%d, tile set +1", dof);
+            One(what,
+                Time([&] {
+                    for (int t = 0; t < 100; ++t) {
+                        const unsigned char* s = b + 1 + ((tile++ * 576) & 0xFFFF);
+                        unsigned char* d = a + dof + (t % 26) * 24 + (t / 26) * 24 * 640;
+                        VC_Stamp_Rows_24(d, s, 640, 24);
+                    }
+                }) / 100,
+                576);
+        }
     }
 
     printf("-- a frame's rows in main memory, 1050 rows (per frame)\n");

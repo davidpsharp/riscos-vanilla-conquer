@@ -13,7 +13,7 @@
 extern "C" {
 /*
 ** A 24-byte-wide block (a map tile's rows): "rows" rows (at least 1) from a packed
-** source, any alignment, to a word-aligned destination whose pitch is a multiple of 4.
+** source to a destination whose pitch is a multiple of 4, either of any alignment.
 */
 void VC_Stamp_Rows_24(void* dst, const void* src, int dst_pitch, int rows);
 }

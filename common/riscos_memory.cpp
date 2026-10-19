@@ -367,13 +367,19 @@ asm(
     ".size " VC_SYM(bzero) ", . - " VC_SYM(bzero) "\n"
 
     // void VC_Stamp_Rows_24(void* dst, const void* src, int dst_pitch, int rows):
-    // a 24-byte-wide block of "rows" rows (at least 1), the source packed, the
-    // destination word-aligned with a pitch that's a multiple of 4. Each row is one
-    // LDM/STM of 6 registers, or, from a misaligned source, 7 aligned words merged into 6.
+    // a 24-byte-wide block of "rows" rows (at least 1), the source packed, any
+    // alignment, the destination's pitch a multiple of 4. With the destination
+    // word-aligned, each row is one LDM/STM of 6 registers, or, from a misaligned
+    // source, 7 aligned words merged into 6. With it misaligned (the map scrolled by a
+    // pixel or so), each row is its first bytes up to a word, then 5 words (merged from
+    // 6 aligned ones by shifts held in registers, if the source is misaligned there),
+    // then its last bytes.
     ".global VC_Stamp_Rows_24\n"
     ".type VC_Stamp_Rows_24, %function\n"
     "VC_Stamp_Rows_24:\n"
-    "    stmfd   sp!, {r4-r9, lr}\n"
+    "    stmfd   sp!, {r3-r9, lr}\n"    // r3 (rows) is kept on the stack for the path below
+    "    ands    lr, r0, #3\n"
+    "    bne     .Lvc_t_dst\n"
     "    mov     ip, r3\n"
     "    ands    lr, r1, #3\n"
     "    bne     .Lvc_t_shift\n"
@@ -382,7 +388,7 @@ asm(
     "    add     r0, r0, r2\n"
     "    subs    ip, ip, #1\n"
     "    bgt     1b\n"
-    "    ldmfd   sp!, {r4-r9, pc}\n"
+    "    ldmfd   sp!, {r3-r9, pc}\n"
     ".macro VC_TILE_SHIFT shr, shl\n"
     "1:  ldmia   r1, {r3-r9}\n"
     "    add     r1, r1, #24\n"
@@ -402,7 +408,7 @@ asm(
     "    add     r0, r0, r2\n"
     "    subs    ip, ip, #1\n"
     "    bgt     1b\n"
-    "    ldmfd   sp!, {r4-r9, pc}\n"
+    "    ldmfd   sp!, {r3-r9, pc}\n"
     ".endm\n"
     ".Lvc_t_shift:\n"
     "    bic     r1, r1, #3\n"
@@ -414,6 +420,69 @@ asm(
     "    VC_TILE_SHIFT 16, 16\n"
     ".Lvc_t_sh3:\n"
     "    VC_TILE_SHIFT 24, 8\n"
+    // The destination misaligned by lr = 1-3: 4 - lr bytes, 5 words, lr bytes a row.
+    // r2 becomes pitch - 24; r9 and lr hold the shifts for the source's alignment after
+    // the first bytes (0 when it's aligned there), ip addresses the aligned words.
+    ".macro VC_TILE_DST lead\n"
+    "1:  ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    ".if \\lead > 1\n"
+    "    ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    ".endif\n"
+    ".if \\lead > 2\n"
+    "    ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    ".endif\n"
+    "    teq     r9, #0\n"
+    "    ldmeqia r1, {r3-r7}\n"
+    "    beq     2f\n"
+    "    bic     ip, r1, #3\n"
+    "    ldmia   ip, {r3-r8}\n"
+    "    mov     r3, r3, lsr r9\n"
+    "    orr     r3, r3, r4, lsl lr\n"
+    "    mov     r4, r4, lsr r9\n"
+    "    orr     r4, r4, r5, lsl lr\n"
+    "    mov     r5, r5, lsr r9\n"
+    "    orr     r5, r5, r6, lsl lr\n"
+    "    mov     r6, r6, lsr r9\n"
+    "    orr     r6, r6, r7, lsl lr\n"
+    "    mov     r7, r7, lsr r9\n"
+    "    orr     r7, r7, r8, lsl lr\n"
+    "2:  stmia   r0!, {r3-r7}\n"
+    "    add     r1, r1, #20\n"
+    ".if \\lead < 3\n"
+    "    ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    ".endif\n"
+    ".if \\lead < 2\n"
+    "    ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    ".endif\n"
+    "    ldrb    r3, [r1], #1\n"
+    "    strb    r3, [r0], #1\n"
+    "    add     r0, r0, r2\n"
+    "    ldr     r3, [sp]\n"
+    "    subs    r3, r3, #1\n"
+    "    str     r3, [sp]\n"
+    "    bgt     1b\n"
+    "    ldmfd   sp!, {r3-r9, pc}\n"
+    ".endm\n"
+    ".Lvc_t_dst:\n"
+    "    sub     r2, r2, #24\n"
+    "    rsb     ip, lr, #4\n"          // bytes before the destination's word boundary
+    "    add     r9, r1, ip\n"          // where the source is then
+    "    and     r9, r9, #3\n"
+    "    mov     r9, r9, lsl #3\n"      // its offset in bits: the right shift
+    "    rsb     lr, r9, #32\n"         // the left shift
+    "    cmp     ip, #2\n"
+    "    blo     .Lvc_t_dst1\n"
+    "    beq     .Lvc_t_dst2\n"
+    "    VC_TILE_DST 3\n"
+    ".Lvc_t_dst1:\n"
+    "    VC_TILE_DST 1\n"
+    ".Lvc_t_dst2:\n"
+    "    VC_TILE_DST 2\n"
     ".size VC_Stamp_Rows_24, . - VC_Stamp_Rows_24\n");
 // clang-format on
 
