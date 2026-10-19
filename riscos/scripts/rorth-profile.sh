@@ -21,6 +21,7 @@
 #   TD_IMAGE, RA_IMAGE   the profiling builds (build/riscos/vanillatd,ff8, build/riscos-ra/vanillara,ff8)
 #   TD_APP, RA_APP       the installed games on the target (defaults per target below)
 #   LEASE_WAIT  seconds to wait for the lease (7200)
+#   START_WAIT  seconds a scenario may take to start its benchmark or movies (180) before it's given up
 #   NO_LEASE=1  the caller holds the lease already (from $RORTH/host)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -36,8 +37,10 @@ RA_ELF=${RA_IMAGE%,ff8}
 
 case "$T" in
 riscpc)
-    TD_APP=${TD_APP:-'IDEFS::HardDisc4b.$.VanillaConquer.!VanillaTD'}
-    RA_APP=${RA_APP:-'IDEFS::HardDisc4b.$.VanillaConquer.!VanillaRA'}
+    # Test copies of the release apps, data in gamedata (made on 2026-10-19; the user's own
+    # installs are left alone).
+    TD_APP=${TD_APP:-'IDEFS::HardDisc4b.$.VCbench.!VanillaTD'}
+    RA_APP=${RA_APP:-'IDEFS::HardDisc4b.$.VCbench.!VanillaRA'}
     ;;
 emu371 | emu530 | emu439)
     # Made by vcport-work/profile/setup-emu-apps.sh in the machine's HostFS Work directory.
@@ -69,8 +72,8 @@ PUT_TD=0 PUT_RA=0
 cleanup()
 {
     set +e
-    if [ "$PUT_TD" = 1 ]; then ro cmd "Run $TD_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut INI.SCG01EA; do ro rm "$TD_APP.$f" >/dev/null 2>&1; done; fi
-    if [ "$PUT_RA" = 1 ]; then ro cmd "Run $RA_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut INI.SCG01EA; do ro rm "$RA_APP.$f" >/dev/null 2>&1; done; fi
+    if [ "$PUT_TD" = 1 ]; then ro cmd "Run $TD_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut gamedata.INI.SCG01EA; do ro rm "$TD_APP.$f" >/dev/null 2>&1; done; fi
+    if [ "$PUT_RA" = 1 ]; then ro cmd "Run $RA_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut gamedata.INI.SCG01EA; do ro rm "$RA_APP.$f" >/dev/null 2>&1; done; fi
     for v in VC_BENCH VC_SEED VC_PARTIALPRESENT VC_NOSOUND VC_BENCHSCROLL VC_MOVIETEST VC_MOVIETEST_FROM VC_MOVIETEST_COUNT VC_PROFILE VC_PROFILE_SECS VC_FPSLOG; do
         ro cmd "Unset $v" >/dev/null 2>&1
     done
@@ -119,10 +122,11 @@ for s in "$@"; do
     fi
     base="$OUT_DIR/$T-$s"
     echo "== $s on $T ($VARS)"
+    # Loose files are found in gamedata (and the Choices directory), not the application's own.
     if [ "$BATTLE" = 1 ]; then
-        ro put "$BATTLE_INI" "$APP.INI.SCG01EA" --type fff >/dev/null
+        ro put "$BATTLE_INI" "$APP.gamedata.INI.SCG01EA" --type fff >/dev/null
     else
-        ro rm "$APP.INI.SCG01EA" >/dev/null 2>&1 || true
+        ro rm "$APP.gamedata.INI.SCG01EA" >/dev/null 2>&1 || true
     fi
     ro rm "$APP.ProfData" >/dev/null 2>&1 || true
     ro rm "$APP.ProfErr" >/dev/null 2>&1 || true
@@ -139,6 +143,13 @@ for s in "$@"; do
             if grep -qE "Fatal|Abort|crash|SIGSEGV|exception" "$base.log"; then result=crashed; break; fi
             if grep -qE "^profile: (VC_PROFILE needs|can't|no dynamic|the handler)" "$base.log"; then result=no-profile; break; fi
         fi
+        # Started? A benchmark's first frame, or a movie test's first movie, within START_WAIT.
+        if [ $(($(date +%s) - started)) -ge "${START_WAIT:-180}" ] &&
+            ! grep -qE "^bench: first game frame|^movie " "$base.log" 2>/dev/null; then
+            result=no-start
+            echo "   no benchmark start within ${START_WAIT:-180} s (last line: $(tail -1 "$base.log" 2>/dev/null))"
+            break
+        fi
     done
     sleep 3
     ro get "$APP.ProfErr" "$base.log" >/dev/null 2>&1 || true
@@ -147,7 +158,7 @@ for s in "$@"; do
     ro cmd "Run $APP.ProfOff" 2>&1 | grep -v "^profoff: 0 " | sed 's/^/   /' || true
     for v in $VARS; do ro cmd "Unset ${v%%=*}" >/dev/null 2>&1 || true; done
     echo "   $result after $(($(date +%s) - started)) s"
-    grep -E "^bench:|^bench ms|^movie |^profile:" "$base.log" | sed 's/^/   /' || true
+    grep -E "^autosize: .*cpu|^bench:|^bench ms|^movie |^profile:" "$base.log" | sed 's/^/   /' || true
     if [ "$result" = ok ] && ro get "$APP.ProfData" "$base.bin" >/dev/null 2>&1; then
         elfkeep="$OUT_DIR/elf/$(md5 -q "$ELF" 2>/dev/null || md5sum "$ELF" | cut -d' ' -f1).elf"
         mkdir -p "$OUT_DIR/elf"; [ -f "$elfkeep" ] || cp "$ELF" "$elfkeep"
@@ -156,6 +167,6 @@ for s in "$@"; do
         python3 "$ROOT/riscos/scripts/vcprof.py" "$base.bin" "$ELF" --phases --markdown --callers memcpy,memset,__divsi3,__udivsi3,__modsi3,__umodsi3,LCW_Uncompress >"$base.md" || true
         head -40 "$base.txt" | sed 's/^/   /'
     fi
-    ro rm "$APP.INI.SCG01EA" >/dev/null 2>&1 || true
+    ro rm "$APP.gamedata.INI.SCG01EA" >/dev/null 2>&1 || true
     ro rm "$APP.ProfData" >/dev/null 2>&1 || true
 done

@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <swis.h>
+#include "poll_once.h"
 
 static unsigned Cs()
 {
@@ -115,6 +116,7 @@ __attribute__((noinline)) int Framed(int a, int b)
 
 int main(int argc, char** argv)
 {
+    Poll_Once_At_Start(); // see poll_once.h: uncached until the first Wimp_Poll on the Risc PC
     bool screen = true;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-noscreen") == 0) {
