@@ -17,9 +17,10 @@ Requirements
 ------------
 
   * A StrongARM Risc PC (or RPCEmu set up as one), or a Raspberry Pi
-    with RISC OS 5. The same !VanillaTD runs on both. ARM610, ARM710 and
-    ARM7500 machines (including the A7000) are not supported: the game
-    will not run on them.
+    with RISC OS 5. The same !VanillaTD runs on both. It also runs on an
+    ARM610 or ARM710 Risc PC and an A7000 (ARM7500), but those are several
+    times slower than a StrongARM, and it has only been tried on them in
+    RPCEmu: choose 320x200 from Screen size on the icon bar menu.
   * RISC OS 3.7 or later. Tested on RISC OS 3.71, 4.39 and 5.30 in
     RPCEmu, on RISC OS 3.7 and 4.39 on a real StrongARM Risc PC, and on
     RISC OS 5.30 on a Raspberry Pi 3 and 4.

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(hello hello.cpp)
 add_executable(unaligned unaligned.c)
-# The probe uses halfword instructions on purpose; the toolchain targets ARMv3M.
+# The probe uses halfword instructions on purpose; the toolchain targets ARMv3.
 if(RISCOS)
     target_compile_options(unaligned PRIVATE -march=armv4)
 endif()
