@@ -311,10 +311,15 @@ SurfaceMonitorClass& AllSurfaces = AllSurfacesDummy; // List of all direct draw 
 ** True if no 8 bpp screen mode is near w x h, the nearest that holds it being at least twice as
 ** big each way (a Pi has nothing like 320x200; a Risc PC has 320x256). VC_NODOUBLE turns it off.
 */
+// VC_NODOUBLE: never double. VC_DOUBLE: double even where a mode near the size exists (for
+// testing and timing the doubling on a machine that has one).
 static bool Wants_Doubling(int w, int h)
 {
     if (getenv("VC_NODOUBLE") != nullptr || w > 400 || h > 300) {
         return false;
+    }
+    if (getenv("VC_DOUBLE") != nullptr) {
+        return true;
     }
     SDL_PixelFormat format;
     memset(&format, 0, sizeof(format));
