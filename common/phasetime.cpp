@@ -280,7 +280,7 @@ void Phase_Startup(const char* step)
 }
 
 bool Bench_Frame_Hashing = Bench_Frames > 0 && getenv("VC_FRAMEHASH") != nullptr;
-static const bool Bench_Hash_Each = Bench_Frame_Hashing && atoi(getenv("VC_FRAMEHASH")) == 2;
+static const bool Bench_Hash_Each = Bench_Frame_Hashing && atoi(getenv("VC_FRAMEHASH")) >= 2;
 static unsigned Bench_Hash = 2166136261u, Bench_Hashed = 0;
 
 void Bench_Frame_Hash(const unsigned char* pixels, int width, int height, int pitch)

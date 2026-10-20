@@ -102,10 +102,11 @@ static void Bench_Hash_HidPage()
         pitch = buffer->Get_Width() + buffer->Get_XAdd() + buffer->Get_Pitch();
     }
     if (pixels != nullptr) {
-        Bench_Frame_Hash(pixels + HidPage.Get_YPos() * pitch + HidPage.Get_XPos(),
-                         HidPage.Get_Width(),
-                         HidPage.Get_Height(),
-                         pitch);
+        // VC_FRAMEHASH=3: only the radar's rectangle (to check radar drawing apart from the clock-driven rest).
+        static const bool radar_only = getenv("VC_FRAMEHASH") != nullptr && atoi(getenv("VC_FRAMEHASH")) == 3;
+        int rx = radar_only ? Map.RadX : 0, ry = radar_only ? Map.RadY : 0;
+        int rw = radar_only ? Map.RadWidth : HidPage.Get_Width(), rh = radar_only ? Map.RadHeight : HidPage.Get_Height();
+        Bench_Frame_Hash(pixels + (HidPage.Get_YPos() + ry) * pitch + HidPage.Get_XPos() + rx, rw, rh, pitch);
     }
 }
 
