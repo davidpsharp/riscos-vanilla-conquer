@@ -506,14 +506,14 @@ static bool Counter_Overlay(SDL_Rect& changed)
 
     // The palette entries: nearest to (0,255,0) and the darkest, again after a palette change.
     if (Ctr.colours_generation != Ctr.palette_generation) {
-        // The brightest clearly green entry: most green, least red and blue (g - 2(r+b)), and
-        // green must dominate. With no such entry, the nearest to (0,255,0).
+        // The brightest clearly green entry: most green, least red and blue (4g - (r+b)), and
+        // green must dominate (g > 1.5 max(r,b)). With no such entry, the nearest to (0,255,0).
         int best_green = -(1 << 30), best_near = 1 << 30, best_dark = 1 << 30;
         bool found = false;
         for (int i = 0; i < 256; ++i) {
             int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
-            int score = g - 2 * (r + b);
-            if (g >= 100 && g > 2 * (r > b ? r : b) && score > best_green) {
+            int score = 4 * g - (r + b);
+            if (g >= 100 && 2 * g > 3 * (r > b ? r : b) && score > best_green) {
                 best_green = score;
                 Ctr.green = Uint8(i);
                 found = true;
