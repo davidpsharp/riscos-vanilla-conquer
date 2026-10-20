@@ -345,6 +345,15 @@ void RadarClass::Draw_It(bool forced)
             }
         }
     }
+    {
+        // VC_RADARFULL=<n> (benchmarks): force a full redraw of the radar every n draws, to cost one.
+        static const int every = getenv("VC_RADARFULL") != nullptr ? atoi(getenv("VC_RADARFULL")) : 0;
+        static int count = 0;
+        if (every > 0 && IsRadarActive && ++count % every == 0) {
+            FullRedraw = true;
+            IsToRedraw = true;
+        }
+    }
     ++Radar_Draws;
     Radar_Active_Draws += IsRadarActive ? 1 : 0;
     PhaseTimer radar_timer(PHASE_X1); // the radar's own drawing, without the map under it (VC_BENCH)
