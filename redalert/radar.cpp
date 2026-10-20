@@ -351,6 +351,23 @@ void RadarClass::Draw_It(bool forced)
 {
     DisplayClass::Draw_It(forced);
 
+    /*
+    ** VC_RADARZOOM=<0|1> (benchmarks): once the radar is on, put it in that zoom state (1 zoomed in,
+    ** 0 the whole map) whatever the game started with. Display only.
+    */
+    {
+        static const int want = getenv("VC_RADARZOOM") != nullptr ? atoi(getenv("VC_RADARZOOM")) : -1;
+        static bool done = false;
+        if (want >= 0 && !done && IsRadarActive && !IsRadarActivating) {
+            done = true;
+            if ((IsZoomed != 0) != (want != 0)) {
+                Zoom_Mode(Coord_Cell(Map.TacticalCoord));
+            }
+        }
+    }
+    ++Radar_Draws;
+    PhaseTimer radar_timer(PHASE_X1); // the radar's own drawing, without the map under it (VC_BENCH)
+
 #ifndef REMASTER_BUILD // Legacy radar rendering not used. ST - 2/26/2020 3:53PM
 
     static const char* _hiresradarnames[] = {
@@ -528,6 +545,7 @@ void RadarClass::Draw_It(bool forced)
 
             } else {
 
+                ++Radar_Full_Draws;
                 GraphicViewPortClass* oldpage = Set_Logic_Page(HidPage);
 
                 CC_Draw_Shape(RadarFrame, 1, RadX, RadY + (1 * RESFACTOR), WINDOW_MAIN, SHAPE_NORMAL);
@@ -987,6 +1005,7 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
     if ((unsigned)x >= RadarCellWidth || (unsigned)y >= RadarCellHeight) {
         return;
     }
+    ++Radar_Pixels;
 
     bool usjamming = false;
     if (LogicPage->Lock()) {
