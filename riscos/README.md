@@ -305,6 +305,8 @@ SDL 1.2 numbers non-ASCII keys (modifiers, arrows, F keys, keypad) 256–322, wh
 
 Hotkeys are stored in `[SDL1Hotkeys]`.
 
+**Frame counter:** F8 turns a small green frames-per-second number on and off, bottom right of the screen (off at start). It is drawn only on the final screen surface after the frame and cursor (`Counter_Overlay` in `video_sdl1.cpp`), with the pixels under it saved and put back at the start of the next present, so partial presents stay exact, screenshots and the game never see it, and `VC_PARTIALVERIFY` checks the screen with it drawn on.
+
 **Screenshots:** Insert saves the game's frame (the surface it draws, at its logical size: no pointer, no border, not doubled or scaled) as an 8-bit paletted PNG in `<App>.Screenshots` (not inside `gamedata`, so deleting that keeps them), named `SCRN0001`, `SCRN0002`... (one above the highest there), with RISC OS filetype &B60. The key is swallowed in `wwkeyboard_sdl1.cpp` (the game never sees it; before, only the debug cheat keys and the map editor used Insert) and the next present writes the file (`Save_Screenshot` in `video_sdl1.cpp`), so it also works at a menu or in a movie. `common/pngwrite.cpp` is the writer: stored (uncompressed) deflate blocks, no libpng or zlib, nothing beyond ARMv3. A full disc or an unwritable folder is logged to stderr and the game goes on. In a mission the game also shows "Screenshot saved" in its message area. `riscos/tests/pngwrite` checks the writer on the Mac against PIL.
 
 ## Filenames (10-character FileCore)
@@ -329,11 +331,32 @@ This was verified by copying the app (without `MIX.MOVIES`, since the 256 MB Har
 
 Without `MIX.MOVIES` the game just skips the movies, so it can be left out on small discs. SCORES (37 MB) holds the music, which isn't used until sound is implemented.
 
+## Versioning
+
+Semantic versioning (https://semver.org): MAJOR.MINOR.PATCH, starting at 0.1.0. TD and RA share this repo and one version.
+
+- **Where it lives:** the `VERSION` file at the top of the tree, and nowhere else. `riscos/scripts/version.sh` reads it (and git) and passes the result to cmake; `common/vcversion.cpp.in` turns it into the strings the game uses.
+- **Where it shows:** the icon bar Info window (Version), the first line of each `!Help` (`Vanilla Conquer TD 0.1.0 (20 Oct 2026)`, filled in when the app is assembled), the first line of the game's stderr (`Vanilla Conquer TD 0.1.0 (20 Oct 2026) built ...`) and the title screen. The date is the commit's, so rebuilding a commit gives the same text.
+- **The tag matches the build:** a release build must be made from a clean tree (no uncommitted or untracked files) whose HEAD is exactly the commit that the annotated tag `v<VERSION>` points at; then the strings say `0.1.0`. Any other build (another commit, local changes, no tag yet) says `0.1.0-dev` and the `git describe` text, so it can't be mistaken for the release. `make-release.sh 0.1.0` stops with a message if those conditions aren't met (`VC_DEV_BUILD=1` builds a `-dev` build anyway, in a zip named `-0.1.0-dev`). The names `preview`, `test` and so on are dev builds too.
+
+To cut a release:
+
+```sh
+echo 0.2.0 > VERSION && git commit -am "Version 0.2.0"      # bump
+git tag -a v0.2.0 -m "Vanilla Conquer RISC OS 0.2.0"       # tag that commit
+riscos/scripts/version.sh                                  # "release build: 1" and the text you expect
+riscos/scripts/make-release.sh 0.2.0                       # -> build/release/VanillaTD-riscos-0.2.0.zip
+RELEASE_GAME=ra riscos/scripts/make-release.sh 0.2.0       # -> VanillaRA-riscos-0.2.0.zip
+# verify: the first line of stderr, the top of !Help and the Info window all say 0.2.0 (no -dev)
+git push origin riscos v0.2.0                               # then push
+```
+
 ## Making a release
 
 ```sh
-git tag v<version>-riscos                   # the title screen shows tags starting with v
+# see Versioning above: bump VERSION, commit, tag v<version>, then
 riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-<version>.zip
+RELEASE_GAME=ra riscos/scripts/make-release.sh <version>
 ```
 
 `make-release.sh` builds the game, then assembles `!VanillaTD` in `build/release`, with:
