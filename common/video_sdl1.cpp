@@ -1632,6 +1632,17 @@ public:
         if (Video_Mark_Count == marks_at_lock) {
             all_dirty = true; // locked by something that doesn't say where it draws
             ++Dirty_Unknown_Locks;
+#ifdef __APPLE__
+            // VC_DIRTYCHECK=3: the first few unmarked locks, with where they came from.
+            static const bool trace = getenv("VC_DIRTYCHECK") != nullptr && atoi(getenv("VC_DIRTYCHECK")) == 3;
+            static int traced = 0;
+            if (trace && traced < 6) {
+                void* frames[12];
+                fprintf(stderr, "dirtycheck: lock with nothing marked (surface %p):\n", static_cast<void*>(this));
+                backtrace_symbols_fd(frames, backtrace(frames, 12), 2);
+                ++traced;
+            }
+#endif
         }
         SDL_UnlockSurface(surface);
         return true;

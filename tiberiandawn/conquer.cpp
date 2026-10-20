@@ -1875,6 +1875,19 @@ bool Main_Loop()
     Sync_Delay();
     Phase_Frame_End();
     if (Bench_Frames > 0) {
+        /*
+        ** VC_BENCHSCROLL=<leptons>: scroll the map that far each frame, round a box of 40 frames
+        ** a side, to measure drawing while scrolling.
+        */
+        static const int scroll = getenv("VC_BENCHSCROLL") != nullptr ? atoi(getenv("VC_BENCHSCROLL")) : 0;
+        if (scroll > 0) {
+            static int scroll_step = 0;
+            static const DirType scroll_dirs[4] = {DIR_E, DIR_S, DIR_W, DIR_N};
+            int distance = scroll;
+            Map.Scroll_Map(scroll_dirs[(scroll_step++ / 40) % 4], distance, true);
+        }
+    }
+    if (Bench_Frames > 0) {
         static int frames = 0;
         if (Bench_Frame_Hashing) {
             Bench_Hash_HidPage();
