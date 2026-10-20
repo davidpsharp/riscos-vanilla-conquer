@@ -143,6 +143,19 @@ static JoinEventType Get_NewGame_Responses(ColorListClass* playerlist);
 static int Net_Fake_New_Dialog(void);
 static int Net_Fake_Join_Dialog(void);
 
+/*
+** The join dialog drops a game from its list when the game owner hasn't answered for a while,
+** and clearing the list of players takes this computer out of it. A computer that has been away
+** (on the RISC OS desktop) must not count that time against the owner, or it starts the game
+** without itself among the players.
+*/
+void Net_Restart_Game_Timeouts(void)
+{
+    for (int i = 0; i < Games.Count(); i++) {
+        Games[i]->Game.LastTime = WinTickCount.Time();
+    }
+}
+
 /***********************************************************************************************
  * Init_Network -- initializes network stuff                               						  *
  *                                                                         						  *

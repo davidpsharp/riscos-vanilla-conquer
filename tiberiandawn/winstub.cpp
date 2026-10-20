@@ -86,11 +86,14 @@ void Focus_Loss(void)
     Stop_Primary_Sound_Buffer();
 }
 
+extern void Net_Restart_Game_Timeouts(void);
+
 void Focus_Restore(void)
 {
 #ifdef SDL_BUILD
     GameInFocus = true;
     VQA_ResumeAudio();
+    Net_Restart_Game_Timeouts();
 #endif
     Map.Flag_To_Redraw(true);
     Start_Primary_Sound_Buffer(true);
