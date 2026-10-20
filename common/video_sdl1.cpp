@@ -1101,6 +1101,8 @@ static void PV_Compare(SDL_Surface* shown, int scale, int kind)
 static bool Shot_Pending = false;
 static bool Shot_Key_Held = false;
 
+static Uint32 Shot_Asked_At = 0;
+
 void Video_Request_Screenshot(bool key_down)
 {
     if (!key_down) {
@@ -1108,6 +1110,7 @@ void Video_Request_Screenshot(bool key_down)
     } else if (!Shot_Key_Held) {
         Shot_Key_Held = true; // key repeat doesn't ask again
         Shot_Pending = true;
+        Shot_Asked_At = SDL_GetTicks();
     }
 }
 
@@ -1407,6 +1410,12 @@ public:
             }
         }
         RenderSurface();
+    }
+
+    // The surface that holds the frame as it stands, for a screenshot of a still screen.
+    SDL_Surface* Frame_Now()
+    {
+        return mirror != nullptr ? mirror->surface : surface;
     }
 
     // Fill in the surface with the frame it stands for, before anything uses it.
@@ -2008,8 +2017,21 @@ void Video_Update_Cursor();
 // dialog waiting for a click, say) would otherwise wait for the next present, which is a mouse move.
 void Video_Service_Screenshot()
 {
-    if (Shot_Pending) {
-        Video_Update_Cursor();
+    if (!Shot_Pending) {
+        return;
+    }
+    Video_Update_Cursor();
+    /*
+    ** If that couldn't present (a dialog drawing on the visible page, say) and nothing has
+    ** by a tenth of a second, which a running game would have, the screen is standing still
+    ** and its frame is what to save.
+    */
+    if (Shot_Pending && frontSurface != nullptr && SDL_GetTicks() - Shot_Asked_At > 100) {
+        Shot_Pending = false;
+        SDL_Surface* frame = frontSurface->Frame_Now();
+        if (frame != nullptr) {
+            Save_Screenshot(frame, frame->w, frame->h);
+        }
     }
 }
 
