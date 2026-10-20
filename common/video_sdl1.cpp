@@ -127,11 +127,22 @@ static void Scale_Rect(SDL_Rect r)
     SDL_UnlockSurface(window);
 }
 
+static bool Counter_Overlay(SDL_Rect& changed); // the frame counter (below)
+
 // SDL_UpdateRects and SDL_Flip for the game's surface, through the doubling if there is any.
+// The frame counter, if there is one, is drawn on the screen once the frame is there, and its
+// place is updated too.
 static void Show_Rects(int count, SDL_Rect* rects)
 {
+    SDL_Rect counter;
     if (Screen == nullptr) {
-        SDL_UpdateRects(window, count, rects);
+        if (Counter_Overlay(counter)) {
+            std::vector<SDL_Rect> all(rects, rects + count);
+            all.push_back(counter);
+            SDL_UpdateRects(window, int(all.size()), all.data());
+        } else if (count > 0) {
+            SDL_UpdateRects(window, count, rects);
+        }
         return;
     }
     std::vector<SDL_Rect> big(static_cast<size_t>(count));
@@ -142,17 +153,25 @@ static void Show_Rects(int count, SDL_Rect* rects)
         big[i].w = Uint16(rects[i].w * 2);
         big[i].h = Uint16(rects[i].h * 2);
     }
-    SDL_UpdateRects(Screen, count, big.data());
+    if (Counter_Overlay(counter)) {
+        big.push_back(counter);
+    }
+    if (!big.empty()) {
+        SDL_UpdateRects(Screen, int(big.size()), big.data());
+    }
 }
 
 static void Show_All(void)
 {
+    SDL_Rect counter;
     if (Screen == nullptr) {
+        Counter_Overlay(counter); // (the flip shows all of it)
         SDL_Flip(window);
         return;
     }
     SDL_Rect all = {0, 0, Uint16(window->w), Uint16(window->h)};
     Scale_Rect(all);
+    Counter_Overlay(counter);
     SDL_Flip(Screen);
 }
 
@@ -289,6 +308,267 @@ static SDL_Rect Make_SDL_Rect(int x, int y, int w, int h)
 {
     SDL_Rect r = {Sint16(x), Sint16(y), Uint16(w), Uint16(h)};
     return r;
+}
+
+static SDL_Rect Union_Rects(const SDL_Rect& a, const SDL_Rect& b)
+{
+    int x0 = a.x < b.x ? a.x : b.x;
+    int y0 = a.y < b.y ? a.y : b.y;
+    int x1 = a.x + a.w > b.x + b.w ? a.x + a.w : b.x + b.w;
+    int y1 = a.y + a.h > b.y + b.h ? a.y + a.h : b.y + b.h;
+    return Make_SDL_Rect(x0, y0, x1 - x0, y1 - y0);
+}
+
+/*
+** The frame counter (F8; wwkeyboard_sdl1.cpp): a small bright green number, the frames a
+** second being shown, in the bottom right corner of the screen, with a thin black outline.
+** It is off until F8 turns it on.
+**
+** It exists only on the screen, never in a game surface, so the game can't see it: it is
+** drawn on the screen (Shown) after the frame, and the cursor, have reached it, and what it
+** covered is saved first, as the software pointer's is. At the start of the next present
+** that is put back, so the frame copy and the cursor work see the screen as they left it
+** (a partial present leaves everything it doesn't copy on the screen). Anything that reads
+** the screen back (Settle) takes it off first. Turning it off puts the screen back once.
+** Screenshots are of the game's own surface, so don't have it.
+**
+** The number is the frames drawn in the last half second to second (two half second
+** counts together, so it doesn't flicker); a frame is a present of something the game drew.
+*/
+static struct
+{
+    bool on = false;
+    // Counting.
+    bool started = false;
+    Uint32 t0 = 0;
+    unsigned frames = 0, prev_frames = 0;
+    Uint32 prev_ms = 0;
+    int value = -1; // the number to show; -1 for none yet
+    // What is on the screen.
+    bool shown = false;
+    SDL_Surface* surface = nullptr;
+    unsigned generation = 0;
+    SDL_Rect rect = {0, 0, 0, 0};
+    std::vector<Uint8> under; // the screen's pixels in rect, before the counter
+    std::vector<Uint8> mask;  // 0 clear, 1 outline, 2 digit: rect.w x rect.h
+    Uint8 fg = 0, bg = 0;     // the palette entries used
+    int shown_value = -1;
+    bool update = false; // the screen under the counter changed since the last update of its place
+    // Palette: the nearest to green, and the darkest.
+    unsigned palette_generation = 1, colours_generation = 0;
+    Uint8 green = 0, dark = 0;
+} Ctr;
+
+// 5x7 digits, a row to a byte (bit 4 is the left column).
+static const Uint8 Counter_Font[10][7] = {
+    {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E}, {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},
+    {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E},
+    {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E},
+    {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},
+    {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E}, {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C},
+};
+
+void Video_Toggle_FPS_Counter(void)
+{
+    Ctr.on = !Ctr.on;
+    Ctr.started = false;
+    Ctr.frames = Ctr.prev_frames = 0;
+    Ctr.prev_ms = 0;
+    Ctr.value = -1;
+    fprintf(stderr, "Frame counter %s\n", Ctr.on ? "on" : "off");
+}
+
+// Counts a present (a new frame, or not) and works out the number to show.
+static void Counter_Tick(bool new_frame)
+{
+    if (!Ctr.on) {
+        return;
+    }
+    Uint32 now = SDL_GetTicks();
+    if (!Ctr.started) {
+        Ctr.started = true;
+        Ctr.t0 = now;
+        Ctr.frames = 0;
+        Ctr.prev_frames = 0;
+        Ctr.prev_ms = 0;
+    }
+    if (new_frame) {
+        ++Ctr.frames;
+    }
+    Uint32 ms = now - Ctr.t0;
+    if (ms >= 500) {
+        Uint32 total_ms = ms + Ctr.prev_ms;
+        unsigned long long n = (Ctr.frames + Ctr.prev_frames) * 1000ull + total_ms / 2;
+        Ctr.value = int(n / total_ms > 9999 ? 9999 : n / total_ms);
+        Ctr.prev_frames = Ctr.frames;
+        Ctr.prev_ms = ms;
+        Ctr.frames = 0;
+        Ctr.t0 = now;
+    }
+}
+
+// Does the screen need a present to bring the counter up to date?
+static bool Counter_Stale(void)
+{
+    if (!Ctr.on) {
+        return Ctr.shown;
+    }
+    return Ctr.value >= 0 && (!Ctr.shown || Ctr.value != Ctr.shown_value || Ctr.colours_generation != Ctr.palette_generation);
+}
+
+// Puts back what the counter covered on the screen.
+static void Counter_Remove(void)
+{
+    if (!Ctr.shown) {
+        return;
+    }
+    Ctr.shown = false;
+    SDL_Surface* on = Shown();
+    if (on == nullptr || SDL_WasInit(SDL_INIT_VIDEO) == 0 || on != Ctr.surface || Ctr.generation != Window_Generation
+        || Ctr.rect.x + Ctr.rect.w > on->w || Ctr.rect.y + Ctr.rect.h > on->h) {
+        return; // the screen is a new one, which holds nothing of ours
+    }
+    SDL_LockSurface(on);
+    for (int row = 0; row < Ctr.rect.h; ++row) {
+        memcpy(static_cast<Uint8*>(on->pixels) + (Ctr.rect.y + row) * on->pitch + Ctr.rect.x,
+               &Ctr.under[size_t(row) * Ctr.rect.w],
+               Ctr.rect.w);
+    }
+    SDL_UnlockSurface(on);
+    Ctr.update = true;
+}
+
+// How big to draw it: 1 up to 600 pixels of screen height, 2 up to 1500, then 3.
+static int Counter_Scale(int screen_h)
+{
+    return screen_h <= 600 ? 1 : (screen_h < 1500 ? 2 : 3);
+}
+
+/*
+** Draws the counter on the screen, if it is on, and says (true) which part of it to update: the
+** counter's place, or the place it just left. Called with the frame on the screen.
+*/
+static bool Counter_Overlay(SDL_Rect& changed)
+{
+    if (!Ctr.on || Ctr.value < 0) {
+        if (Ctr.update) {
+            Ctr.update = false;
+            changed = Ctr.rect; // what it covered, put back
+            return true;
+        }
+        return false;
+    }
+    SDL_Surface* on = Shown();
+    if (on == nullptr) {
+        return false;
+    }
+    if (Ctr.shown) {
+        Counter_Remove(); // (nothing should be left, but a double draw would save the digits as the screen)
+    }
+
+    // The digits, as a mask: 5x7 glyphs a pixel apart, scaled, and a one pixel outline.
+    char text[8];
+    int digits = snprintf(text, sizeof(text), "%d", Ctr.value);
+    int scale = Counter_Scale(on->h);
+    int w = (digits * 6 - 1) * scale + 2, h = 7 * scale + 2;
+    int margin = 2 * scale;
+    SDL_Rect rect = Make_SDL_Rect(on->w - w - margin, on->h - h - margin, w, h);
+    if (rect.x < 0 || rect.y < 0) {
+        return false; // a screen too small for it
+    }
+    Ctr.mask.assign(size_t(w) * h, 0);
+    for (int d = 0; d < digits; ++d) {
+        const Uint8* glyph = Counter_Font[text[d] - '0'];
+        for (int row = 0; row < 7 * scale; ++row) {
+            for (int col = 0; col < 5 * scale; ++col) {
+                if (glyph[row / scale] & (0x10 >> (col / scale))) {
+                    Ctr.mask[size_t(1 + row) * w + 1 + d * 6 * scale + col] = 2;
+                }
+            }
+        }
+    }
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (Ctr.mask[size_t(y) * w + x] != 0) {
+                continue;
+            }
+            for (int dy = -1; dy <= 1 && Ctr.mask[size_t(y) * w + x] == 0; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < w && ny < h && Ctr.mask[size_t(ny) * w + nx] == 2) {
+                        Ctr.mask[size_t(y) * w + x] = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // The palette entries: nearest to (0,255,0) and the darkest, again after a palette change.
+    if (Ctr.colours_generation != Ctr.palette_generation) {
+        // The brightest clearly green entry: most green, least red and blue (g - 2(r+b)), and
+        // green must dominate. With no such entry, the nearest to (0,255,0).
+        int best_green = -(1 << 30), best_near = 1 << 30, best_dark = 1 << 30;
+        bool found = false;
+        for (int i = 0; i < 256; ++i) {
+            int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
+            int score = g - 2 * (r + b);
+            if (g >= 100 && g > 2 * (r > b ? r : b) && score > best_green) {
+                best_green = score;
+                Ctr.green = Uint8(i);
+                found = true;
+            }
+            int near = r * r + (255 - g) * (255 - g) + b * b;
+            if (near < best_near) {
+                best_near = near;
+                if (!found) {
+                    Ctr.green = Uint8(i);
+                }
+            }
+            int k = r * 3 + g * 6 + b;
+            if (k < best_dark) {
+                best_dark = k;
+                Ctr.dark = Uint8(i);
+            }
+        }
+        if (!found) {
+            for (int i = 0; i < 256; ++i) {
+                int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
+                if (r * r + (255 - g) * (255 - g) + b * b == best_near) {
+                    Ctr.green = Uint8(i);
+                    break;
+                }
+            }
+        }
+        Ctr.colours_generation = Ctr.palette_generation;
+    }
+    Ctr.fg = Ctr.green;
+    Ctr.bg = Ctr.dark;
+
+    // Save what it covers, and draw it.
+    Ctr.under.resize(size_t(w) * h);
+    SDL_LockSurface(on);
+    for (int y = 0; y < h; ++y) {
+        Uint8* row = static_cast<Uint8*>(on->pixels) + (rect.y + y) * on->pitch + rect.x;
+        memcpy(&Ctr.under[size_t(y) * w], row, w);
+        for (int x = 0; x < w; ++x) {
+            Uint8 m = Ctr.mask[size_t(y) * w + x];
+            if (m != 0) {
+                row[x] = m == 2 ? Ctr.fg : Ctr.bg;
+            }
+        }
+    }
+    SDL_UnlockSurface(on);
+
+    // The place it left, if it moved or got smaller, was put back by Counter_Remove.
+    changed = Union_Rects(Ctr.update ? Ctr.rect : rect, rect);
+    Ctr.rect = rect;
+    Ctr.surface = on;
+    Ctr.generation = Window_Generation;
+    Ctr.shown = true;
+    Ctr.shown_value = Ctr.value;
+    Ctr.update = false;
+    return true;
 }
 
 class SurfaceMonitorClassDummy : public SurfaceMonitorClass
@@ -772,6 +1052,7 @@ void Set_DD_Palette(void* rpalette)
     }
 
     Set_Palette_Both(SDL_PHYSPAL, physpal);
+    ++Ctr.palette_generation; // the frame counter's colours
 
     /*
     ** Cursor needs to be updated when palette changes.
@@ -1037,18 +1318,39 @@ static void PV_Compare(SDL_Surface* shown, int scale, int kind)
     const Uint8* screen = PV_Display(shown, pitch);
     unsigned long long n = 0;
     int x0 = w, y0 = h, x1 = -1, y1 = -1;
+    // The frame counter is on the screen over the frame: its place is checked below, against
+    // the frame with the counter drawn on it.
+    const bool counter = Ctr.shown && Ctr.surface == shown && Ctr.generation == Window_Generation;
     for (int y = 0; y < h; ++y) {
         const Uint8* want = &PV.expected[size_t(y) * w];
         const Uint8* row = screen + size_t(y) * scale * pitch;
-        if (scale == 1 && memcmp(row, want, w) == 0) {
+        const bool counter_row = counter && y * scale < Ctr.rect.y + Ctr.rect.h && (y + 1) * scale > Ctr.rect.y;
+        if (scale == 1 && !counter_row && memcmp(row, want, w) == 0) {
             continue;
         }
         for (int x = 0; x < w; ++x) {
+            if (counter_row && x * scale < Ctr.rect.x + Ctr.rect.w && (x + 1) * scale > Ctr.rect.x) {
+                continue;
+            }
             bool same = row[x * scale] == want[x];
             if (scale == 2) {
                 same = same && row[x * 2 + 1] == want[x] && row[pitch + x * 2] == want[x] && row[pitch + x * 2 + 1] == want[x];
             }
             if (!same) {
+                ++n;
+                x0 = x < x0 ? x : x0;
+                x1 = x > x1 ? x : x1;
+                y0 = y < y0 ? y : y0;
+                y1 = y > y1 ? y : y1;
+            }
+        }
+    }
+    for (int sy = counter ? Ctr.rect.y : 0; counter && sy < Ctr.rect.y + Ctr.rect.h && sy < h * scale; ++sy) {
+        for (int sx = Ctr.rect.x; sx < Ctr.rect.x + Ctr.rect.w && sx < w * scale; ++sx) {
+            Uint8 m = Ctr.mask[size_t(sy - Ctr.rect.y) * Ctr.rect.w + (sx - Ctr.rect.x)];
+            Uint8 want = m == 2 ? Ctr.fg : m == 1 ? Ctr.bg : PV.expected[size_t(sy / scale) * w + sx / scale];
+            if (screen[size_t(sy) * pitch + sx] != want) {
+                int x = sx / scale, y = sy / scale;
                 ++n;
                 x0 = x < x0 ? x : x0;
                 x1 = x > x1 ? x : x1;
@@ -1432,7 +1734,10 @@ public:
         if (!mirror_shown) {
             Raw_Copy(from->surface, surface);
         } else if (window != nullptr && window->pixels != nullptr) {
-            // The frame is on the screen, with the cursor drawn over it.
+            // The frame is on the screen, with the cursor drawn over it (and the frame counter, off first).
+            if (Screen == nullptr) {
+                Counter_Remove();
+            }
             Raw_Copy(window, surface);
             if (last_cursor) {
                 Put_Under(surface, last_drawn);
@@ -1459,6 +1764,7 @@ public:
         ** this off, for comparison.
         */
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
+        Counter_Tick(changed || Shake_Count > 0); // (a present of something the game drew is a frame)
         if (Shake_Count > 0) {
             Present_Shaken();
             return;
@@ -1467,11 +1773,12 @@ public:
         bool full = changed || force_full;
         Shake_Undo = false;
         if (!full && !Shot_Pending && cursor == last_cursor && Cursor_Generation == last_generation
-            && (!cursor || (area.x == last_area.x && area.y == last_area.y))) {
+            && (!cursor || (area.x == last_area.x && area.y == last_area.y)) && !Counter_Stale()) {
             ++Phase_Counts[COUNT_PRESENT_SKIPPED];
             return;
         }
         ++Phase_Counts[full ? COUNT_PRESENT_FULL : COUNT_PRESENT_PARTIAL];
+        Counter_Remove(); // the screen as the frame left it, for the copying below
 
         // The frame to show: the hidden surface if this one mirrors it.
         SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
@@ -1587,6 +1894,8 @@ public:
             Show_All();
         } else if (dirty.w > 0 && dirty.h > 0) {
             Show_Rects(1, &dirty);
+        } else if (Ctr.on || Ctr.update) {
+            Show_Rects(0, nullptr); // only the frame counter's place
         }
         if (pv_kind >= 0) {
             PV_Compare(Shown(), Scale, pv_kind);
@@ -1616,6 +1925,7 @@ private:
         --Shake_Count;
         ++Phase_Counts[COUNT_PRESENT_FULL];
 
+        Counter_Remove(); // the rows the shake leaves alone must not keep it
         SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
         int h = (frame->h < window->h ? frame->h : window->h) - (dy < 0 ? -dy : dy);
         int w = frame->w < window->w ? frame->w : window->w;

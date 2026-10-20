@@ -185,6 +185,10 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 break;
             }
 #endif
+            if (event.key.keysym.sym == SDLK_F8) {
+                Video_Toggle_FPS_Counter(); // on key down only; the game never sees F8
+                break;
+            }
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 /* Switching to full screen is handled in the key up event */
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
@@ -202,6 +206,9 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 break;
             }
 #endif
+            if (event.key.keysym.sym == SDLK_F8) {
+                break;
+            }
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 Toggle_Video_Fullscreen();
             } else if (unsigned short key = SDL1_Key(event.key.keysym.sym)) {
