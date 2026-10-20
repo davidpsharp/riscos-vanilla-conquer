@@ -27,4 +27,11 @@ extern int GitRevision;
 // When this binary was built, e.g. "2026-09-27 21:05 UTC".
 extern const char BuildStamp[];
 
+// The version of this build: "0.1.0" for the release, "0.1.0-dev" for anything else (VERSION, riscos/scripts/version.sh).
+extern const char VC_Version[];
+extern const char VC_Version_Date[];     // the commit's date, e.g. "20 Oct 2026"
+extern const char VC_Version_Describe[]; // git describe for a dev build, "" for the release
+extern const char VC_Version_Full[];     // "0.1.0 (20 Oct 2026)", or "0.1.0-dev v0.1.0-3-gabc1234 (20 Oct 2026)"
+extern const char VC_Version_Title[];    // "0.1.0", or "0.1.0-dev v0.1.0-3-gabc1234": for the title screen
+
 #endif

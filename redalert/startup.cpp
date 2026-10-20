@@ -324,7 +324,7 @@ int main(int argc, char* argv[])
         setvbuf(stderr, stderr_buffer, _IOFBF, sizeof(stderr_buffer));
     }
     // Record which build wrote this log.
-    fprintf(stderr, "Vanilla Conquer RA %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
+    fprintf(stderr, "Vanilla Conquer RA %s built %s (git %s%s)\n", VC_Version_Full, BuildStamp, GitShortSHA1, GitUncommittedChanges ? "~" : "");
 #endif
     UtfArgs args(argc, argv);
     WWDebugString("RA95 - Starting up.\n");

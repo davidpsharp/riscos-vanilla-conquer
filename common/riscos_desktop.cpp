@@ -137,8 +137,10 @@ static void Indirected(Icon& icon, int x0, int y0, int x1, int y1, unsigned flag
 */
 static void Create_Info_Window(void)
 {
-    static char version[64];
-    snprintf(version, sizeof(version), "r%d %s (%.10s)", GitRevision, GitShortSHA1, BuildStamp);
+    // "0.1.0 (20 Oct 2026)"; a dev build says 0.1.0-dev and what git describes (the date is
+    // the commit's, so a rebuild of the same commit says the same).
+    static char version[96];
+    snprintf(version, sizeof(version), "%s", VC_Version_Full);
 
     static struct
     {

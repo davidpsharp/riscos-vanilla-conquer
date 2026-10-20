@@ -408,17 +408,9 @@ unsigned short VersionClass::Minor_Version(void)
  *=========================================================================*/
 char* VersionClass::Version_Name(void)
 {
-    // Only print the git tag version number if it starts with 'v'
-    if (*GitTag == '\0' || GitUncommittedChanges || *GitTag != 'v') {
-        snprintf(VersionName,
-                 sizeof(VersionName),
-                 "r%d %s%s",
-                 GitRevision,
-                 (GitUncommittedChanges ? "~" : ""),
-                 GitShortSHA1);
-    } else {
-        snprintf(VersionName, sizeof(VersionName), "%s %s%s", GitTag, (GitUncommittedChanges ? "~" : ""), GitShortSHA1);
-    }
+    // The version of this build: 0.1.0 for the release, 0.1.0-dev and git's description otherwise
+    // (see VERSION and riscos/scripts/version.sh).
+    snprintf(VersionName, sizeof(VersionName), "%s", VC_Version_Title);
 
     return (VersionName);
 

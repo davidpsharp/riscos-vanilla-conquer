@@ -1,7 +1,7 @@
+Vanilla Conquer RA @VERSION@
+
 Vanilla Conquer: Red Alert for RISC OS
 ======================================
-
-Preview release
 
 Command & Conquer: Red Alert (1996) for the Risc PC and the Raspberry Pi,
 built from the Vanilla Conquer source code, which is based on the game's
@@ -10,7 +10,8 @@ source code as released by Electronic Arts under the GNU GPL.
 Source code, updates and bug reports:
   https://github.com/davidpsharp/riscos-vanilla-conquer
 
-The title screen shows the version and when it was built.
+The version is on the first line above, on the title screen and in the
+Info window (from the icon bar menu).
 
 
 Requirements
@@ -136,6 +137,10 @@ SCRN0001, SCRN0002 and so on; the folder is made the first time). It is
 the game's own picture at its own size, without the pointer. The folder
 is not part of the game data, so deleting !VanillaRA.gamedata keeps your
 screenshots.
+
+F8 turns a frame counter on and off: the number of frames a second being
+shown, as a small green number in the bottom right corner of the screen. It
+is off each time the game starts, and is not in screenshots.
 
 Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
 change its options.

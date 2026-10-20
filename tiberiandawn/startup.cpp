@@ -257,7 +257,7 @@ int main(int argc, char** argv)
         return 0;
     }
     // Record which build wrote this log.
-    fprintf(stderr, "Vanilla Conquer TD %s%s built %s\n", GitUncommittedChanges ? "~" : "", GitShortSHA1, BuildStamp);
+    fprintf(stderr, "Vanilla Conquer TD %s built %s (git %s%s)\n", VC_Version_Full, BuildStamp, GitShortSHA1, GitUncommittedChanges ? "~" : "");
 #endif
     UtfArgs args(argc, argv);
     CCDebugString("C&C95 - Starting up.\n");

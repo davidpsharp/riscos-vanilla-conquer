@@ -6,6 +6,9 @@
 # Usage: [VC_DEBUG=1] deploy-ra.sh [--no-build]
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# VC_VERSION_* : the version this build says it is (see version.sh).
+# shellcheck source=riscos/scripts/version.sh
+source "$(dirname "$0")/version.sh"
 WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
 APP="$WORK/hostfs/!VanillaRA"
 
@@ -25,7 +28,7 @@ if [ "${1:-}" != --no-build ]; then
     "$ROOT/riscos/scripts/sdk.sh" bash -c "
         cmake -S . -B $BDIR -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/riscos/cmake/riscos-gccsdk.cmake \
             -DCMAKE_BUILD_TYPE=Release -DRISCOS_EXTRA_FLAGS=$EXTRA \
-            -DBUILD_VANILLATD=OFF -DBUILD_VANILLARA=ON -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=ON >/dev/null &&
+            -DBUILD_VANILLATD=OFF -DBUILD_VANILLARA=ON -DSDL1=ON -DSDL2=OFF -DOPENAL=OFF -DNETWORKING=ON $VC_CMAKE_VERSION >/dev/null &&
         cmake --build $BDIR &&
         elf2aif $BDIR/vanillara $BDIR/vanillara,ff8 &&
         cmake -S riscos/tools -B build/riscos-tools -G Ninja \
@@ -37,6 +40,7 @@ fi
 [ -d "$WORK/hostfs/modules" ] || "$ROOT/riscos/scripts/fetch-runtime.sh"
 mkdir -p "$APP/Modules"
 cp "$ROOT"/riscos/app/\!VanillaRA/* "$APP/"
+vc_stamp_help "$APP/!Help,fff"
 cp "$ROOT/$BDIR/vanillara,ff8" "$APP/!RunImage,ff8"
 mkdir -p "$APP/Utils"
 cp "$ROOT/build/riscos-tools/vcprep,ff8" "$APP/Utils/"

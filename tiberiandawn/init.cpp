@@ -2363,28 +2363,9 @@ int Version_Number(void)
 {
     const char* demo_text = Is_Demo() ? "DEMO " : "";
 
-    // Only print the git tag version number if it starts with 'v'
-    if (*GitTag == '\0' || GitUncommittedChanges || *GitTag != 'v') {
-        snprintf(VersionText,
-                 sizeof(VersionText),
-                 "%sr%d %s%s",
-                 demo_text,
-                 GitRevision,
-                 (GitUncommittedChanges ? "~" : ""),
-                 GitShortSHA1);
-    } else {
-        snprintf(VersionText,
-                 sizeof(VersionText),
-                 "%s%s %s%s",
-                 demo_text,
-                 GitTag,
-                 (GitUncommittedChanges ? "~" : ""),
-                 GitShortSHA1);
-    }
-
-    // Also show when it was built, to tell test builds apart.
-    size_t len = strlen(VersionText);
-    snprintf(VersionText + len, sizeof(VersionText) - len, " %s", BuildStamp);
+    // The version of this build: 0.1.0 for the release, 0.1.0-dev and git's description otherwise
+    // (see VERSION and riscos/scripts/version.sh).
+    snprintf(VersionText, sizeof(VersionText), "%s%s", demo_text, VC_Version_Title);
 
     return (1);
 }

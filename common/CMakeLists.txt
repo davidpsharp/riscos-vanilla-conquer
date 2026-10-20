@@ -11,8 +11,36 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -DOUT=${BUILD_STAMP_FILE} -P ${CMAKE_CURRENT_SOURCE_DIR}/buildstamp.cmake
     COMMENT "Recording build time")
 
+# The version number: VERSION is the one place it lives. riscos/scripts/version.sh decides
+# whether this is the release (a clean tree at the commit tagged v<VERSION>) and passes
+# VC_VERSION (VERSION, or VERSION-dev), VC_VERSION_DATE (the commit date, spaces as _) and
+# VC_VERSION_DESCRIBE (git describe, "none" for a release). Without them (a build by hand) it is a dev build.
+file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" VC_VERSION_BASE LIMIT_COUNT 1)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/VERSION")
+if(NOT VC_VERSION)
+    set(VC_VERSION "${VC_VERSION_BASE}-dev")
+endif()
+if(NOT VC_VERSION STREQUAL VC_VERSION_BASE AND NOT VC_VERSION STREQUAL "${VC_VERSION_BASE}-dev")
+    message(FATAL_ERROR "VC_VERSION ${VC_VERSION} doesn't match the VERSION file (${VC_VERSION_BASE})")
+endif()
+string(REPLACE "_" " " VC_VERSION_DATE_TEXT "${VC_VERSION_DATE}")
+if(VC_VERSION_DESCRIBE STREQUAL "none")
+    set(VC_VERSION_DESCRIBE "")
+endif()
+if(VC_VERSION STREQUAL VC_VERSION_BASE)
+    set(VC_VERSION_DESCRIBE_TEXT "")
+    set(VC_VERSION_TITLE_TEXT "${VC_VERSION}")
+    set(VC_VERSION_FULL_TEXT "${VC_VERSION} (${VC_VERSION_DATE_TEXT})")
+else()
+    set(VC_VERSION_DESCRIBE_TEXT "${VC_VERSION_DESCRIBE}")
+    set(VC_VERSION_TITLE_TEXT "${VC_VERSION} ${VC_VERSION_DESCRIBE}")
+    set(VC_VERSION_FULL_TEXT "${VC_VERSION_TITLE_TEXT} (${VC_VERSION_DATE_TEXT})")
+endif()
+configure_file(vcversion.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/vcversion.cpp" @ONLY)
+
 set(COMMON_SRC
     ${GIT_POST_CONFIGURE_FILE}
+    ${CMAKE_CURRENT_BINARY_DIR}/vcversion.cpp
     ${BUILD_STAMP_FILE}
     _diptabl.cpp
     alloc.cpp
