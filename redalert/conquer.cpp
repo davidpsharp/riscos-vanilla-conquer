@@ -2076,6 +2076,7 @@ bool Main_Loop()
         if (Bench_Frame_Hashing) {
             Bench_Hash_HidPage();
         }
+        Phase_Bench_Shot(Bench_Frames_Done + 1);
         if (++Bench_Frames_Done >= Bench_Frames) {
             Bench_Finish(nullptr);
         }

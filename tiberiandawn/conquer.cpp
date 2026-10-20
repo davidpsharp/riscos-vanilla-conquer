@@ -1879,6 +1879,7 @@ bool Main_Loop()
         if (Bench_Frame_Hashing) {
             Bench_Hash_HidPage();
         }
+        Phase_Bench_Shot(frames + 1);
         if (++frames >= Bench_Frames) {
             Phase_Bench_Report(frames);
             unsigned Bench_Game_CRC(); // queue.cpp

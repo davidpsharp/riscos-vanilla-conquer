@@ -1,4 +1,5 @@
 #include "phasetime.h"
+#include "video.h"
 
 #include <chrono>
 #ifdef SDL_BUILD
@@ -304,6 +305,25 @@ void Bench_Frame_Hash(const unsigned char* pixels, int width, int height, int pi
 unsigned Phase_Bench_Started_Us()
 {
     return Bench_Started;
+}
+
+void Phase_Bench_Shot(unsigned frames_done)
+{
+    static const char* list = getenv("VC_BENCHSHOT");
+    if (list == nullptr) {
+        return;
+    }
+    for (const char* p = list; *p != '\0';) {
+        char* end;
+        unsigned long n = strtoul(p, &end, 10);
+        if (end == p) {
+            break;
+        }
+        if (n == frames_done) {
+            Video_Request_Screenshot(true);
+        }
+        p = *end == ',' ? end + 1 : end;
+    }
 }
 
 void Phase_Bench_Report(unsigned frames)
