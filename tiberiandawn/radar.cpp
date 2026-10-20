@@ -587,8 +587,10 @@ void RadarClass::Render_Terrain(CELL cell, int x, int y, int size)
         if (!icon)
             continue;
 
-        Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
-        _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, ZoomFactor, ZoomFactor, true, (char*)&FadingBrighten[0]);
+        if (!Radar_Blip(*LogicPage, icon, 3, x, y, ZoomFactor, (char*)&FadingBrighten[0])) {
+            Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
+            _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, ZoomFactor, ZoomFactor, true, (char*)&FadingBrighten[0]);
+        }
     }
 }
 
@@ -674,11 +676,10 @@ void RadarClass::Render_Overlay(CELL cell, int x, int y, int size)
             unsigned char* icon = otype->Radar_Icon((*this)[cell].OverlayData);
             if (!icon)
                 return;
-            Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
-            if (otype->IsTiberium) {
-                _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, true, (char*)&FadingGreen[0]);
-            } else {
-                _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, true, (char*)&FadingBrighten[0]);
+            char* remap = otype->IsTiberium ? (char*)&FadingGreen[0] : (char*)&FadingBrighten[0];
+            if (!Radar_Blip(*LogicPage, icon, 3, x, y, size, remap)) {
+                Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
+                _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, true, remap);
             }
         }
     }
@@ -868,7 +869,7 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
                 ptr = Add_Long_To_Pointer((void*)ptr, offset + icon * (24 * 24));
 
                 unsigned char* data = (unsigned char*)ptr;
-                if (!Radar_Tile_Blip(*LogicPage, data, x, y, ZoomFactor)) {
+                if (!Radar_Blip(*LogicPage, data, 24, x, y, ZoomFactor, nullptr)) {
                     Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
                     _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
                 }

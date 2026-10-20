@@ -44,22 +44,22 @@ void Fat_Put_Pixel(int x, int y, int value, int size, GraphicViewPortClass& gvp)
     }
 }
 
-bool Radar_Tile_Blip(GraphicViewPortClass& gvp, const unsigned char* icon, int x, int y, int size)
+bool Radar_Blip(GraphicViewPortClass& gvp, const unsigned char* icon, int src, int x, int y, int size, const char* remap)
 {
     if (size <= 0 || x < 0 || y < 0 || x + size > gvp.Get_Width() || y + size > gvp.Get_Height()) {
         return false;
     }
     Mark_Written(gvp, x, y, size, size);
-    const int ratio = ((24 << 16) / size) + 1; // as Linear_Scale_To_Linear's
+    const int ratio = ((src << 16) / size) + 1; // as Linear_Scale_To_Linear's
     const int pitch = gvp.Get_Pitch() + gvp.Get_XAdd() + gvp.Get_Width();
     unsigned char* dst = reinterpret_cast<unsigned char*>(gvp.Get_Offset()) + y * pitch + x;
     for (int i = 0; i < size; ++i, dst += pitch) {
-        const unsigned char* src = icon + ((i * ratio) >> 16) * 24;
+        const unsigned char* row = icon + ((i * ratio) >> 16) * src;
         int xrat = 0;
         for (int j = 0; j < size; ++j, xrat += ratio) {
-            unsigned char c = src[xrat >> 16];
+            unsigned char c = row[xrat >> 16];
             if (c != 0) {
-                dst[j] = c;
+                dst[j] = remap != nullptr ? static_cast<unsigned char>(remap[c]) : c;
             }
         }
     }

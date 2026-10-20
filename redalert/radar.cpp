@@ -729,8 +729,10 @@ void RadarClass::Render_Terrain(CELL cell, int x, int y, int size)
         unsigned char* icon = list[lp]->Radar_Icon(cell);
         if (!icon)
             continue;
-        Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
-        _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, ZoomFactor, ZoomFactor, true, (char*)&FadingBrighten[0]);
+        if (!Radar_Blip(*LogicPage, icon, 3, x, y, ZoomFactor, (char*)&FadingBrighten[0])) {
+            Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
+            _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, ZoomFactor, ZoomFactor, true, (char*)&FadingBrighten[0]);
+        }
     }
 }
 
@@ -823,14 +825,14 @@ void RadarClass::Render_Overlay(CELL cell, int x, int y, int size)
             unsigned char* icon = otype->Radar_Icon((*this)[cell].OverlayData);
             if (!icon)
                 return;
-            Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
             if (otype->IsTiberium) {
                 if (size == 1) {
                     LogicPage->Put_Pixel(x, y, DKGREY);
 
                     //					_IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, TRUE, (char
                     //*)&FadingShade[0]);
-                } else {
+                } else if (!Radar_Blip(*LogicPage, icon, 3, x, y, size, (char*)&FadingYellow[0])) {
+                    Buffer_To_Page(0, 0, 3, 3, icon, _IconStage);
                     _IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, true, (char*)&FadingYellow[0]);
                 }
                 //				_IconStage.Scale(*LogicPage, 0, 0, x, y, 3, 3, size, size, TRUE, (char
@@ -1080,7 +1082,7 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
                 icon = *(iconset->Map_Data() + icon);
 
                 unsigned char* data = (unsigned char*)icondata + icon * (24 * 24);
-                if (!Radar_Tile_Blip(*LogicPage, data, x, y, ZoomFactor)) {
+                if (!Radar_Blip(*LogicPage, data, 24, x, y, ZoomFactor, nullptr)) {
                     Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
                     _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
                 }
