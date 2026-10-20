@@ -78,6 +78,7 @@ set(COMMON_SRC
     pk.cpp
     pkpipe.cpp
     pkstraw.cpp
+    pngwrite.cpp
     ramfile.cpp
     random.cpp
     rawfile.cpp
