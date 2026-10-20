@@ -50,7 +50,7 @@
 #include "ccini.h"
 
 /************************************* Prototypes *********************************************/
-static void Assign_Houses(void);
+static bool Assign_Houses(void);
 static void Remove_AI_Players(void);
 static void Create_Units(void);
 static void Sort_Cells(CELL* cells, int numcells, CELL* outcells);
@@ -401,7 +401,10 @@ bool Read_Scenario_Ini(char* root, bool fresh)
         // Assign_Houses();
         GlyphX_Assign_Houses();
 #else
-        Assign_Houses();
+        if (!Assign_Houses()) {
+            fprintf(stderr, "network game: this computer is not one of the players, so the game can't start\n");
+            return (false);
+        }
 #endif
     }
 
@@ -800,7 +803,10 @@ bool Read_Scenario_Ini_File(char* scenario_file_name, char* bin_file_name, const
         // Assign_Houses();
         GlyphX_Assign_Houses();
 #else
-        Assign_Houses();
+        if (!Assign_Houses()) {
+            fprintf(stderr, "network game: this computer is not one of the players, so the game can't start\n");
+            return (false);
+        }
 #endif
     }
 
@@ -1177,8 +1183,12 @@ void Write_Scenario_Ini(char* root)
  *   06/09/1995 BRR : Created.                                                                 *
  *   07/14/1995 JLB : Records name of player in house structure.                               *
  *=============================================================================================*/
-static void Assign_Houses(void)
+/*
+** Returns false if none of the players in the game is this computer (PlayerPtr was not set).
+*/
+static bool Assign_Houses(void)
 {
+    bool found_local = false;
     HousesType house;
     HousesType pref_house;
     HouseClass* housep;
@@ -1189,6 +1199,17 @@ static void Assign_Houses(void)
     PlayerColorType color;
     HousesType house2;
     HouseClass* housep2;
+
+    /*
+    **	The players, as they are when the game starts: if this computer's own ID isn't among them,
+    **	PlayerPtr isn't set and the game can't start (see below).
+    */
+    fprintf(stderr, "network game: %d player(s), %d computer player(s), this computer's ID %d, IDs:",
+            MPlayerCount, MPlayerGhosts, (int)MPlayerLocalID);
+    for (i = 0; i < MPlayerCount; i++) {
+        fprintf(stderr, " %d", (int)MPlayerID[i]);
+    }
+    fprintf(stderr, "\n");
 
     /*
     **	Init the 'used' flag for all houses & colors to 0
@@ -1241,6 +1262,7 @@ static void Assign_Houses(void)
         */
         if (MPlayerID[i] == MPlayerLocalID) {
             PlayerPtr = housep;
+            found_local = true;
         }
 
         housep->Assign_Handicap(Scen.Difficulty);
@@ -1299,6 +1321,8 @@ static void Assign_Houses(void)
             housep->Clobber_All();
         }
     }
+
+    return (found_local);
 }
 
 /***********************************************************************************************
