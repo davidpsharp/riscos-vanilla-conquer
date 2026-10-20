@@ -72,6 +72,7 @@ The frame limiter's sleep ends on a centisecond tick, so the centisecond clock w
 
 **What the timings led to** (StrongARM Risc PC, in play). At first, whole-screen copies took about 60% of every second: ~250 ms/s in `Blit_Display` (hidden page to visible page) and ~370 ms/s presenting (visible page to screen). The game logic ran at 12.4 of its 15 frames a second.
 - **Unchanged frames aren't copied:** the game presents about twice per frame it draws, so presents copy only the cursor's old and new areas, or nothing, when nothing has drawn on the visible page. `VC_FULLPRESENT` turns this off.
+- **Partial presents (the default since rc8):** each surface keeps a grid of 16x16 tiles marked as the drawing routines write, and a present copies only the marked tiles and the cursor's old and new places (see "Partial presents" in `video_sdl1.cpp`). `VC_FULLPRESENT=1` turns them off, and with them the marking, for comparison; `VC_PARTIALPRESENT` (which used to turn them on) is still accepted and does nothing.
 - **The hidden page is presented directly:** `Blit_Display` makes the visible surface mirror the hidden one, instead of copying it (`video_sdl1.cpp`). The visible surface is filled in only when something actually uses it, such as a dialog. `VC_NODEFERBLIT` turns this off.
 - **Pacing:** waiting for the next game frame no longer oversleeps it. The old sleeps ran to the next present slot, so each frame took three slots instead of two, which is why the game ran at 12.4 fps. `VC_SIMLOAD=<ms>` adds that much work per game frame, to reproduce a slow machine on RPCEmu. At 55 ms it gave 12.3–12.5 fps before the fix and 15.2–15.6 after.
 
@@ -232,6 +233,8 @@ The game looks for a disc's files in `allied` or `soviet`, as it would ask for t
 | Allied 2 with `VC_PARTIALPRESENT=1` | 23.5 | |
 | start-up to the first frame | 14.9 s, now 12.8 s | 2.2 s |
 
+The "with `VC_PARTIALPRESENT=1`" rows were measured when partial presents were opt-in. They are the default now, so the other rows need `VC_FULLPRESENT=1`.
+
 **Missions:** Allied and Soviet 1–7 (3000 frames each, or until lost; with no player, Allied 4 and Soviet 7 are lost) run to the end on both machines, with the same outcomes. They take 18–29 ms/frame on the Risc PC. The game was also started normally there, and played through the menus into Allied 1 using the mouse.
 
 **Start-up on the Risc PC:** 9 s of the 12.8 s is reading the cached mixfiles (LOCAL, HIRES, CONQUER, SOUNDS, the side and theater mixfiles: 14 MB) at the IDE disc's 2.4 MB/s. `VC_FPSLOG` logs each step (`Phase_Startup`). Checking their SHA-1 digests took 4.2 s before the SHA engine was unrolled, and now takes 2.0 s.
@@ -301,6 +304,8 @@ SDL 1.2 numbers non-ASCII keys (modifiers, arrows, F keys, keypad) 256–322, wh
 - Home works.
 
 Hotkeys are stored in `[SDL1Hotkeys]`.
+
+**Screenshots:** Insert saves the game's frame (the surface it draws, at its logical size: no pointer, no border, not doubled or scaled) as an 8-bit paletted PNG in `<App>.Screenshots` (not inside `gamedata`, so deleting that keeps them), named `SCRN0001`, `SCRN0002`... (one above the highest there), with RISC OS filetype &B60. The key is swallowed in `wwkeyboard_sdl1.cpp` (the game never sees it; before, only the debug cheat keys and the map editor used Insert) and the next present writes the file (`Save_Screenshot` in `video_sdl1.cpp`), so it also works at a menu or in a movie. `common/pngwrite.cpp` is the writer: stored (uncompressed) deflate blocks, no libpng or zlib, nothing beyond ARMv3. A full disc or an unwritable folder is logged to stderr and the game goes on. In a mission the game also shows "Screenshot saved" in its message area. `riscos/tests/pngwrite` checks the writer on the Mac against PIL.
 
 ## Filenames (10-character FileCore)
 

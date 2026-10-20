@@ -1634,6 +1634,16 @@ bool Main_Loop()
     Check_For_Focus_Loss();
 
     /*
+    ** Say so on the screen when a screenshot (Insert) has been saved.
+    */
+    if (Screenshot_Message_Due) {
+        Screenshot_Message_Due = false;
+        static char saved[] = "Screenshot saved";
+        Messages.Add_Message(saved, MPlayerTColors[0], TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_FULLSHADOW, 200, 0, 0);
+        Map.Flag_To_Redraw(false);
+    }
+
+    /*
     ** Allocate extra memory for uncompressed shapes as needed
     */
     Reallocate_Big_Shape_Buffer();

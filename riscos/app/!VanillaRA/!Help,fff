@@ -131,6 +131,12 @@ Shift+F12 in the game goes back to the desktop, with the game paused
 where it was (sound too); click the icon again to carry on. The icon's
 menu has Info, Help (this file), Screen size (see below) and Quit.
 
+Insert saves a screenshot, as a PNG file in !VanillaRA.Screenshots (named
+SCRN0001, SCRN0002 and so on; the folder is made the first time). It is
+the game's own picture at its own size, without the pointer. The folder
+is not part of the game data, so deleting !VanillaRA.gamedata keeps your
+screenshots.
+
 Settings are in !VanillaRA.INI.REDALERT, which the game creates when you
 change its options.
 

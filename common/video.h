@@ -71,6 +71,13 @@ void Set_Video_Cursor_Clip(bool clipped);
 void Move_Video_Mouse(float xrel, float yrel);
 void Get_Video_Mouse(int& x, int& y);
 void Toggle_Video_Fullscreen();
+/*
+** Screenshots: the key (Insert) asks, and the next present saves the frame as a PNG in
+** the application's Screenshots directory. Screenshot_Message_Due is set after one is saved,
+** for the game's main loop to put a message on the screen and clear it.
+*/
+void Video_Request_Screenshot(bool key_down);
+extern bool Screenshot_Message_Due;
 void Reset_Video_Mode();
 unsigned Get_Free_Video_Memory();
 void Wait_Blit();

@@ -46,6 +46,8 @@
 #include "palette.h"
 #include "video.h"
 #include "riscos_desktop.h"
+#include "pngwrite.h"
+#include "paths.h"
 #include "wwkeyboard.h"
 #include "wwmouse.h"
 #include "settings.h"
@@ -55,6 +57,18 @@
 #endif
 
 #include <SDL.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef __riscos__
+#include <kernel.h>
+#include <swis.h>
+#endif
 #ifdef __APPLE__
 #include <execinfo.h> // VC_DIRTYCHECK=2
 #endif
@@ -1077,6 +1091,126 @@ static void PV_Compare(SDL_Surface* shown, int scale, int kind)
     }
 }
 
+/*
+** Screenshots. Insert (wwkeyboard_sdl1.cpp) asks for one; the next present saves the
+** game's own frame, as the game drew it (without the pointer, and without any border or
+** the doubling or scaling to the display), as an 8 bit PNG with the game's palette.
+** The files go in the Screenshots directory of the application, as SCRN0001, SCRN0002
+** and so on, always the first number above those already there, so nothing is overwritten.
+*/
+static bool Shot_Pending = false;
+static bool Shot_Key_Held = false;
+
+void Video_Request_Screenshot(bool key_down)
+{
+    if (!key_down) {
+        Shot_Key_Held = false;
+    } else if (!Shot_Key_Held) {
+        Shot_Key_Held = true; // key repeat doesn't ask again
+        Shot_Pending = true;
+    }
+}
+
+// The next number to use: one above the highest SCRNnnnn there (a ",xxx" type suffix is ignored).
+static int Next_Screenshot_Number(const std::string& dir)
+{
+    int highest = 0;
+    DIR* d = opendir(dir.c_str());
+    if (d == nullptr) {
+        return 1;
+    }
+    while (struct dirent* e = readdir(d)) {
+        const char* n = e->d_name;
+        if (strncasecmp(n, "SCRN", 4) != 0) {
+            continue;
+        }
+        int value = 0, digits = 0;
+        for (n += 4; *n >= '0' && *n <= '9' && digits < 6; ++n, ++digits) {
+            value = value * 10 + (*n - '0');
+        }
+        if (digits > 0 && value > highest) {
+            highest = value;
+        }
+    }
+    closedir(d);
+    return highest + 1;
+}
+
+static void Save_Screenshot(SDL_Surface* from, int w, int h)
+{
+    if (w > from->w) {
+        w = from->w;
+    }
+    if (h > from->h) {
+        h = from->h;
+    }
+    std::string dir = std::string(Paths.Program_Path()) + "/Screenshots";
+    if (mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
+        fprintf(stderr, "Screenshot: can't make %s: %s\n", dir.c_str(), strerror(errno));
+        return;
+    }
+
+    unsigned char palette[768];
+    for (int i = 0; i < 256; ++i) {
+        palette[i * 3] = physpal[i].r;
+        palette[i * 3 + 1] = physpal[i].g;
+        palette[i * 3 + 2] = physpal[i].b;
+    }
+
+    int number = Next_Screenshot_Number(dir);
+    std::string path;
+    for (int tries = 0; tries < 20; ++tries, ++number) { // (a name that turns up since the listing is skipped)
+        char leaf[16];
+        snprintf(leaf, sizeof(leaf), "/SCRN%04d", number);
+        path = dir + leaf;
+        FILE* exists = fopen(path.c_str(), "rb");
+        if (exists == nullptr) {
+            break;
+        }
+        fclose(exists);
+        path.clear();
+    }
+    if (path.empty()) {
+        fprintf(stderr, "Screenshot: no free name in %s\n", dir.c_str());
+        return;
+    }
+
+    FILE* fp = fopen(path.c_str(), "wb");
+    if (fp == nullptr) {
+        fprintf(stderr, "Screenshot: can't write %s: %s\n", path.c_str(), strerror(errno));
+        return;
+    }
+    SDL_LockSurface(from);
+    bool ok = PNG_Write_Paletted(fp, w, h, static_cast<const unsigned char*>(from->pixels), from->pitch, palette);
+    SDL_UnlockSurface(from);
+    if (fclose(fp) != 0) {
+        ok = false;
+    }
+    if (!ok) {
+        fprintf(stderr, "Screenshot: couldn't write %s (disc full?)\n", path.c_str());
+        remove(path.c_str());
+        return;
+    }
+#ifdef __riscos__
+    // The RISC OS name (<VanillaTD$Dir>.Screenshots.SCRN0001) and its type, PNG.
+    std::string native = path.substr(path.size() > 0 && path[0] == '/' ? 1 : 0);
+    for (size_t i = 0; i < native.size(); ++i) {
+        if (native[i] == '/') {
+            native[i] = '.';
+        }
+    }
+    _kernel_swi_regs regs;
+    regs.r[0] = 18;
+    regs.r[1] = reinterpret_cast<int>(native.c_str());
+    regs.r[2] = 0xB60;
+    if (_kernel_swi(OS_File, &regs, &regs) != nullptr) {
+        fprintf(stderr, "Screenshot: couldn't set the type of %s\n", native.c_str());
+    }
+#endif
+    fprintf(stderr, "Screenshot saved: %s (%dx%d)\n", path.c_str(), w, h);
+    Screenshot_Message_Due = true; // the game's main loop says so on the screen
+}
+
 static void Raw_Copy(SDL_Surface* from, SDL_Surface* to)
 {
     int w = from->w < to->w ? from->w : to->w;
@@ -1130,7 +1264,8 @@ public:
         tiles_h = (h + TILE - 1) / TILE;
         tiles.assign(size_t(tiles_w) * tiles_h, 0);
         All_Surfaces->push_back(this);
-        static const bool partial = getenv("VC_PARTIALPRESENT") != nullptr;
+        // On unless VC_FULLPRESENT is set (VC_PARTIALPRESENT, which turned it on, is still accepted).
+        static const bool partial = getenv("VC_FULLPRESENT") == nullptr;
         if (partial) {
             Video_Written_Hook = Written;
         }
@@ -1347,6 +1482,10 @@ public:
             if (last_cursor) {
                 Put_Under(window, last_drawn);
             }
+            if (Shot_Pending) {
+                Shot_Pending = false; // the screen holds the frame, without the pointer now
+                Save_Screenshot(window, frame->w, frame->h);
+            }
             if (cursor) {
                 cursor = Save_Area(window, drawn);
                 if (cursor) {
@@ -1376,6 +1515,10 @@ public:
             ** leaves it missing for part of every frame, which flickers badly on real
             ** hardware.
             */
+            if (Shot_Pending) {
+                Shot_Pending = false; // the whole frame, before the pointer goes on it
+                Save_Screenshot(frame, frame->w, frame->h);
+            }
             if (cursor) {
                 cursor = Save_Area(frame, drawn); // clips "drawn" to the surface
                 if (cursor) {
@@ -1594,8 +1737,9 @@ private:
     ** of the screen changes per frame. A lock that ends with nothing marked means
     ** something drew without saying where, so then the whole surface is copied.
     **
-    ** For now it's only on with VC_PARTIALPRESENT=1, until it has been played with
-    ** more widely. In the battle benchmark on the StrongARM Risc PC (same image, runs
+    ** It's on unless VC_FULLPRESENT is set, which also leaves out the marking. (It was
+    ** once on only with VC_PARTIALPRESENT=1, which is still accepted and does nothing.)
+    ** In the battle benchmark on the StrongARM Risc PC (same image, runs
     ** alternated) frames went from 54.4 to 48.1 ms: presenting 10.8 to 4.1 ms,
     ** drawing 17.0 to 18.0 ms for the marking.
     ** VC_DIRTYCHECK=1 compares each partial present with the whole frame and reports

@@ -342,6 +342,9 @@ bool GraphicViewPortClass::DD_Linear_Blit_To_Linear(GraphicViewPortClass& dest,
  *   10/09/1995     : Moved actually functionality to GraphicBuffer                            *
  *=============================================================================================*/
 void (*Video_Written_Hook)(VideoSurface* surface, int x, int y, int w, int h) = nullptr;
+
+// Set when a screenshot has been saved, for the game's main loop to say so on the screen (video.h).
+bool Screenshot_Message_Due = false;
 unsigned Video_Mark_Count;
 
 bool GraphicViewPortClass::Lock()

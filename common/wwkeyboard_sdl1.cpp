@@ -180,6 +180,10 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 RISCOS_Desktop_Suspend(); // Shift+F12: to the desktop, paused, until the icon is clicked
                 break;
             }
+            if (event.key.keysym.sym == SDLK_INSERT) {
+                Video_Request_Screenshot(true); // saved at the next present; the game doesn't see the key
+                break;
+            }
 #endif
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
                 /* Switching to full screen is handled in the key up event */
@@ -192,6 +196,10 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 #ifdef __riscos__
             if (RISCOS_Desktop_Is_Leave_Key(event.key.keysym.sym, event.key.keysym.mod)) {
                 break; // its key down was the desktop's, not the game's
+            }
+            if (event.key.keysym.sym == SDLK_INSERT) {
+                Video_Request_Screenshot(false);
+                break;
             }
 #endif
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
