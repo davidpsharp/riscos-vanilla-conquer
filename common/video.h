@@ -80,7 +80,7 @@ void Video_Request_Screenshot(bool key_down);
 
 void Video_Service_Screenshot();
 
-// F8: turns the frame counter (frames a second, small and green, bottom right of the screen) on and off.
+// Shift+F8: turns the frame counter (frames a second, small and green, bottom right of the screen) on and off.
 void Video_Toggle_FPS_Counter(void);
 extern bool Screenshot_Message_Due;
 void Reset_Video_Mode();

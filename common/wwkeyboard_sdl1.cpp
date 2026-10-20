@@ -151,6 +151,9 @@ void WWKeyboardClassSDL1::Poll_RISCOS_Wheel(void)
 }
 #endif
 
+/* Shift+F8 (the frame counter) was pressed and its key up is still to come. */
+static bool Counter_Key_Down = false;
+
 void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
 {
 #ifdef NETWORKING
@@ -185,8 +188,9 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 break;
             }
 #endif
-            if (event.key.keysym.sym == SDLK_F8) {
-                Video_Toggle_FPS_Counter(); // on key down only; the game never sees F8
+            if (event.key.keysym.sym == SDLK_F8 && (event.key.keysym.mod & KMOD_SHIFT)) {
+                Video_Toggle_FPS_Counter(); // Shift+F8, on key down only; the game never sees it
+                Counter_Key_Down = true;    // so its key up is swallowed even if Shift is let go first
                 break;
             }
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
@@ -206,7 +210,8 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
                 break;
             }
 #endif
-            if (event.key.keysym.sym == SDLK_F8) {
+            if (event.key.keysym.sym == SDLK_F8 && Counter_Key_Down) {
+                Counter_Key_Down = false;
                 break;
             }
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
