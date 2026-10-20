@@ -43,3 +43,25 @@ void Fat_Put_Pixel(int x, int y, int value, int size, GraphicViewPortClass& gvp)
         buf += pitch;
     }
 }
+
+bool Radar_Tile_Blip(GraphicViewPortClass& gvp, const unsigned char* icon, int x, int y, int size)
+{
+    if (size <= 0 || x < 0 || y < 0 || x + size > gvp.Get_Width() || y + size > gvp.Get_Height()) {
+        return false;
+    }
+    Mark_Written(gvp, x, y, size, size);
+    const int ratio = ((24 << 16) / size) + 1; // as Linear_Scale_To_Linear's
+    const int pitch = gvp.Get_Pitch() + gvp.Get_XAdd() + gvp.Get_Width();
+    unsigned char* dst = reinterpret_cast<unsigned char*>(gvp.Get_Offset()) + y * pitch + x;
+    for (int i = 0; i < size; ++i, dst += pitch) {
+        const unsigned char* src = icon + ((i * ratio) >> 16) * 24;
+        int xrat = 0;
+        for (int j = 0; j < size; ++j, xrat += ratio) {
+            unsigned char c = src[xrat >> 16];
+            if (c != 0) {
+                dst[j] = c;
+            }
+        }
+    }
+    return true;
+}

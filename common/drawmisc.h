@@ -43,4 +43,13 @@ void Init_Stamps(unsigned int icondata);
 
 void Fat_Put_Pixel(int x, int y, int value, int size, GraphicViewPortClass& gvp);
 
+/*
+** The radar's terrain blip: a 24x24 icon drawn "size" x "size" pixels at x,y of a locked viewport,
+** pixel for pixel what copying the icon into a 24x24 buffer and Linear_Scale_To_Linear'ing that onto
+** the viewport with transparency gives (index 0 not drawn), without the buffer and its locks. Returns
+** false, drawing nothing, if the blip isn't wholly inside the viewport (the caller then does it the
+** long way).
+*/
+bool Radar_Tile_Blip(GraphicViewPortClass& gvp, const unsigned char* icon, int x, int y, int size);
+
 #endif

@@ -67,6 +67,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "common/drawmisc.h"
 #include "common/phasetime.h"
 
 // void const * RadarClass::CoverShape;
@@ -1079,8 +1080,10 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
                 icon = *(iconset->Map_Data() + icon);
 
                 unsigned char* data = (unsigned char*)icondata + icon * (24 * 24);
-                Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
-                _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
+                if (!Radar_Tile_Blip(*LogicPage, data, x, y, ZoomFactor)) {
+                    Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
+                    _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
+                }
             } else {
                 //				LogicPage->Fill_Rect(x, y, x+ZoomFactor-1, y+ZoomFactor-1, cellptr->Cell_Color(false));
                 /*BG*/ LogicPage->Put_Pixel(x, y, cellptr->Cell_Color(false));

@@ -64,6 +64,7 @@
  *   RadarClass::Coord_To_Radar_Pixel -- Converts a coordinate to a radar pixel position       *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/drawmisc.h"
 #include "common/phasetime.h"
 #include "function.h"
 #include <stdlib.h>
@@ -867,8 +868,10 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
                 ptr = Add_Long_To_Pointer((void*)ptr, offset + icon * (24 * 24));
 
                 unsigned char* data = (unsigned char*)ptr;
-                Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
-                _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
+                if (!Radar_Tile_Blip(*LogicPage, data, x, y, ZoomFactor)) {
+                    Buffer_To_Page(0, 0, 24, 24, data, _TileStage);
+                    _TileStage.Scale(*LogicPage, 0, 0, x, y, 24, 24, ZoomFactor, ZoomFactor, true);
+                }
 
             } else {
                 if (LogicPage->Lock()) {
