@@ -77,6 +77,7 @@ void Toggle_Video_Fullscreen();
 ** for the game's main loop to put a message on the screen and clear it.
 */
 void Video_Request_Screenshot(bool key_down);
+void Video_Service_Screenshot();
 extern bool Screenshot_Message_Due;
 void Reset_Video_Mode();
 unsigned Get_Free_Video_Memory();

@@ -1459,7 +1459,7 @@ public:
         bool force_full = always_full || !presented || Shake_Undo; // copy all of it, not just what changed
         bool full = changed || force_full;
         Shake_Undo = false;
-        if (!full && cursor == last_cursor && Cursor_Generation == last_generation
+        if (!full && !Shot_Pending && cursor == last_cursor && Cursor_Generation == last_generation
             && (!cursor || (area.x == last_area.x && area.y == last_area.y))) {
             ++Phase_Counts[COUNT_PRESENT_SKIPPED];
             return;
@@ -2000,6 +2000,17 @@ bool Video_Show_Hidden(VideoSurface* hidden)
         return false;
     }
     return frontSurface->Show_Hidden(static_cast<VideoSurfaceSDL1*>(hidden));
+}
+
+void Video_Update_Cursor();
+
+// After the keyboard has been read: a screenshot asked for while the screen isn't changing (a
+// dialog waiting for a click, say) would otherwise wait for the next present, which is a mouse move.
+void Video_Service_Screenshot()
+{
+    if (Shot_Pending) {
+        Video_Update_Cursor();
+    }
 }
 
 // Moves the cursor between presents (see Frame_Limiter).

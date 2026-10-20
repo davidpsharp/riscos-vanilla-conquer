@@ -273,6 +273,7 @@ void WWKeyboardClassSDL1::Fill_Buffer_From_System(void)
             break;
         }
     }
+    Video_Service_Screenshot();
 }
 
 KeyASCIIType WWKeyboardClassSDL1::To_ASCII(unsigned short key)
