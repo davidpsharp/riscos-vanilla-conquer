@@ -61,7 +61,7 @@ unsigned long long Dirty_Partial, Dirty_Full_Unknown, Dirty_Full_Other, Dirty_Ti
     Dirty_Unknown_Locks; // partial presents, from video_sdl1.cpp
 unsigned long long Dirty_Frames, Dirty_Tiles, Dirty_Tiles_Total, Dirty_Bands, Dirty_Bands_Total, Dirty_Box_Pixels,
     Dirty_Pixels_Total; // VC_DIRTYSTAT, from video_sdl1.cpp
-unsigned long long Radar_Draws, Radar_Full_Draws, Radar_Pixels;
+unsigned long long Radar_Draws, Radar_Full_Draws, Radar_Pixels, Radar_Active_Draws;
 static unsigned Bench_Rtti_Calls[32];
 static unsigned Bench_Started = 0;
 static unsigned Bench_Worst_Ms = 0;
@@ -420,10 +420,11 @@ void Phase_Bench_Report(unsigned frames)
                 100.0 * Dirty_Box_Pixels / Dirty_Pixels_Total);
     }
     fprintf(stderr,
-            "bench radar: %.2f ms/frame (the radar's own drawing); %.2f draws, %.3f full redraws, %.1f pixels plotted per "
-            "frame\n",
+            "bench radar: %.2f ms/frame (the radar's own drawing); %.2f draws (%.0f%% with the radar on), %.3f full redraws, "
+            "%.1f pixels plotted per frame\n",
             Bench_Us[PHASE_X1] * per,
             double(Radar_Draws) / frames,
+            Radar_Draws ? 100.0 * Radar_Active_Draws / Radar_Draws : 0.0,
             double(Radar_Full_Draws) / frames,
             double(Radar_Pixels) / frames);
     fprintf(stderr, "bench object AI ms/frame (calls/frame):");

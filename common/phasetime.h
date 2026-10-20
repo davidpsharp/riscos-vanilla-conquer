@@ -58,7 +58,7 @@ enum PhaseCountId
 };
 
 // Radar statistics for the benchmark report (RadarClass::Draw_It and Plot_Radar_Pixel).
-extern unsigned long long Radar_Draws, Radar_Full_Draws, Radar_Pixels;
+extern unsigned long long Radar_Draws, Radar_Full_Draws, Radar_Pixels, Radar_Active_Draws;
 
 extern bool Phase_Timing;
 

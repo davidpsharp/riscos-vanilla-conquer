@@ -346,6 +346,7 @@ void RadarClass::Draw_It(bool forced)
         }
     }
     ++Radar_Draws;
+    Radar_Active_Draws += IsRadarActive ? 1 : 0;
     PhaseTimer radar_timer(PHASE_X1); // the radar's own drawing, without the map under it (VC_BENCH)
 
 #ifndef REMASTER_BUILD
