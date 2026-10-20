@@ -1099,16 +1099,14 @@ static void PV_Compare(SDL_Surface* shown, int scale, int kind)
 ** and so on, always the first number above those already there, so nothing is overwritten.
 */
 static bool Shot_Pending = false;
-static bool Shot_Key_Held = false;
 
 static Uint32 Shot_Asked_At = 0;
 
 void Video_Request_Screenshot(bool key_down)
 {
-    if (!key_down) {
-        Shot_Key_Held = false;
-    } else if (!Shot_Key_Held) {
-        Shot_Key_Held = true; // key repeat doesn't ask again
+    // (The game doesn't turn on key repeat, so one key down is one request; asking again
+    // before the frame is saved is the same screenshot.)
+    if (key_down && !Shot_Pending) {
         Shot_Pending = true;
         Shot_Asked_At = SDL_GetTicks();
     }
