@@ -507,23 +507,21 @@ static bool Counter_Overlay(SDL_Rect& changed)
     // The palette entries: nearest to (0,255,0) and the darkest, again after a palette change.
     if (Ctr.colours_generation != Ctr.palette_generation) {
         // The brightest clearly green entry: most green, least red and blue (4g - (r+b)), and
-        // green must dominate (g > 1.5 max(r,b)). With no such entry, the nearest to (0,255,0).
-        int best_green = -(1 << 30), best_near = 1 << 30, best_dark = 1 << 30;
-        bool found = false;
+        // green must dominate (g > 1.5 max(r,b)). A palette with none (a movie's, say) gets the
+        // entry with the most of that score anyway: a bright yellow or white, still legible
+        // inside the dark outline.
+        int best_green = -(1 << 30), best_any = -(1 << 30), best_dark = 1 << 30;
+        Uint8 any = 0;
         for (int i = 0; i < 256; ++i) {
             int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
             int score = 4 * g - (r + b);
             if (g >= 100 && 2 * g > 3 * (r > b ? r : b) && score > best_green) {
                 best_green = score;
                 Ctr.green = Uint8(i);
-                found = true;
             }
-            int near = r * r + (255 - g) * (255 - g) + b * b;
-            if (near < best_near) {
-                best_near = near;
-                if (!found) {
-                    Ctr.green = Uint8(i);
-                }
+            if (score > best_any) {
+                best_any = score;
+                any = Uint8(i);
             }
             int k = r * 3 + g * 6 + b;
             if (k < best_dark) {
@@ -531,14 +529,8 @@ static bool Counter_Overlay(SDL_Rect& changed)
                 Ctr.dark = Uint8(i);
             }
         }
-        if (!found) {
-            for (int i = 0; i < 256; ++i) {
-                int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
-                if (r * r + (255 - g) * (255 - g) + b * b == best_near) {
-                    Ctr.green = Uint8(i);
-                    break;
-                }
-            }
+        if (best_green == -(1 << 30)) {
+            Ctr.green = any;
         }
         Ctr.colours_generation = Ctr.palette_generation;
     }
