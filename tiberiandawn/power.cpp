@@ -180,7 +180,9 @@ void PowerClass::Draw_It(bool complete)
     if (complete || IsToRedraw) {
         //		PowX = TacPixelX + TacWidth*ICON_PIXEL_W;	// X position of upper left corner of power bar.
 
-        if (LogicPage->Lock()) {
+        // With the sidebar away there is nothing to draw, so don't lock the page: a lock that marks nothing
+        // makes every present a full one (video_sdl1.cpp), for as long as the sidebar stays away.
+        if (Map.IsSidebarActive && LogicPage->Lock()) {
 
             if (Map.IsSidebarActive) {
                 IsToRedraw = false;
