@@ -337,24 +337,25 @@ Semantic versioning (https://semver.org): MAJOR.MINOR.PATCH, starting at 0.1.0. 
 
 - **Where it lives:** the `VERSION` file at the top of the tree, and nowhere else. `riscos/scripts/version.sh` reads it (and git) and passes the result to cmake; `common/vcversion.cpp.in` turns it into the strings the game uses.
 - **Where it shows:** the icon bar Info window (Version), the first line of each `!Help` (`Vanilla Conquer TD 0.1.0 (20 Oct 2026)`, filled in when the app is assembled), the first line of the game's stderr (`Vanilla Conquer TD 0.1.0 (20 Oct 2026) built ...`) and the title screen. The date is the commit's, so rebuilding a commit gives the same text.
-- **The tag matches the build:** a release build must be made from a clean tree (no uncommitted or untracked files) whose HEAD is exactly the commit that the annotated tag `v<VERSION>` points at; then the strings say `0.1.0`. Any other build (another commit, local changes, no tag yet) says `0.1.0-dev` and the `git describe` text, so it can't be mistaken for the release. `make-release.sh 0.1.0` stops with a message if those conditions aren't met (`VC_DEV_BUILD=1` builds a `-dev` build anyway, in a zip named `-0.1.0-dev`). The names `preview`, `test` and so on are dev builds too.
+- **Tag names:** the port's tags are `riscos-v<VERSION>` (`riscos-v0.1.0`), not `v<VERSION>`: the upstream Vanilla Conquer project has its own `v0.1.0`-style tags, and a tag of that name here would collide or be mistaken for theirs. The version text in the game stays plain `0.1.0`.
+- **The tag matches the build:** a release build must be made from a clean tree (no uncommitted or untracked files) whose HEAD is exactly the commit that the annotated tag `riscos-v<VERSION>` points at; then the strings say `0.1.0`. Any other build (another commit, local changes, no tag yet) says `0.1.0-dev` and the `git describe` text, so it can't be mistaken for the release. `make-release.sh 0.1.0` stops with a message if those conditions aren't met (`VC_DEV_BUILD=1` builds a `-dev` build anyway, in a zip named `-0.1.0-dev`). The names `preview`, `test` and so on are dev builds too.
 
 To cut a release:
 
 ```sh
 echo 0.2.0 > VERSION && git commit -am "Version 0.2.0"      # bump
-git tag -a v0.2.0 -m "Vanilla Conquer RISC OS 0.2.0"       # tag that commit
+git tag -a riscos-v0.2.0 -m "Vanilla Conquer RISC OS 0.2.0" # tag that commit
 riscos/scripts/version.sh                                  # "release build: 1" and the text you expect
 riscos/scripts/make-release.sh 0.2.0                       # -> build/release/VanillaTD-riscos-0.2.0.zip
 RELEASE_GAME=ra riscos/scripts/make-release.sh 0.2.0       # -> VanillaRA-riscos-0.2.0.zip
 # verify: the first line of stderr, the top of !Help and the Info window all say 0.2.0 (no -dev)
-git push origin riscos v0.2.0                               # then push
+git push origin riscos riscos-v0.2.0                               # then push
 ```
 
 ## Making a release
 
 ```sh
-# see Versioning above: bump VERSION, commit, tag v<version>, then
+# see Versioning above: bump VERSION, commit, tag riscos-v<version>, then
 riscos/scripts/make-release.sh <version>    # -> build/release/VanillaTD-riscos-<version>.zip
 RELEASE_GAME=ra riscos/scripts/make-release.sh <version>
 ```

@@ -7,7 +7,7 @@
 #   e.g. make-release.sh 0.1.0  ->  build/release/VanillaTD-riscos-0.1.0.zip
 #
 # A version like 0.1.0 asks for a release, and only a release build can have that name: the
-# tree must be clean and HEAD exactly the commit tagged v0.1.0 (an annotated tag), and the
+# tree must be clean and HEAD exactly the commit tagged riscos-v0.1.0 (an annotated tag), and the
 # VERSION file must say 0.1.0 (see version.sh). Then the game, its Info window, !Help and log
 # say exactly 0.1.0. Otherwise this stops, unless VC_DEV_BUILD=1 is set: that builds a dev
 # build (0.1.0-dev and git describe, in the zip named <version>-dev) that can't be mistaken for
@@ -27,7 +27,7 @@ if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     if [ "$VC_RELEASE" != 1 ]; then
         if [ "${VC_DEV_BUILD:-0}" != 1 ]; then
             echo "error: can't build release $VERSION: $VC_RELEASE_WHY." >&2
-            echo "       A release is built from a clean tree at the commit tagged v$VERSION. To build a dev build" >&2
+            echo "       A release is built from a clean tree at the commit tagged riscos-v$VERSION. To build a dev build" >&2
             echo "       ($VC_VERSION_FULL) anyway, set VC_DEV_BUILD=1." >&2
             exit 1
         fi

@@ -4,7 +4,7 @@
 # on its own it prints what it found.
 #
 # A *release* build is made from a clean tree whose HEAD is exactly the commit that the
-# annotated tag v<VERSION> points at; its strings say just "0.1.0". Anything else (another
+# annotated tag riscos-v<VERSION> points at; its strings say just "0.1.0". Anything else (another
 # commit, uncommitted changes, no tag yet) is a dev build, and says "0.1.0-dev" with the
 # `git describe` text, so it can never be mistaken for the release.
 #
@@ -14,7 +14,7 @@
 #   VC_RELEASE_WHY       why it isn't a release (when VC_RELEASE is 0)
 #   VC_VERSION           0.1.0, or 0.1.0-dev
 #   VC_VERSION_DATE      the commit's date, e.g. 20 Oct 2026 (so a rebuild says the same)
-#   VC_VERSION_DESCRIBE  git describe text for a dev build (v0.1.0-3-gabc1234-dirty), else empty
+#   VC_VERSION_DESCRIBE  git describe text for a dev build (riscos-v0.1.0-3-gabc1234-dirty), else empty
 #   VC_VERSION_FULL      what !Help and the log say after the game's name, e.g. "0.1.0 (20 Oct 2026)"
 #   VC_CMAKE_VERSION     the -D options that give the game these (as a word list; no spaces in them)
 # and defines vc_stamp_help <file>, which fills @VERSION@ in a !Help copy.
@@ -27,9 +27,10 @@ fi
 
 VC_RELEASE=0
 VC_RELEASE_WHY=
-VC_TAG=v$VC_VERSION_BASE
+# The port's tags are riscos-v<VERSION>: upstream Vanilla Conquer has its own v0.1.0 (and similar) tags.
+VC_TAG=riscos-v$VC_VERSION_BASE
 vc_dirty=$(git -C "$VC_ROOT" status --porcelain 2>/dev/null | head -1)
-VC_VERSION_DESCRIBE=$(git -C "$VC_ROOT" describe --tags --always --match 'v*' 2>/dev/null || echo unknown)
+VC_VERSION_DESCRIBE=$(git -C "$VC_ROOT" describe --tags --always --match 'riscos-v*' 2>/dev/null || echo unknown)
 [ -n "$vc_dirty" ] && VC_VERSION_DESCRIBE=$VC_VERSION_DESCRIBE-dirty
 VC_VERSION_DATE=$(LC_ALL=C git -C "$VC_ROOT" log -1 --format=%cd --date='format:%-d %b %Y' HEAD 2>/dev/null || date '+%-d %b %Y')
 
