@@ -167,6 +167,7 @@ public:
     virtual bool Scroll_Map(DirType facing, int& distance, bool really);
     virtual void Refresh_Cells(CELL cell, short const* list);
     virtual void Set_View_Dimensions(int x, int y, int width = -1, int height = -1);
+    void Refit_View(void); // Set_View_Dimensions as last asked for (after a load: see MouseClass::Load)
 
     /*
     **	Pending object placement control.

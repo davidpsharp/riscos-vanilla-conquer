@@ -48,6 +48,9 @@ public:
     {
     }
 
+    // After a load: the layout for this screen, not the one the game was saved at (see iomap.cpp).
+    void Keep_Current_Layout(const MouseClass& now);
+
     /*
     ** Initialization
     */

@@ -530,6 +530,11 @@ short const* DisplayClass::Text_Overlap_List(char const* text, int x, int y) con
     return (_list);
 }
 
+void DisplayClass::Refit_View(void)
+{
+    Set_View_Dimensions(ViewRequestX, ViewRequestY, ViewRequestW, ViewRequestH);
+}
+
 /***********************************************************************************************
  * DisplayClass::Set_View_Dimensions -- Sets the tactical display screen coordinates.          *
  *                                                                                             *

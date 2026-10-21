@@ -46,6 +46,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include <vector>
 
 /***********************************************************************************************
  * CellClass::Should_Save -- Should the cell be written to disk?                               *
@@ -179,6 +180,31 @@ void CellClass::Decode_Pointers(void)
 }
 
 /***********************************************************************************************
+ * MouseClass::Keep_Current_Layout -- Puts the screen-size dependent members back after a load.*
+ *                                                                                             *
+ *    "now" is a copy of the object as it was before the load; these are the members that      *
+ *    One_Time sets from the size of the screen. The view is then fitted again.                *
+ *=============================================================================================*/
+void MouseClass::Keep_Current_Layout(const MouseClass& now)
+{
+    RadX = now.RadX;
+    RadOffX = now.RadOffX;
+    RadY = now.RadY;
+    RadOffY = now.RadOffY;
+    RadWidth = now.RadWidth;
+    RadHeight = now.RadHeight;
+    RadIWidth = now.RadIWidth;
+    RadIHeight = now.RadIHeight;
+    RadPWidth = now.RadPWidth;
+    RadPHeight = now.RadPHeight;
+    for (int i = 0; i < COLUMNS; i++) {
+        Column[i].X = now.Column[i].X;
+        Column[i].Y = now.Column[i].Y;
+    }
+    Refit_View();
+}
+
+/***********************************************************************************************
  * MouseClass::Load -- Loads from a save game file.                                            *
  *                                                                                             *
  * Loading the map is very complicated.  Here are the steps:                                   *
@@ -253,12 +279,24 @@ bool MouseClass::Load(Straw& file)
     ** Read the entire map object in.  Only read in sizeof(MouseClass), so if we're
     ** in editor mode, none of the map editor object is read in.
     */
+    /*
+    ** The layout (the tactical view, radar and sidebar strips) depends on the screen's size, not on the
+    ** game being loaded, but the raw read below overwrites it with the size the game was saved at (see
+    ** the Tiberian Dawn MouseClass::Load). Keep the current layout members and put them back after the
+    ** read: no new members, so the file is as it was.
+    */
+    std::vector<char> current(sizeof(*this));
+    memcpy(&current[0], static_cast<void*>(this), sizeof(*this));
+
     file.Get(this, sizeof(*this));
 #ifdef SCENARIO_EDITOR
     new (this) MapEditClass(NoInitClass());
 #else
     new (this) MouseClass(NoInitClass());
 #endif
+    if (getenv("VC_OLDLAYOUT") == nullptr) { // (test only)
+        Keep_Current_Layout(*reinterpret_cast<const MouseClass*>(&current[0]));
+    }
 
     /*
     ** Reallocate the cell array

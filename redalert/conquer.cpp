@@ -1749,6 +1749,57 @@ static void Bench_Hash_HidPage()
     }
 }
 
+/*
+** VC_SAVELOADTEST=save:<frame>:<file> or load:<frame>:<file> (test only): saves, or loads, the game at that
+** game frame, and logs the screen layout and the state's CRC before and after, to check that a save made at
+** one screen size loads at another (and VC_OLDLAYOUT=1 loads as it was before the layout was kept).
+*/
+unsigned Bench_Game_CRC(); // queue.cpp
+
+static void Log_Layout(const char* when)
+{
+    fprintf(stderr,
+            "layout %s: frame %ld crc %08x screen %dx%d view %d,%d lepton %dx%d radar %d,%d %dx%d strips %d,%d %d,%d\n",
+            when,
+            long(Frame),
+            Bench_Game_CRC(),
+            ScreenWidth,
+            ScreenHeight,
+            Map.TacPixelX,
+            Map.TacPixelY,
+            int(Map.TacLeptonWidth),
+            int(Map.TacLeptonHeight),
+            Map.RadX,
+            Map.RadY,
+            Map.RadWidth,
+            Map.RadHeight,
+            Map.Column[0].X,
+            Map.Column[0].Y,
+            Map.Column[1].X,
+            Map.Column[1].Y);
+}
+
+static void Test_Save_Load_Hook()
+{
+    static const char* spec = getenv("VC_SAVELOADTEST");
+    if (spec == nullptr) {
+        return;
+    }
+    char what[8], file[200];
+    int at = 0;
+    if (sscanf(spec, "%7[a-z]:%d:%199s", what, &at, file) != 3 || Frame != at) {
+        return;
+    }
+    Log_Layout("before");
+    if (strcmp(what, "save") == 0) {
+        fprintf(stderr, "layout save %s\n", Save_Game(file, "layout test") ? "ok" : "FAILED");
+    } else {
+        fprintf(stderr, "layout load %s\n", Load_Game(file) ? "ok" : "FAILED");
+        Log_Layout("after");
+        Map.Flag_To_Redraw(true);
+    }
+}
+
 /***********************************************************************************************
  * Main_Loop -- This is the main game loop (as a single loop).                                 *
  *                                                                                             *
@@ -2066,6 +2117,7 @@ bool Main_Loop()
     BEnd(BENCH_GAME_FRAME);
 
     Game_Frame_Done();
+    Test_Save_Load_Hook();
     Sync_Delay();
     Phase_Frame_End();
     if (Bench_Frames > 0) {
