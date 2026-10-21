@@ -42,6 +42,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include <chrono>
 
 /***************************************************************************
 **	Controls what special effects may occur on the sound effect.
@@ -784,7 +785,9 @@ void Speak_AI(void)
 void Stop_Speaking(void)
 {
     SpeakQueue = VOX_NONE;
-    Stop_Sample_Playing(SpeechBuffer);
+    for (int index = 0; index < ARRAY_SIZE(SpeechBuffer); index++) {
+        Stop_Sample_Playing(SpeechBuffer[index]);
+    }
 }
 
 /***********************************************************************************************
@@ -805,9 +808,38 @@ void Stop_Speaking(void)
  *=============================================================================================*/
 bool Is_Speaking(void)
 {
+    /*
+    ** SpeechBuffer is an array of two buffers, so each is asked about: the array itself matches no
+    ** sample, which made this "speaking" only while a line was still queued, and the waits for the
+    ** mission's verdict line and the like never waited for it to finish.
+    **
+    ** The waits call this in a loop with nothing else to stop them, so a line that never finishes (the
+    ** sound stuck or stopped) must not hold them for ever: after 20 s of unbroken "speaking" (the
+    ** longest line is a few seconds) it is stopped and the answer is no.
+    */
+    static std::chrono::steady_clock::time_point since;
+    static bool speaking = false;
+
     Speak_AI();
-    if (!Debug_Quiet && SampleType != 0 && (SpeakQueue != VOX_NONE || Is_Sample_Playing(SpeechBuffer))) {
-        return (true);
+    bool now = false;
+    if (!Debug_Quiet && SampleType != 0) {
+        now = SpeakQueue != VOX_NONE;
+        for (int index = 0; index < ARRAY_SIZE(SpeechBuffer) && !now; index++) {
+            now = Is_Sample_Playing(SpeechBuffer[index]);
+        }
     }
-    return (false);
+    if (!now) {
+        speaking = false;
+        return (false);
+    }
+    if (!speaking) {
+        speaking = true;
+        since = std::chrono::steady_clock::now();
+    } else if (std::chrono::steady_clock::now() - since > std::chrono::seconds(20)) {
+        fprintf(stderr, "speech: still speaking after 20 s, giving up on it\n");
+        speaking = false;
+        Stop_Speaking();
+        return (false);
+    }
+    return (true);
 }
