@@ -1613,6 +1613,67 @@ static void Sync_Delay(void)
  * HISTORY:                                                                                    *
  *   10/01/1994 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** VC_SAVELOADTEST=save:<frame>:<file> or load:<frame>:<file> (test only): saves, or loads, the game
+** at that game frame, and logs the screen layout (tactical view, radar, power bar, sidebar) and the
+** state's CRC before and after, to check a save made at one screen size loads at another.
+*/
+unsigned Bench_Game_CRC(); // queue.cpp
+
+static void Log_Layout(const char* when)
+{
+    fprintf(stderr,
+            "layout %s: frame %ld crc %08x screen %dx%d view %d,%d lepton %dx%d radar %d,%d %dx%d power %d,%d %dx%d "
+            "side %d,%d %dx%d strips %d,%d %d,%d\n",
+            when,
+            long(Frame),
+            Bench_Game_CRC(),
+            ScreenWidth,
+            ScreenHeight,
+            Map.TacPixelX,
+            Map.TacPixelY,
+            Map.TacLeptonWidth,
+            Map.TacLeptonHeight,
+            Map.RadX,
+            Map.RadY,
+            Map.RadWidth,
+            Map.RadHeight,
+            Map.PowX,
+            Map.PowY,
+            Map.PowWidth,
+            Map.PowHeight,
+            Map.SideX,
+            Map.SideY,
+            Map.SideWidth,
+            Map.SideHeight,
+            Map.Column[0].X,
+            Map.Column[0].Y,
+            Map.Column[1].X,
+            Map.Column[1].Y);
+}
+
+static void Test_Save_Load_Hook()
+{
+    static const char* spec = getenv("VC_SAVELOADTEST");
+    if (spec == nullptr) {
+        return;
+    }
+    char what[8], file[200];
+    int at = 0;
+    if (sscanf(spec, "%7[a-z]:%d:%199s", what, &at, file) != 3 || Frame != at) {
+        return;
+    }
+    Log_Layout("before");
+    if (strcmp(what, "save") == 0) {
+        char descr[] = "layout test";
+        fprintf(stderr, "layout save %s\n", Save_Game(file, descr) ? "ok" : "FAILED");
+    } else {
+        fprintf(stderr, "layout load %s\n", Load_Game(file) ? "ok" : "FAILED");
+        Log_Layout("after");
+        Map.Flag_To_Redraw(true);
+    }
+}
+
 extern void Check_For_Focus_Loss(void);
 void Reallocate_Big_Shape_Buffer(void);
 
@@ -1848,6 +1909,7 @@ bool Main_Loop()
     */
     Frame++;
     Game_Frame_Done();
+    Test_Save_Load_Hook();
 
     /*
     ** Very rarely, the human players will get a message from the computer.

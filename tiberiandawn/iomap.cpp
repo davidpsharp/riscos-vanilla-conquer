@@ -412,7 +412,9 @@ bool MouseClass::Load(FileClass& file)
         return (false);
     }
     new (this) MouseClass(NoInitClass());
-    Keep_Current_Layout(*reinterpret_cast<const MouseClass*>(&current[0]));
+    if (getenv("VC_OLDLAYOUT") == nullptr) { // (test only: the loading as it was, to see the fault)
+        Keep_Current_Layout(*reinterpret_cast<const MouseClass*>(&current[0]));
+    }
 
     /*
     ** Reallocate the cell array
