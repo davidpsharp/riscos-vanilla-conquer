@@ -391,13 +391,7 @@ int main(int argc, char** argv)
             fallback = RISCOS_Desktop_Auto_Resolution();
 #endif
             int w = ScreenWidth, h = ScreenHeight;
-            int max_w = 0, max_h = 0;
-#ifdef __riscos__
-            if (getenv("VC_NODESKTOPCHECK") == nullptr) { // (test only: to see a failed mode and the retry)
-                RISCOS_Desktop_Pixel_Size(max_w, max_h);
-            }
-#endif
-            if (!Choose_Screen_Size(resolution, fallback, w, h, note, max_w, max_h)) {
+            if (!Choose_Screen_Size(resolution, fallback, w, h, note)) {
                 fprintf(stderr, "video: %s: using %dx%d\n", note.c_str(), w, h);
                 size_unusable = true;
             }

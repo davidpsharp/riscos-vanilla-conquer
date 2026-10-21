@@ -39,28 +39,11 @@ inline bool Parse_Screen_Size(const std::string& setting, int& w, int& h, std::s
 ** the default) with "note" saying what was wrong. "w", "h" hold the default; they are set to the
 ** fallback if that is usable too.
 */
-inline bool Choose_Screen_Size(const std::string& setting,
-                               const std::string& fallback,
-                               int& w,
-                               int& h,
-                               std::string& note,
-                               int max_w = 0,
-                               int max_h = 0)
+inline bool Choose_Screen_Size(const std::string& setting, const std::string& fallback, int& w, int& h, std::string& note)
 {
     std::string why;
-    int pw = w, ph = h;
-    if (Parse_Screen_Size(setting, pw, ph, why)) {
-        if ((max_w > 0 && pw > max_w) || (max_h > 0 && ph > max_h)) {
-            // A display can't show a surface bigger than its own screen: asking SDL for one fails, and on RISC OS
-            // a failed mode leaves SDL's event handling in a state that crashed the retry. Never asked for.
-            char text[64];
-            snprintf(text, sizeof(text), "it is bigger than the screen (%dx%d)", max_w, max_h);
-            why = text;
-        } else {
-            w = pw;
-            h = ph;
-            return true;
-        }
+    if (Parse_Screen_Size(setting, w, h, why)) {
+        return true;
     }
     note = "The screen size '" + setting + "' can't be used (" + why + ")";
     std::string ignored;
