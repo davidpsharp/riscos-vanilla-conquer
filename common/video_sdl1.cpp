@@ -320,9 +320,9 @@ static SDL_Rect Union_Rects(const SDL_Rect& a, const SDL_Rect& b)
 }
 
 /*
-** The frame counter (F8; wwkeyboard_sdl1.cpp): a small bright green number, the frames a
+** The frame counter (Shift+F8; wwkeyboard_sdl1.cpp): a small bright green number, the frames a
 ** second being shown, in the bottom right corner of the screen, with a thin black outline.
-** It is off until F8 turns it on.
+** It is off until Shift+F8 turns it on.
 **
 ** It exists only on the screen, never in a game surface, so the game can't see it: it is
 ** drawn on the screen (Shown) after the frame, and the cursor, have reached it, and what it

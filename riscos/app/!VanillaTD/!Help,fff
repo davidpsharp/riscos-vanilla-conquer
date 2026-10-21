@@ -144,7 +144,7 @@ the game's own picture at its own size, without the pointer. The folder
 is not part of the game data, so deleting !VanillaTD.gamedata keeps your
 screenshots.
 
-F8 turns a frame counter on and off: the number of frames a second being
+Shift+F8 turns a frame counter on and off: the number of frames a second being
 shown, as a small green number in the bottom right corner of the screen. It
 is off each time the game starts, and is not in screenshots.
 
