@@ -47,11 +47,6 @@ void RISCOS_Desktop_Pixel_Size(int& width, int& height);
 // the same way at every start).
 void RISCOS_Desktop_Forget_Size(void);
 
-// Registered with atexit in place of SDL_Quit (video_sdl1.cpp). Closes the audio (and timer) threads while UnixLib's
-// ticker still runs, stops the ticker, and only then lets SDL close the task (Wimp_CloseDown), so that no ticker
-// callback can fire into a task that has gone. One stderr line for each step.
-void RISCOS_Exit_Cleanly(void);
-
 // True for the key that leaves for the desktop: Shift+F12 (as on the desktop, where it brings
 // the icon bar to the front). F12 alone stays the game's (a map bookmark).
 bool RISCOS_Desktop_Is_Leave_Key(int sdl_key, int sdl_mod);
