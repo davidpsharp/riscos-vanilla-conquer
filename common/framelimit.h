@@ -38,9 +38,15 @@ void Rate_Idle_Leave_Slow();
 bool Rate_Meter_Read(int& fps, int& busy_percent); // false: no game frames lately (a menu, say)
 
 // Called once per pass of the game's main loop, after the logic.
+void Test_Slowdown(); // VC_SLOWDOWN (test only)
+extern bool Test_Slowdown_On;
+
 inline void Game_Frame_Done()
 {
     ++Logic_Frame_Count;
+    if (Test_Slowdown_On) {
+        Test_Slowdown();
+    }
     if (Rate_Meter_On) {
         Rate_Frame_Slow();
     }

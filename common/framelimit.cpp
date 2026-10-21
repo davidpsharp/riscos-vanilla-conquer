@@ -3,6 +3,7 @@
 #include "settings.h"
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -44,6 +45,35 @@ void Rate_Meter_Enable(bool on)
     Idle_Total = 0;
     if (on) {
         Meter_Last = Phase_Now_Us();
+    }
+}
+
+/*
+** VC_SLOWDOWN=<ms>[,<seconds>] (test only, to see the frame counter's number fall and its busy
+** figure rise without a slow machine): every game frame burns that many milliseconds, doing
+** nothing the game can see. With seconds, only in alternate spells of that length (the first
+** is without).
+*/
+static int Slowdown_Ms = 0, Slowdown_Spell = 0;
+bool Test_Slowdown_On = getenv("VC_SLOWDOWN") != nullptr;
+
+void Test_Slowdown()
+{
+    static bool read = false;
+    static unsigned long long start = 0;
+    if (!read) {
+        read = true;
+        const char* e = getenv("VC_SLOWDOWN");
+        const char* comma = strchr(e, ',');
+        Slowdown_Ms = atoi(e);
+        Slowdown_Spell = comma != nullptr ? atoi(comma + 1) : 0;
+        start = Meter_Time();
+    }
+    unsigned long long now = Meter_Time();
+    if (Slowdown_Spell > 0 && ((now - start) / (1000000ull * Slowdown_Spell)) % 2 == 0) {
+        return;
+    }
+    while (Meter_Time() - now < 1000ull * Slowdown_Ms) {
     }
 }
 

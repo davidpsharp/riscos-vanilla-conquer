@@ -390,6 +390,16 @@ void Video_Toggle_FPS_Counter(void)
 */
 static void Counter_Tick(void)
 {
+    /*
+    ** VC_COUNTER=1 (test only): the counter is on from the first present, without the key.
+    ** VC_COUNTER=2: and toggled off and on again every 50 presents, to test taking it away.
+    */
+    static const char* test = getenv("VC_COUNTER");
+    static unsigned presents = 0;
+    if (test != nullptr && (presents == 0 || (test[0] == '2' && presents % 50 == 0))) {
+        Video_Toggle_FPS_Counter();
+    }
+    ++presents;
     if (!Ctr.on) {
         return;
     }
