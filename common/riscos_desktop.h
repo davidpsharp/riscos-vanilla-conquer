@@ -40,6 +40,10 @@ void RISCOS_Desktop_Set_Screen(int width, int height, bool forced_low_res);
 // The size Settings.Video.Resolution "auto" stands for (riscos_autosize.h), as "WxH".
 const std::string& RISCOS_Desktop_Auto_Resolution(void);
 
+// A size that could not be opened is put back to automatic in the settings file (so the game doesn't fail
+// the same way at every start).
+void RISCOS_Desktop_Forget_Size(void);
+
 // True for the key that leaves for the desktop: Shift+F12 (as on the desktop, where it brings
 // the icon bar to the front). F12 alone stays the game's (a map bookmark).
 bool RISCOS_Desktop_Is_Leave_Key(int sdl_key, int sdl_mod);
