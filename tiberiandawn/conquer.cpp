@@ -1574,6 +1574,7 @@ static void Sync_Delay(void)
     **	This accumulates into a running histogram of performance.
     */
     SpareTicks += FrameTimer.Time();
+    Idle_Enter(); // (the frame counter's busy figure: from here to the next tick is waiting)
     while (FrameTimer.Time()) {
         Color_Cycle();
         Call_Back();
@@ -1593,6 +1594,7 @@ static void Sync_Delay(void)
         // Wake in time for the next game frame rather than the next present slot.
         Frame_Limiter(FL_NONE, Ms_Before_Next_Frame());
     }
+    Idle_Leave();
     Color_Cycle();
     Call_Back();
 }
@@ -1845,7 +1847,7 @@ bool Main_Loop()
     **	counter.
     */
     Frame++;
-    ++Logic_Frame_Count;
+    Game_Frame_Done();
 
     /*
     ** Very rarely, the human players will get a message from the computer.

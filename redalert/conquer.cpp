@@ -1691,6 +1691,7 @@ static void Sync_Delay(void)
     **	Accumulate the number of 'spare' ticks that are frittered away here.
     */
     SpareTicks += FrameTimer;
+    Idle_Enter(); // (the frame counter's busy figure: from here to the next tick is waiting)
 
     /*
     **	Delay until the frame timer expires. This forces the game loop to be regulated to a
@@ -1714,6 +1715,7 @@ static void Sync_Delay(void)
         // Wake in time for the next game frame rather than the next present slot.
         Frame_Limiter(FL_NONE, Ms_Before_Next_Frame());
     }
+    Idle_Leave();
     Color_Cycle();
     Call_Back();
 }
@@ -2063,7 +2065,7 @@ bool Main_Loop()
 #endif
     BEnd(BENCH_GAME_FRAME);
 
-    ++Logic_Frame_Count;
+    Game_Frame_Done();
     Sync_Delay();
     Phase_Frame_End();
     if (Bench_Frames > 0) {

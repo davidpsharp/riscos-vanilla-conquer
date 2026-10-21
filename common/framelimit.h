@@ -23,4 +23,42 @@ int Present_Rate();
 // Game logic frames completed, counted by the game for speed diagnostics (VC_FPSLOG).
 extern unsigned Logic_Frame_Count;
 
+/*
+** The frame counter (Shift+F8) shows the game's own frame rate, and how busy it is. A game frame
+** is one pass of its main loop (Game_Frame_Done, once a pass); the busy figure is the share of
+** the time not spent waiting for the next frame (Idle_Enter / Idle_Leave around the waits: the
+** game's wait for its next tick and the frame limiter's sleeps). All of it does nothing, and
+** costs a test, while the counter is off.
+*/
+extern bool Rate_Meter_On;
+void Rate_Meter_Enable(bool on);
+void Rate_Frame_Slow();
+void Rate_Idle_Enter_Slow();
+void Rate_Idle_Leave_Slow();
+bool Rate_Meter_Read(int& fps, int& busy_percent); // false: no game frames lately (a menu, say)
+
+// Called once per pass of the game's main loop, after the logic.
+inline void Game_Frame_Done()
+{
+    ++Logic_Frame_Count;
+    if (Rate_Meter_On) {
+        Rate_Frame_Slow();
+    }
+}
+
+// Waiting begins / ends (these nest).
+inline void Idle_Enter()
+{
+    if (Rate_Meter_On) {
+        Rate_Idle_Enter_Slow();
+    }
+}
+
+inline void Idle_Leave()
+{
+    if (Rate_Meter_On) {
+        Rate_Idle_Leave_Slow();
+    }
+}
+
 #endif /* FRAMELIMIT_H */

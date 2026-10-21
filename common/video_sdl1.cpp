@@ -320,30 +320,29 @@ static SDL_Rect Union_Rects(const SDL_Rect& a, const SDL_Rect& b)
 }
 
 /*
-** The frame counter (Shift+F8; wwkeyboard_sdl1.cpp): a small bright green number, the frames a
-** second being shown, in the bottom right corner of the screen, with a thin black outline.
-** It is off until Shift+F8 turns it on.
+** The frame counter (Shift+F8; wwkeyboard_sdl1.cpp): a small bright green figure in the bottom
+** right corner of the screen, with a thin black outline: the game's own frames a second, then
+** how busy it is, as in "15 40%" (the share of the time it isn't waiting for its next frame;
+** framelimit.h and ratemeter.h). Out of a game frame (a menu, a dialog) it is a "-". It is off
+** until Shift+F8 turns it on.
 **
 ** It exists only on the screen, never in a game surface, so the game can't see it: it is
 ** drawn on the screen (Shown) after the frame, and the cursor, have reached it, and what it
-** covered is saved first, as the software pointer's is. At the start of the next present
-** that is put back, so the frame copy and the cursor work see the screen as they left it
-** (a partial present leaves everything it doesn't copy on the screen). Anything that reads
-** the screen back (Settle) takes it off first. Turning it off puts the screen back once.
-** Screenshots are of the game's own surface, so don't have it.
-**
-** The number is the frames drawn in the last half second to second (two half second
-** counts together, so it doesn't flicker); a frame is a present of something the game drew.
+** covered is saved first, as the software pointer's is. The screen is written live, so it is
+** left alone as long as it can be: it stays where it is through partial presents that don't
+** touch its place and while its figures don't change (they are looked at a few times a
+** second), and only a present that copies over its place, or its own change, rewrites it.
+** A full present gets what the counter covered from the frame itself, not from a copy put
+** back first, so the figures are never off the screen between the copy and being drawn again.
+** Anything that reads the screen back (Settle) takes it off first. Turning it off puts the screen
+** back once. Screenshots are of the game's own surface, so don't have it.
 */
 static struct
 {
     bool on = false;
-    // Counting.
-    bool started = false;
-    Uint32 t0 = 0;
-    unsigned frames = 0, prev_frames = 0;
-    Uint32 prev_ms = 0;
-    int value = -1; // the number to show; -1 for none yet
+    Uint32 t0 = 0;          // when it was turned on
+    Uint32 changed_at = 0;  // when the figures to show last changed
+    char text[16] = "";     // the figures to show; empty for none yet
     // What is on the screen.
     bool shown = false;
     SDL_Surface* surface = nullptr;
@@ -352,58 +351,64 @@ static struct
     std::vector<Uint8> under; // the screen's pixels in rect, before the counter
     std::vector<Uint8> mask;  // 0 clear, 1 outline, 2 digit: rect.w x rect.h
     Uint8 fg = 0, bg = 0;     // the palette entries used
-    int shown_value = -1;
+    char shown_text[16] = "";
     bool update = false; // the screen under the counter changed since the last update of its place
     // Palette: the nearest to green, and the darkest.
     unsigned palette_generation = 1, colours_generation = 0;
     Uint8 green = 0, dark = 0;
 } Ctr;
 
-// 5x7 digits, a row to a byte (bit 4 is the left column).
-static const Uint8 Counter_Font[10][7] = {
+// 5x7 glyphs, a row to a byte (bit 4 is the left column): 0 to 9, %, -, space.
+static const Uint8 Counter_Font[13][7] = {
     {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E}, {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},
     {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E},
     {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E},
     {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},
     {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E}, {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C},
+    {0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03}, {0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 };
+
+static const Uint8* Counter_Glyph(char c)
+{
+    return Counter_Font[c >= '0' && c <= '9' ? c - '0' : c == '%' ? 10 : c == '-' ? 11 : 12];
+}
 
 void Video_Toggle_FPS_Counter(void)
 {
     Ctr.on = !Ctr.on;
-    Ctr.started = false;
-    Ctr.frames = Ctr.prev_frames = 0;
-    Ctr.prev_ms = 0;
-    Ctr.value = -1;
+    Ctr.t0 = SDL_GetTicks();
+    Ctr.changed_at = 0;
+    Ctr.text[0] = '\0';
+    Rate_Meter_Enable(Ctr.on);
     fprintf(stderr, "Frame counter %s\n", Ctr.on ? "on" : "off");
 }
 
-// Counts a present (a new frame, or not) and works out the number to show.
-static void Counter_Tick(bool new_frame)
+/*
+** Works out the figures to show, at every present. The first as soon as there is a reading (a
+** rough one, from the first frames), then changes at most four times a second.
+*/
+static void Counter_Tick(void)
 {
     if (!Ctr.on) {
         return;
     }
     Uint32 now = SDL_GetTicks();
-    if (!Ctr.started) {
-        Ctr.started = true;
-        Ctr.t0 = now;
-        Ctr.frames = 0;
-        Ctr.prev_frames = 0;
-        Ctr.prev_ms = 0;
+    if (Ctr.text[0] != '\0' && now - Ctr.changed_at < 250) {
+        return;
     }
-    if (new_frame) {
-        ++Ctr.frames;
+    char text[16];
+    int fps, busy;
+    if (Rate_Meter_Read(fps, busy)) {
+        snprintf(text, sizeof(text), "%d %d%%", fps > 999 ? 999 : fps, busy);
+    } else if (now - Ctr.t0 >= 400) {
+        snprintf(text, sizeof(text), "-"); // no game frames: a menu or a dialog
+    } else {
+        return; // still waiting for the first
     }
-    Uint32 ms = now - Ctr.t0;
-    if (ms >= 500) {
-        Uint32 total_ms = ms + Ctr.prev_ms;
-        unsigned long long n = (Ctr.frames + Ctr.prev_frames) * 1000ull + total_ms / 2;
-        Ctr.value = int(n / total_ms > 9999 ? 9999 : n / total_ms);
-        Ctr.prev_frames = Ctr.frames;
-        Ctr.prev_ms = ms;
-        Ctr.frames = 0;
-        Ctr.t0 = now;
+    if (strcmp(text, Ctr.text) != 0) {
+        memcpy(Ctr.text, text, sizeof(text));
+        Ctr.changed_at = now;
     }
 }
 
@@ -413,7 +418,26 @@ static bool Counter_Stale(void)
     if (!Ctr.on) {
         return Ctr.shown;
     }
-    return Ctr.value >= 0 && (!Ctr.shown || Ctr.value != Ctr.shown_value || Ctr.colours_generation != Ctr.palette_generation);
+    return Ctr.text[0] != '\0'
+           && (!Ctr.shown || strcmp(Ctr.text, Ctr.shown_text) != 0 || Ctr.colours_generation != Ctr.palette_generation);
+}
+
+// Is the counter on the screen as it was drawn, and where the screen still is?
+static bool Counter_On_Screen(void)
+{
+    SDL_Surface* on = Shown();
+    return Ctr.shown && on != nullptr && SDL_WasInit(SDL_INIT_VIDEO) != 0 && on == Ctr.surface
+           && Ctr.generation == Window_Generation && Ctr.rect.x + Ctr.rect.w <= on->w && Ctr.rect.y + Ctr.rect.h <= on->h;
+}
+
+// Does the counter's place (on the screen) meet "r" (in the game's pixels)?
+static bool Counter_Meets(const SDL_Rect& r)
+{
+    if (r.w <= 0 || r.h <= 0) {
+        return false;
+    }
+    int x0 = r.x * Scale, y0 = r.y * Scale, x1 = (r.x + r.w) * Scale, y1 = (r.y + r.h) * Scale;
+    return x0 < Ctr.rect.x + Ctr.rect.w && x1 > Ctr.rect.x && y0 < Ctr.rect.y + Ctr.rect.h && y1 > Ctr.rect.y;
 }
 
 // Puts back what the counter covered on the screen.
@@ -422,12 +446,12 @@ static void Counter_Remove(void)
     if (!Ctr.shown) {
         return;
     }
+    bool there = Counter_On_Screen();
     Ctr.shown = false;
-    SDL_Surface* on = Shown();
-    if (on == nullptr || SDL_WasInit(SDL_INIT_VIDEO) == 0 || on != Ctr.surface || Ctr.generation != Window_Generation
-        || Ctr.rect.x + Ctr.rect.w > on->w || Ctr.rect.y + Ctr.rect.h > on->h) {
+    if (!there) {
         return; // the screen is a new one, which holds nothing of ours
     }
+    SDL_Surface* on = Shown();
     SDL_LockSurface(on);
     for (int row = 0; row < Ctr.rect.h; ++row) {
         memcpy(static_cast<Uint8*>(on->pixels) + (Ctr.rect.y + row) * on->pitch + Ctr.rect.x,
@@ -438,6 +462,45 @@ static void Counter_Remove(void)
     Ctr.update = true;
 }
 
+/*
+** After a full present, in place of Counter_Remove before it: the copy has left the screen
+** holding the frame in some places and the counter in others, so the counter's place is given the
+** frame's pixels (the game's surface "frame", which the doubling copy, Scale_Rect, takes from the
+** window), ready to be drawn on again. Nothing of the frame's is lost in between, as it would be
+** by putting the saved pixels back and copying over them.
+*/
+static void Counter_Refresh(SDL_Surface* frame)
+{
+    if (!Ctr.shown) {
+        return;
+    }
+    bool there = Counter_On_Screen();
+    Ctr.shown = false;
+    Ctr.update = true;
+    if (!there) {
+        return;
+    }
+    SDL_Surface* on = Shown();
+    if (Screen != nullptr) {
+        SDL_Rect r = Make_SDL_Rect(Ctr.rect.x / Scale, Ctr.rect.y / Scale, (Ctr.rect.x + Ctr.rect.w + Scale - 1) / Scale - Ctr.rect.x / Scale,
+                                   (Ctr.rect.y + Ctr.rect.h + Scale - 1) / Scale - Ctr.rect.y / Scale);
+        Scale_Rect(r); // (clipped to the window)
+        return;
+    }
+    if (frame->w < Ctr.rect.x + Ctr.rect.w || frame->h < Ctr.rect.y + Ctr.rect.h) {
+        return;
+    }
+    SDL_LockSurface(frame);
+    SDL_LockSurface(on);
+    for (int row = 0; row < Ctr.rect.h; ++row) {
+        memcpy(static_cast<Uint8*>(on->pixels) + (Ctr.rect.y + row) * on->pitch + Ctr.rect.x,
+               static_cast<const Uint8*>(frame->pixels) + (Ctr.rect.y + row) * frame->pitch + Ctr.rect.x,
+               Ctr.rect.w);
+    }
+    SDL_UnlockSurface(on);
+    SDL_UnlockSurface(frame);
+}
+
 // How big to draw it: 1 up to 600 pixels of screen height, 2 up to 1500, then 3.
 static int Counter_Scale(int screen_h)
 {
@@ -445,12 +508,13 @@ static int Counter_Scale(int screen_h)
 }
 
 /*
-** Draws the counter on the screen, if it is on, and says (true) which part of it to update: the
-** counter's place, or the place it just left. Called with the frame on the screen.
+** Draws the counter on the screen, if it is on and not there as it should be, and says (true)
+** which part of it to update: the counter's place, or the place it just left. Called with the
+** frame on the screen.
 */
 static bool Counter_Overlay(SDL_Rect& changed)
 {
-    if (!Ctr.on || Ctr.value < 0) {
+    if (!Ctr.on || Ctr.text[0] == '\0') {
         if (Ctr.update) {
             Ctr.update = false;
             changed = Ctr.rect; // what it covered, put back
@@ -463,12 +527,17 @@ static bool Counter_Overlay(SDL_Rect& changed)
         return false;
     }
     if (Ctr.shown) {
-        Counter_Remove(); // (nothing should be left, but a double draw would save the digits as the screen)
+        if (strcmp(Ctr.text, Ctr.shown_text) == 0 && Ctr.colours_generation == Ctr.palette_generation
+            && Counter_On_Screen()) {
+            return false; // still there, untouched by this present
+        }
+        Counter_Remove(); // (to change it, or else a double draw would save the digits as the screen)
     }
 
-    // The digits, as a mask: 5x7 glyphs a pixel apart, scaled, and a one pixel outline.
-    char text[8];
-    int digits = snprintf(text, sizeof(text), "%d", Ctr.value);
+    // The figures, as a mask: 5x7 glyphs a pixel apart, scaled, and a one pixel outline.
+    char text[sizeof(Ctr.text)];
+    memcpy(text, Ctr.text, sizeof(text));
+    int digits = int(strlen(text));
     int scale = Counter_Scale(on->h);
     int w = (digits * 6 - 1) * scale + 2, h = 7 * scale + 2;
     int margin = 2 * scale;
@@ -478,7 +547,7 @@ static bool Counter_Overlay(SDL_Rect& changed)
     }
     Ctr.mask.assign(size_t(w) * h, 0);
     for (int d = 0; d < digits; ++d) {
-        const Uint8* glyph = Counter_Font[text[d] - '0'];
+        const Uint8* glyph = Counter_Glyph(text[d]);
         for (int row = 0; row < 7 * scale; ++row) {
             for (int col = 0; col < 5 * scale; ++col) {
                 if (glyph[row / scale] & (0x10 >> (col / scale))) {
@@ -558,7 +627,7 @@ static bool Counter_Overlay(SDL_Rect& changed)
     Ctr.surface = on;
     Ctr.generation = Window_Generation;
     Ctr.shown = true;
-    Ctr.shown_value = Ctr.value;
+    memcpy(Ctr.shown_text, text, sizeof(text));
     Ctr.update = false;
     return true;
 }
@@ -1767,7 +1836,7 @@ public:
         ** this off, for comparison.
         */
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
-        Counter_Tick(changed || Shake_Count > 0); // (a present of something the game drew is a frame)
+        Counter_Tick();
         if (Shake_Count > 0) {
             Present_Shaken();
             return;
@@ -1781,7 +1850,23 @@ public:
             return;
         }
         ++Phase_Counts[full ? COUNT_PRESENT_FULL : COUNT_PRESENT_PARTIAL];
-        Counter_Remove(); // the screen as the frame left it, for the copying below
+        /*
+        ** The counter is left on the screen if this present doesn't touch its place (a partial
+        ** one, with the pointer elsewhere): it would otherwise be missing for the length of the
+        ** present, over and over. A full present copies the frame over it, in some places: it is
+        ** given the frame's pixels afterwards instead (Counter_Refresh). Otherwise the screen is
+        ** put back as the frame left it, for the copying below.
+        */
+        bool counter_refresh = false;
+        if (Ctr.shown) {
+            bool meets = Shot_Pending || Counter_Meets(Union(last_cursor ? last_drawn : SDL_Rect{0, 0, 0, 0},
+                                                              cursor ? area : SDL_Rect{0, 0, 0, 0}));
+            if (!meets && full) {
+                counter_refresh = true;
+            } else if (meets || full) {
+                Counter_Remove();
+            }
+        }
 
         // The frame to show: the hidden surface if this one mirrors it.
         SDL_Surface* frame = mirror != nullptr ? mirror->surface : surface;
@@ -1873,6 +1958,9 @@ public:
             }
             if (cursor) {
                 Put_Under(frame, drawn);
+            }
+            if (counter_refresh) {
+                Counter_Refresh(frame);
             }
             if (PV_Enabled()) {
                 PV_Grab(frame, PV.ref, PV.w, PV.h);

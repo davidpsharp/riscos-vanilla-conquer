@@ -10,11 +10,74 @@
 
 #include "mssleep.h"
 #include "phasetime.h"
+#include "ratemeter.h"
 
 extern WWMouseClass* WWMouse;
 
 unsigned Logic_Frame_Count = 0;
 unsigned Present_Count = 0;
+
+/*
+** The frame counter's measurements (framelimit.h). Times are Phase_Now_Us, which wraps every 71
+** minutes: kept as 64 bits by adding the 32 bit differences.
+*/
+bool Rate_Meter_On = false;
+static RateMeter Meter;
+static uint64_t Meter_Now = 0;
+static unsigned Meter_Last = 0;
+static int Idle_Depth = 0;
+static uint64_t Idle_Since = 0, Idle_Total = 0;
+
+static uint64_t Meter_Time()
+{
+    unsigned t = Phase_Now_Us();
+    Meter_Now += unsigned(t - Meter_Last);
+    Meter_Last = t;
+    return Meter_Now;
+}
+
+void Rate_Meter_Enable(bool on)
+{
+    Rate_Meter_On = on;
+    Meter.Reset();
+    Idle_Depth = 0;
+    Idle_Total = 0;
+    if (on) {
+        Meter_Last = Phase_Now_Us();
+    }
+}
+
+void Rate_Frame_Slow()
+{
+    uint64_t now = Meter_Time();
+    // (Not inside a wait, but if it were, the wait so far counts.)
+    Meter.Frame(now, Idle_Total + (Idle_Depth > 0 ? now - Idle_Since : 0));
+}
+
+void Rate_Idle_Enter_Slow()
+{
+    if (Idle_Depth++ == 0) {
+        Idle_Since = Meter_Time();
+    }
+}
+
+void Rate_Idle_Leave_Slow()
+{
+    if (Idle_Depth > 0 && --Idle_Depth == 0) {
+        Idle_Total += Meter_Time() - Idle_Since;
+    }
+}
+
+bool Rate_Meter_Read(int& fps, int& busy_percent)
+{
+    if (!Rate_Meter_On) {
+        return false;
+    }
+    RateMeter::Reading r = Meter.Read(Meter_Time());
+    fps = r.Fps;
+    busy_percent = r.Busy;
+    return r.Valid;
+}
 
 #ifdef __riscos__
 #include <kernel.h>
@@ -47,7 +110,9 @@ static bool VSync_Due(bool wait)
             return false;
         }
         PhaseTimer phase_timer(PHASE_SLEEP);
+        Idle_Enter();
         _kernel_osbyte(19, 0, 0);
+        Idle_Leave();
         now = VSync_Counter();
     }
     last = now;
@@ -79,13 +144,17 @@ static void Sleep_Updating_Cursor(unsigned us)
         if (left <= steady_clock::duration::zero()) {
             break;
         }
+        Idle_Enter();
         us_sleep(unsigned(duration_cast<microseconds>(left < step ? left : step).count()));
+        Idle_Leave();
         if (steady_clock::now() + milliseconds(2) < end) {
             Video_Update_Cursor(); // not when the next present is about due anyway
         }
     }
 #else
+    Idle_Enter();
     us_sleep(us);
+    Idle_Leave();
 #endif
 }
 
@@ -169,7 +238,9 @@ void Frame_Limiter(FrameLimitFlags flags, int max_sleep_ms)
             Sleep_Updating_Cursor(
                 unsigned(max_sleep_ms >= 0 && max_sleep_ms < render_remaining ? max_sleep_ms : render_remaining) * 1000);
         } else {
+            Idle_Enter();
             ms_sleep(1); // Unconditionally yield for minimum time.
+            Idle_Leave();
         }
         return;
     }
