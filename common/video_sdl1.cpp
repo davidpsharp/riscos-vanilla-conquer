@@ -1034,8 +1034,37 @@ static void Update_HWCursor()
 // Bumped whenever the cursor shape may have changed, so a frame is presented.
 static unsigned Cursor_Generation = 0;
 
+/*
+** The game sets its pointer's shape on every frame it draws (Override_Mouse_Shape, even to the
+** shape it already has, as when the pointer is pinned to the edge of the map and can't scroll
+** any further), and each call used to make the pointer drawn again, so a screen written live
+** was having it erased and redrawn for nothing, every frame. Now only a call that changes the
+** shape (the pixels, size or hot spot) does.
+*/
+unsigned Pointer_Stat_Sets = 0, Pointer_Stat_Changed = 0, Pointer_Stat_Draws = 0;
+
 void Set_Video_Cursor(void* cursor, int w, int h, int hotx, int hoty)
 {
+    static std::vector<Uint8> last;
+    static int last_w = -1, last_h = -1, last_hotx = 0, last_hoty = 0;
+    ++Pointer_Stat_Sets;
+    const Uint8* now = static_cast<const Uint8*>(cursor);
+    bool same = cursor != nullptr && cursor == hwcursor.Raw && w == last_w && h == last_h && hotx == last_hotx && hoty == last_hoty
+                && last.size() == size_t(w) * h && memcmp(&last[0], now, last.size()) == 0 && hwcursor.Surface != nullptr
+                && !getenv("VC_POINTERALWAYS");
+    if (same) {
+        return;
+    }
+    ++Pointer_Stat_Changed;
+    if (cursor != nullptr && w > 0 && h > 0) {
+        last.assign(now, now + size_t(w) * h);
+    } else {
+        last.clear();
+    }
+    last_w = w;
+    last_h = h;
+    last_hotx = hotx;
+    last_hoty = hoty;
     ++Cursor_Generation;
     hwcursor.Raw = cursor;
     hwcursor.W = w;
@@ -1902,6 +1931,7 @@ public:
                 cursor = Save_Area(window, drawn);
                 if (cursor) {
                     Draw_Cursor(window, area);
+                    ++Pointer_Stat_Draws;
                 }
             }
             dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
@@ -1935,6 +1965,7 @@ public:
                 cursor = Save_Area(frame, drawn); // clips "drawn" to the surface
                 if (cursor) {
                     Draw_Cursor(frame, area);
+                    ++Pointer_Stat_Draws;
                 }
             }
 
@@ -2525,6 +2556,23 @@ static void Log_Frame_Rate(Uint32 render_ms)
         }
         last_audio = audio;
 #endif
+        {
+            // The pointer: shape calls from the game (and those that changed it), pointer draws, and the
+            // presents of each kind, to see what a pointer pinned to an edge costs.
+            static unsigned last_sets = 0, last_changed = 0, last_draws = 0;
+            fprintf(stderr,
+                    "pointer: %u shape calls (%u changed it), %u draws over %ums; presents: %u full, %u partial, %u skipped\n",
+                    Pointer_Stat_Sets - last_sets,
+                    Pointer_Stat_Changed - last_changed,
+                    Pointer_Stat_Draws - last_draws,
+                    now - start,
+                    Phase_Counts[COUNT_PRESENT_FULL],
+                    Phase_Counts[COUNT_PRESENT_PARTIAL],
+                    Phase_Counts[COUNT_PRESENT_SKIPPED]);
+            last_sets = Pointer_Stat_Sets;
+            last_changed = Pointer_Stat_Changed;
+            last_draws = Pointer_Stat_Draws;
+        }
         Phase_Report(now - start);
         last_buttons = SDL1_Mouse_Button_Events;
         last_logic = Logic_Frame_Count;
