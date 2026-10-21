@@ -40,6 +40,9 @@ void RISCOS_Desktop_Set_Screen(int width, int height, bool forced_low_res);
 // The size Settings.Video.Resolution "auto" stands for (riscos_autosize.h), as "WxH".
 const std::string& RISCOS_Desktop_Auto_Resolution(void);
 
+// The desktop's size, for checking a size before asking SDL for it (riscos_autosize.h).
+void RISCOS_Desktop_Pixel_Size(int& width, int& height);
+
 // A size that could not be opened is put back to automatic in the settings file (so the game doesn't fail
 // the same way at every start).
 void RISCOS_Desktop_Forget_Size(void);

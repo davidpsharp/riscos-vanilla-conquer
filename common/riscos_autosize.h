@@ -14,6 +14,10 @@
 // The size, as "WxH", reading and updating the speed test's results in the settings file ini_name.
 // Worked out once per run; call it in the desktop's mode, before the game's screen opens.
 const std::string& RISCOS_Auto_Resolution(const char* ini_name);
+
+// The desktop's size in square pixels (as autosize sees it), read once, in the desktop's mode, before the game's
+// screen opens. No screen size bigger than this can be opened.
+void RISCOS_Desktop_Size(int& width, int& height);
 #endif
 
 #endif

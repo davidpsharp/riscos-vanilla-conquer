@@ -7,8 +7,12 @@
 #include "settings.h"
 #include "video.h"
 
+#ifdef __riscos__
+#include <SDL.h>
+#endif
+
 /*
-** Opens the screen at w x h. If that can't be opened (a size the display can't show: on RISC OS
+** Opens the screen at w x h. If that can't be opened (not expected: a size bigger than the desktop is not asked for; on RISC OS
 ** SDL_SetVideoMode fails for one bigger than the desktop, and the game used to end with a fatal
 ** signal as it quit), tries the automatic size, then 640x400, and says what happened on stderr. On
 ** RISC OS a [Video] Resolution that failed, or was not usable at all ("unusable"), is put back to
@@ -30,6 +34,15 @@ inline bool Set_Video_Mode_With_Fallback(int& w, int& h, bool unusable)
                 fprintf(stderr, "video: can't open a %dx%d screen: trying %dx%d\n", w, h, cw, ch);
                 w = cw;
                 h = ch;
+#ifdef __riscos__
+                /*
+                ** SDL's video is shut down and started again first: after a failed mode the same session
+                ** crashed in its event handling (SDL_PumpEvents) on a Pi 4. This is only the safety net: a size
+                ** bigger than the desktop is not asked for at all (Choose_Screen_Size).
+                */
+                SDL_QuitSubSystem(SDL_INIT_VIDEO);
+                SDL_InitSubSystem(SDL_INIT_VIDEO);
+#endif
                 opened = Set_Video_Mode(w, h, 8);
             }
         }

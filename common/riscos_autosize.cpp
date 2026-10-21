@@ -37,6 +37,21 @@ static unsigned Monotonic_Cs(void)
     return unsigned(regs.r[0]);
 }
 
+void RISCOS_Desktop_Size(int& width, int& height)
+{
+    static int dw = 0, dh = 0;
+    if (dw == 0) {
+        dw = Mode_Variable(11) + 1; // XWindLimit, YWindLimit: the desktop's size, less one
+        dh = Mode_Variable(12) + 1;
+        int xeig = Mode_Variable(4), yeig = Mode_Variable(5);
+        if (yeig > xeig) {
+            dh <<= yeig - xeig; // rectangular pixels: the shape as seen, in square pixels
+        }
+    }
+    width = dw;
+    height = dh;
+}
+
 const std::string& RISCOS_Auto_Resolution(const char* ini_name)
 {
     static std::string resolution;

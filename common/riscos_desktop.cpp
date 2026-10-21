@@ -244,6 +244,11 @@ static void Set_Os_Variable(const std::string& name, const char* value)
     _kernel_swi(OS_SetVarVal, &regs, &regs);
 }
 
+void RISCOS_Desktop_Pixel_Size(int& width, int& height)
+{
+    RISCOS_Desktop_Size(width, height);
+}
+
 const std::string& RISCOS_Desktop_Auto_Resolution(void)
 {
     return RISCOS_Auto_Resolution(App.ini);
