@@ -64,6 +64,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include <vector>
 
 /***********************************************************************************************
  * CellClass::Should_Save -- Should the cell be written to disk?                               *
@@ -276,6 +277,52 @@ void CellClass::Decode_Pointers(void)
 }
 
 /***********************************************************************************************
+ * MouseClass::Keep_Current_Layout -- Puts the screen-size dependent members back after a load.*
+ *                                                                                             *
+ *    A saved game holds the layout of the screen it was saved on. These are the members that  *
+ *    One_Time sets from the size of the screen; "now" is a copy of the object as it was before *
+ *    the load. The tactical view is then fitted to the sidebar the game has open.              *
+ *=============================================================================================*/
+void MouseClass::Keep_Current_Layout(const MouseClass& now)
+{
+    RadX = now.RadX;
+    RadOffX = now.RadOffX;
+    RadY = now.RadY;
+    RadOffY = now.RadOffY;
+    RadWidth = now.RadWidth;
+    RadHeight = now.RadHeight;
+    RadIWidth = now.RadIWidth;
+    RadIHeight = now.RadIHeight;
+    RadPWidth = now.RadPWidth;
+    RadPHeight = now.RadPHeight;
+    PowX = now.PowX;
+    PowY = now.PowY;
+    PowWidth = now.PowWidth;
+    PowHeight = now.PowHeight;
+    PowLineSpace = now.PowLineSpace;
+    PowLineWidth = now.PowLineWidth;
+    SideX = now.SideX;
+    SideY = now.SideY;
+    SideBarWidth = now.SideBarWidth;
+    SideWidth = now.SideWidth;
+    SideHeight = now.SideHeight;
+    TopHeight = now.TopHeight;
+    MaxVisible = now.MaxVisible;
+    ButtonHeight = now.ButtonHeight;
+    for (int i = 0; i < COLUMNS; i++) {
+        Column[i].X = now.Column[i].X;
+        Column[i].Y = now.Column[i].Y;
+    }
+    Eva_Width = now.Eva_Width;
+    Tab_Height = now.Tab_Height;
+    if (IsSidebarActive) {
+        Set_View_Dimensions(0, Get_Tab_Height(), SeenBuff.Get_Width() - SideBarWidth);
+    } else {
+        Set_View_Dimensions(0, Get_Tab_Height());
+    }
+}
+
+/***********************************************************************************************
  * MouseClass::Load -- Loads from a save game file.                                            *
  *                                                                                             *
  * Loading the map is very complicated.  Here are the steps:                                   *
@@ -351,10 +398,21 @@ bool MouseClass::Load(FileClass& file)
     ** Read the entire map object in.  Only read in sizeof(MouseClass), so if we're
     ** in editor mode, none of the map editor object is read in.
     */
+    /*
+    ** The layout (where the tactical view, radar, power bar and sidebar are) depends on the screen's size,
+    ** not on the game being loaded, but the raw read below overwrites it with the size the game was
+    ** saved at: loaded at another size the map was clipped into a corner and the sidebar and radar were
+    ** off the screen, or in the old place. So keep the current layout members and put them back after
+    ** the read (no new members, so the file is as before).
+    */
+    std::vector<char> current(sizeof(*this));
+    memcpy(&current[0], static_cast<void*>(this), sizeof(*this));
+
     if (file.Read(this, sizeof(*this)) != sizeof(*this)) {
         return (false);
     }
     new (this) MouseClass(NoInitClass());
+    Keep_Current_Layout(*reinterpret_cast<const MouseClass*>(&current[0]));
 
     /*
     ** Reallocate the cell array
