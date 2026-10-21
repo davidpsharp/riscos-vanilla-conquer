@@ -415,10 +415,9 @@ int main(int argc, char* argv[])
             ** size instead, with a message; one the screen can't open is handled where the mode is set.
             */
             std::string note;
+            // The fallback (the automatic size, which runs its speed test when it has no figures) is only
+            // worked out if the setting is no good: a usable explicit size never asks for it.
             std::string fallback = "640x400";
-#ifdef __riscos__
-            fallback = RISCOS_Desktop_Auto_Resolution();
-#endif
             int w = ScreenWidth, h = ScreenHeight;
             int max_w = 0, max_h = 0;
 #ifdef __riscos__
@@ -426,7 +425,12 @@ int main(int argc, char* argv[])
                 RISCOS_Desktop_Pixel_Size(max_w, max_h);
             }
 #endif
-            if (!Choose_Screen_Size(resolution, fallback, w, h, note, max_w, max_h)) {
+            bool usable = Choose_Screen_Size(resolution, fallback, w, h, note, max_w, max_h);
+            if (!usable) {
+#ifdef __riscos__
+                fallback = RISCOS_Desktop_Auto_Resolution();
+#endif
+                Choose_Screen_Size(resolution, fallback, w, h, note, max_w, max_h);
                 fprintf(stderr, "video: %s: using %dx%d\n", note.c_str(), w, h);
                 size_unusable = true;
             }
