@@ -733,7 +733,15 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     */
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
     SDL_ShowCursor(SDL_DISABLE);
+#ifdef __riscos__
+    static bool exit_handler_set = false; // (once: Set_Video_Mode can run again for the fallback)
+    if (!exit_handler_set) {
+        exit_handler_set = true;
+        atexit(RISCOS_Exit_Cleanly);
+    }
+#else
     atexit(SDL_Quit);
+#endif
 
     int win_w = w;
     int win_h = h;
