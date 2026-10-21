@@ -629,16 +629,6 @@ void RISCOS_Exit_Cleanly(void)
     SDL_QuitSubSystem(SDL_INIT_AUDIO | SDL_INIT_TIMER);
     fprintf(stderr, "exit: stopping UnixLib's thread ticker\n");
     __pthread_stop_ticker();
-    /*
-    ** UnixLib's own finalisation then clears __ul_global.pthread_system_running, so that its callback and
-    ** locking code does nothing more; here that is done before the task goes (SDL_Quit), not after. The field is
-    ** at offset 72 of __ul_global in the UnixLib linked into !RunImage (checked in the disassembly of
-    ** __pthread_stop_ticker, which tests [__ul_global + 72] first; it is the app's own copy, not the module's).
-    */
-    {
-        extern char __ul_global[] asm("__ul_global");
-        *reinterpret_cast<volatile int*>(__ul_global + 72) = 0;
-    }
     // Every handler UnixLib put in is handed back to the OS's (as around Wimp_Poll), so that nothing the OS or the
     // Wimp does after the task's memory is gone (a pending callback, an event) can run at the game's addresses.
     HandlerType ours[Swapped_Count];
