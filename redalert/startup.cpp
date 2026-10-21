@@ -41,7 +41,6 @@
 #endif
 #include "language.h"
 #include "settings.h"
-#include "common/screensize_video.h"
 #include "common/gitinfo.h"
 #include "common/paths.h"
 #include <strings.h>
@@ -394,7 +393,6 @@ int main(int argc, char* argv[])
             low_res_asked = low_res_asked || strcasecmp(argv[i], "-LOWRES") == 0;
         }
         bool forced_low_res = low_res_asked;
-        bool size_unusable = false; // the setting was not a size the game can use (see below)
         if (Settings.Video.DOSMode || Settings.Video.LowRes || forced_low_res) {
             RESFACTOR = 1;
             ScreenWidth = 320;
@@ -410,22 +408,12 @@ int main(int argc, char* argv[])
                 resolution = RISCOS_Desktop_Auto_Resolution();
             }
 #endif
-            /*
-            ** A size that can't be used (under 640x400, over 2048, not a size at all) is the automatic
-            ** size instead, with a message; one the screen can't open is handled where the mode is set.
-            */
-            std::string note;
-            std::string fallback = "640x400";
-#ifdef __riscos__
-            fallback = RISCOS_Desktop_Auto_Resolution();
-#endif
-            int w = ScreenWidth, h = ScreenHeight;
-            if (!Choose_Screen_Size(resolution, fallback, w, h, note)) {
-                fprintf(stderr, "video: %s: using %dx%d\n", note.c_str(), w, h);
-                size_unusable = true;
+            int w = 0, h = 0;
+            if (sscanf(resolution.c_str(), "%dx%d", &w, &h) == 2 && w >= 640 && h >= 400 && w <= 2048
+                && h <= 2048) {
+                ScreenWidth = w;
+                ScreenHeight = h;
             }
-            ScreenWidth = w;
-            ScreenHeight = h;
         }
 #ifdef __riscos__
         RISCOS_Desktop_Set_Screen(ScreenWidth, ScreenHeight, forced_low_res);
@@ -446,7 +434,9 @@ int main(int argc, char* argv[])
 #ifdef REMASTER_BUILD
         video_success = true;
 #else
-        video_success = Set_Video_Mode_With_Fallback(ScreenWidth, ScreenHeight, size_unusable);
+        if (Set_Video_Mode(ScreenWidth, ScreenHeight, 8)) {
+            video_success = true;
+        }
 #endif
 
         if (!video_success) {

@@ -1,5 +1,5 @@
 add_custom_target(tests)
-add_dependencies(tests test_miscasm test_face test_rect test_fading test_lcw test_xordelta test_irandom test_fatpixel test_tobuff test_drawline test_putpixel test_drawbuff test_ratemeter test_screensize)
+add_dependencies(tests test_miscasm test_face test_rect test_fading test_lcw test_xordelta test_irandom test_fatpixel test_tobuff test_drawline test_putpixel test_drawbuff test_ratemeter)
 
 add_executable(test_miscasm miscasm.cpp)
 target_include_directories(test_miscasm PUBLIC .. ../common)
@@ -76,7 +76,3 @@ add_test(NAME drawbuff COMMAND ${TARGET_SYSTEM_EMULATOR} $<TARGET_FILE:test_draw
 add_executable(test_ratemeter ratemeter.cpp)
 target_include_directories(test_ratemeter PUBLIC ..)
 add_test(NAME ratemeter COMMAND ${TARGET_SYSTEM_EMULATOR} $<TARGET_FILE:test_ratemeter>)
-
-add_executable(test_screensize screensize.cpp)
-target_include_directories(test_screensize PUBLIC ..)
-add_test(NAME screensize COMMAND ${TARGET_SYSTEM_EMULATOR} $<TARGET_FILE:test_screensize>)

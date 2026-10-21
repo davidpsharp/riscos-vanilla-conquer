@@ -289,12 +289,6 @@ static void Save_Choice(const std::string& choice)
     fprintf(stderr, "desktop: screen size %s saved\n", choice.empty() ? "(automatic)" : choice.c_str());
 }
 
-void RISCOS_Desktop_Forget_Size(void)
-{
-    fprintf(stderr, "desktop: the screen size in the settings could not be used: back to automatic\n");
-    Save_Choice("");
-}
-
 /*
 ** Menus as the Wimp takes them: a title, colours and sizes, then the items. Item text that fits
 ** in 12 characters is held in the item; longer text is indirected.
