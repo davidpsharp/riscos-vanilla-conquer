@@ -955,8 +955,30 @@ static void Apply_Mouse_Area(int& x, int& y)
     y = y < 0 ? 0 : (y >= MouseArea.H ? MouseArea.H - 1 : y);
 }
 
+/*
+** VC_WANDER (test only): the pointer is shown and goes round a list of places (the corners, the
+** edges, in the middle, with spells of staying still, and shape changes), a step every few
+** presents, so that the pointer drawing and moving can be tested where there is no mouse (a
+** headless run) or the frames come too fast for a real one to be caught between.
+*/
+static unsigned Wander_Step = 0;
+static const bool Wander = getenv("VC_WANDER") != nullptr;
+
 static void Get_Screen_Mouse(int& x, int& y)
 {
+    if (Wander) {
+        static const int places[][2] = {{100, 100}, {100, 100}, {101, 100}, {300, 200}, {300, 200}, {500, 300},
+                                        {639, 200}, {639, 200}, {639, 399}, {320, 399}, {0, 399}, {0, 0},
+                                        {1, 1},     {400, 0},   {400, 0},   {402, 3},   {250, 250}, {250, 250}};
+        const unsigned n = sizeof(places) / sizeof(places[0]);
+        x = places[(Wander_Step / 3) % n][0];
+        y = places[(Wander_Step / 3) % n][1];
+        if (hwcursor.GameW > 0) {
+            x = x * hwcursor.GameW / 640;
+            y = y * hwcursor.GameH / 400;
+        }
+        return;
+    }
 #ifdef __riscos__
     // A centred surface: SDL's positions are off (see RISCOS_Pointer_Position), raw or not.
     if (!Keyboard->Is_Gamepad_Active() && RISCOS_Pointer_Position(x, y)) {
@@ -1055,6 +1077,9 @@ static unsigned Cursor_Generation = 0;
 ** shape (the pixels, size or hot spot) does.
 */
 unsigned Pointer_Stat_Sets = 0, Pointer_Stat_Changed = 0, Pointer_Stat_Draws = 0;
+unsigned Pointer_Why[5] = {0, 0, 0, 0, 0}; // partial presents: why (shot, cursor on/off, shape, moved, counter)
+unsigned Pointer_Stat_Untouched = 0;
+unsigned Pointer_Stat_Hidden = 0, Pointer_Stat_Toggles = 0, Pointer_Stat_Moved = 0;
 
 void Set_Video_Cursor(void* cursor, int w, int h, int hotx, int hoty)
 {
@@ -1872,7 +1897,14 @@ public:
     void RenderSurface()
     {
         SDL_Rect area = {0, 0, 0, 0};
-        bool cursor = !Get_Mouse_State() && hwcursor.Surface != nullptr;
+        ++Wander_Step;
+        bool cursor = (Wander || !Get_Mouse_State()) && hwcursor.Surface != nullptr;
+        if (!cursor) {
+            ++Pointer_Stat_Hidden;
+        }
+        if (cursor != last_cursor) {
+            ++Pointer_Stat_Toggles;
+        }
 
         if (cursor) {
             int x, y;
@@ -1889,6 +1921,9 @@ public:
         */
         static const bool always_full = getenv("VC_FULLPRESENT") != nullptr;
         Counter_Tick();
+        if (cursor && last_cursor && (area.x != last_area.x || area.y != last_area.y)) {
+            ++Pointer_Stat_Moved;
+        }
         if (Shake_Count > 0) {
             Present_Shaken();
             return;
@@ -1902,6 +1937,13 @@ public:
             return;
         }
         ++Phase_Counts[full ? COUNT_PRESENT_FULL : COUNT_PRESENT_PARTIAL];
+        if (!full) {
+            Pointer_Why[0] += Shot_Pending;
+            Pointer_Why[1] += cursor != last_cursor;
+            Pointer_Why[2] += Cursor_Generation != last_generation;
+            Pointer_Why[3] += cursor && (area.x != last_area.x || area.y != last_area.y);
+            Pointer_Why[4] += Counter_Stale();
+        }
         /*
         ** The counter is left on the screen if this present doesn't touch its place (a partial
         ** one, with the pointer elsewhere): it would otherwise be missing for the length of the
@@ -1930,24 +1972,35 @@ public:
         if (!full && mirror != nullptr && mirror_shown) {
             /*
             ** The frame is only on the screen now (the hidden surface may already hold
-            ** part of the next one), so move the cursor on the screen itself: put back
-            ** what was under it, then save what's under the new place and draw it there.
+            ** part of the next one), so the pointer is moved on the screen itself. If it is to change, moves in one pass (Move_Cursor); if it hasn't changed at
+            ** all (this present is for something else: the frame counter, say) it isn't touched.
             */
-            if (last_cursor) {
-                Put_Under(window, last_drawn);
-            }
-            if (Shot_Pending) {
-                Shot_Pending = false; // the screen holds the frame, without the pointer now
-                Save_Screenshot(window, frame->w, frame->h);
-            }
-            if (cursor) {
-                cursor = Save_Area(window, drawn);
-                if (cursor) {
-                    Draw_Cursor(window, area);
-                    ++Pointer_Stat_Draws;
+            bool same = cursor && last_cursor && !Shot_Pending && Cursor_Generation == last_generation
+                        && area.x == last_area.x && area.y == last_area.y;
+            if (same) {
+                drawn = last_drawn;
+                ++Pointer_Stat_Untouched;
+            } else if (cursor && last_cursor && !Shot_Pending) {
+                cursor = Move_Cursor(window, last_drawn, drawn);
+                ++Pointer_Stat_Draws;
+                dirty = Union(last_drawn, cursor ? drawn : last_drawn);
+            } else {
+                if (last_cursor) {
+                    Put_Under(window, last_drawn);
                 }
+                if (Shot_Pending) {
+                    Shot_Pending = false; // the screen holds the frame, without the pointer now
+                    Save_Screenshot(window, frame->w, frame->h);
+                }
+                if (cursor) {
+                    cursor = Save_Area(window, drawn);
+                    if (cursor) {
+                        Draw_Cursor(window, area);
+                        ++Pointer_Stat_Draws;
+                    }
+                }
+                dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
             }
-            dirty = Union(last_cursor ? last_drawn : dirty, cursor ? drawn : dirty);
             if (PV_Enabled()) {
                 if (PV.ref_valid) {
                     PV.expected = PV.ref;
@@ -2166,6 +2219,64 @@ private:
                    area.w);
         }
         SDL_UnlockSurface(on);
+    }
+
+    /*
+    ** Moves the pointer on the screen, which is live (the display reads it as it is written), so that
+    ** no pixel of it is written twice: putting back what was under the old place and then saving and
+    ** drawing at the new one leaves the pointer's pixels showing the background for a moment, often
+    ** enough on a slow machine to see (a shimmer). Here each pixel of the old and new places gets its
+    ** final value in one write: the pointer's pixel, or else the background, which is what "under"
+    ** saved for the old place wherever the new one overlaps it. "old" is where the pointer was (and
+    ** what "under" holds); "at" is where it goes, unclipped; it comes back clipped, and "under"
+    ** holds what is under that. False if none of it is on the screen (the old place is put back).
+    */
+    bool Move_Cursor(SDL_Surface* on, const SDL_Rect& old, SDL_Rect& at)
+    {
+        SDL_Rect n = at;
+        int nx0 = n.x < 0 ? 0 : n.x, ny0 = n.y < 0 ? 0 : n.y;
+        int nx1 = n.x + n.w > on->w ? on->w : n.x + n.w, ny1 = n.y + n.h > on->h ? on->h : n.y + n.h;
+        if (nx1 <= nx0 || ny1 <= ny0) {
+            Put_Under(on, old);
+            return false;
+        }
+        int nw = nx1 - nx0, nh = ny1 - ny0;
+        std::vector<Uint8> old_under = under; // the old place's background
+        std::vector<Uint8> now(size_t(nw) * nh);
+        const Uint8* shape = static_cast<const Uint8*>(hwcursor.Surface->pixels);
+        int pitch = hwcursor.Surface->pitch;
+        SDL_LockSurface(on);
+        int y0 = old.y < ny0 ? old.y : ny0, y1 = old.y + old.h > ny1 ? old.y + old.h : ny1;
+        for (int y = y0; y < y1; ++y) {
+            Uint8* dst = static_cast<Uint8*>(on->pixels) + y * on->pitch;
+            bool in_old = y >= old.y && y < old.y + old.h, in_new = y >= ny0 && y < ny1;
+            int a0 = in_old ? old.x : on->w, a1 = in_old ? old.x + old.w : on->w; // [a0, a1) the old place
+            int b0 = in_new ? nx0 : on->w, b1 = in_new ? nx1 : on->w;             // the new
+            int x0 = a0 < b0 ? a0 : b0, x1 = a1 > b1 ? a1 : b1;
+            for (int x = x0; x < x1; ++x) {
+                bool a = x >= a0 && x < a1, b = x >= b0 && x < b1;
+                if (!a && !b) {
+                    continue; // between the two places: not ours
+                }
+                Uint8 back;
+                if (a) {
+                    back = old_under[size_t(y - old.y) * old.w + (x - old.x)];
+                } else {
+                    back = dst[x]; // never under the old pointer: the screen's own
+                }
+                if (b) {
+                    now[size_t(y - ny0) * nw + (x - nx0)] = back;
+                    Uint8 c = shape[(y - n.y) * pitch + (x - n.x)];
+                    dst[x] = c != 0 ? c : back;
+                } else {
+                    dst[x] = back;
+                }
+            }
+        }
+        SDL_UnlockSurface(on);
+        under.swap(now);
+        at = Make_SDL_Rect(nx0, ny0, nw, nh);
+        return true;
     }
 
     // Draws the cursor with its top left at "at", colour 0 transparent, clipped.
@@ -2572,16 +2683,27 @@ static void Log_Frame_Rate(Uint32 render_ms)
         {
             // The pointer: shape calls from the game (and those that changed it), pointer draws, and the
             // presents of each kind, to see what a pointer pinned to an edge costs.
-            static unsigned last_sets = 0, last_changed = 0, last_draws = 0;
+            static unsigned last_sets = 0, last_changed = 0, last_draws = 0, last_hidden = 0, last_toggles = 0, last_moved = 0;
             fprintf(stderr,
-                    "pointer: %u shape calls (%u changed it), %u draws over %ums; presents: %u full, %u partial, %u skipped\n",
+                    "pointer: %u shape calls (%u changed it), %u draws over %ums; presents: %u full, %u partial, %u skipped; "
+                    "hidden at %u presents, shown/hidden toggles %u, moved %u, untouched %u; partial presents because: shot %u, on/off %u, shape %u, moved %u, counter %u\n",
                     Pointer_Stat_Sets - last_sets,
                     Pointer_Stat_Changed - last_changed,
                     Pointer_Stat_Draws - last_draws,
                     now - start,
                     Phase_Counts[COUNT_PRESENT_FULL],
                     Phase_Counts[COUNT_PRESENT_PARTIAL],
-                    Phase_Counts[COUNT_PRESENT_SKIPPED]);
+                    Phase_Counts[COUNT_PRESENT_SKIPPED],
+                    Pointer_Stat_Hidden - last_hidden,
+                    Pointer_Stat_Toggles - last_toggles,
+                    Pointer_Stat_Moved - last_moved,
+                    Pointer_Stat_Untouched,
+                    Pointer_Why[0], Pointer_Why[1], Pointer_Why[2], Pointer_Why[3], Pointer_Why[4]);
+            memset(Pointer_Why, 0, sizeof(Pointer_Why));
+            Pointer_Stat_Untouched = 0;
+            last_hidden = Pointer_Stat_Hidden;
+            last_toggles = Pointer_Stat_Toggles;
+            last_moved = Pointer_Stat_Moved;
             last_sets = Pointer_Stat_Sets;
             last_changed = Pointer_Stat_Changed;
             last_draws = Pointer_Stat_Draws;
@@ -2600,6 +2722,9 @@ void Video_Render_Frame()
     if (frontSurface) {
         Uint32 before = SDL_GetTicks();
         frontSurface->RenderSurface();
+        if (Wander) {
+            frontSurface->RenderSurface(); // (test only) a second present, of the pointer alone, as the frame limiter's sleeps make
+        }
         Log_Frame_Rate(SDL_GetTicks() - before);
     }
 }
