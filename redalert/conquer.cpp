@@ -1794,8 +1794,21 @@ static void Test_Save_Load_Hook()
     if (strcmp(what, "save") == 0) {
         fprintf(stderr, "layout save %s\n", Save_Game(file, "layout test") ? "ok" : "FAILED");
     } else {
+        /*
+        ** As from the main menu: the menu layout (640x400 in the middle of a bigger screen) is the one in
+        ** use while the game loads, and the game layout comes back afterwards.
+        */
+        int px = Map.TacPixelX, py = Map.TacPixelY, lw = int(Map.TacLeptonWidth), lh = int(Map.TacLeptonHeight);
+        Use_Menu_Layout();
         fprintf(stderr, "layout load %s\n", Load_Game(file) ? "ok" : "FAILED");
+        Use_Game_Layout();
         Log_Layout("after");
+        fprintf(stderr,
+                "layout check: view %s (before %d,%d %dx%d, after %d,%d %dx%d)\n",
+                (px == Map.TacPixelX && py == Map.TacPixelY && lw == int(Map.TacLeptonWidth) && lh == int(Map.TacLeptonHeight))
+                    ? "SAME as a fresh game at this size"
+                    : "DIFFERS",
+                px, py, lw, lh, Map.TacPixelX, Map.TacPixelY, int(Map.TacLeptonWidth), int(Map.TacLeptonHeight));
         Map.Flag_To_Redraw(true);
     }
 }

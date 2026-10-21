@@ -813,6 +813,7 @@ bool Load_Game(const char* file_name)
     file.Close();
     Decode_All_Pointers();
     Map.Init_IO();
+    Map.Refit_View(); // (to the screen, not the menu layout the game is loaded in)
     Map.Flag_To_Redraw(true);
 
     /*

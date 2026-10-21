@@ -168,6 +168,7 @@ static int ViewRequestX = 0;
 static int ViewRequestY = 0;
 static int ViewRequestW = -1;
 static int ViewRequestH = -1;
+static int ViewScreenW = 0, ViewScreenH = 0; // Refit_View: the screen's size, if SeenBuff is not the whole of it
 static int ViewAreaX = 0;
 static int ViewAreaY = 0;
 static int ViewAreaW = 0;
@@ -532,7 +533,12 @@ short const* DisplayClass::Text_Overlap_List(char const* text, int x, int y) con
 
 void DisplayClass::Refit_View(void)
 {
+    // The whole screen, not SeenBuff: a game loaded from the main menu is loaded with the (640x400) menu layout.
+    ViewScreenW = ScreenWidth;
+    ViewScreenH = ScreenHeight;
     Set_View_Dimensions(ViewRequestX, ViewRequestY, ViewRequestW, ViewRequestH);
+    ViewScreenW = ViewScreenH = 0;
+    Flag_To_Redraw(true);
 }
 
 /***********************************************************************************************
@@ -570,8 +576,10 @@ void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
     **	The view's area, in pixels: the screen right of x and below y, or with a width in cells
     **	(the sidebar's call), everything left of the sidebar, whole cells or not.
     */
-    int area_w = (width == -1) ? SeenBuff.Get_Width() - x : SeenBuff.Get_Width() - x - SIDEBAR_WID * RESFACTOR;
-    int area_h = (height == -1) ? SeenBuff.Get_Height() - y : height * CELL_PIXEL_H;
+    int screen_w = ViewScreenW != 0 ? ViewScreenW : SeenBuff.Get_Width();
+    int screen_h = ViewScreenH != 0 ? ViewScreenH : SeenBuff.Get_Height();
+    int area_w = (width == -1) ? screen_w - x : screen_w - x - SIDEBAR_WID * RESFACTOR;
+    int area_h = (height == -1) ? screen_h - y : height * CELL_PIXEL_H;
     int pixels_w = (width == -1) ? area_w : width * CELL_PIXEL_W;
     int pixels_h = area_h;
     if (pixels_w > area_w) {

@@ -201,7 +201,6 @@ void MouseClass::Keep_Current_Layout(const MouseClass& now)
         Column[i].X = now.Column[i].X;
         Column[i].Y = now.Column[i].Y;
     }
-    Refit_View();
 }
 
 /***********************************************************************************************

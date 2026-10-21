@@ -315,11 +315,23 @@ void MouseClass::Keep_Current_Layout(const MouseClass& now)
     }
     Eva_Width = now.Eva_Width;
     Tab_Height = now.Tab_Height;
-    if (IsSidebarActive) {
-        Set_View_Dimensions(0, Get_Tab_Height(), SeenBuff.Get_Width() - SideBarWidth);
-    } else {
-        Set_View_Dimensions(0, Get_Tab_Height());
-    }
+}
+
+/***********************************************************************************************
+ * MouseClass::Refit_View_After_Load -- Fits the tactical view to the screen after a load.      *
+ *                                                                                             *
+ *    Called by Load_Game after Init_IO (which fits the view again, to SeenBuff).              *
+ *=============================================================================================*/
+void MouseClass::Refit_View_After_Load(void)
+{
+    /*
+    ** The view is fitted to the whole screen, not to SeenBuff: a game loaded from the main menu is
+    ** loaded with the menu layout (SeenBuff is the 640x400 menu in the middle of a bigger screen), and
+    ** the view fitted to that was a small rectangle in the corner that did not redraw.
+    */
+    int tab = Get_Tab_Height();
+    Set_View_Dimensions(0, tab, ScreenWidth - (IsSidebarActive ? SideBarWidth : 0), ScreenHeight - tab);
+    Flag_To_Redraw(true);
 }
 
 /***********************************************************************************************

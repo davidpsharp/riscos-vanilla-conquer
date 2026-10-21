@@ -58,6 +58,7 @@ public:
 
     // After a load: the layout for this screen, not the one the game was saved at (see iomap.cpp).
     void Keep_Current_Layout(const MouseClass& now);
+    void Refit_View_After_Load(void);
     virtual bool Override_Mouse_Shape(MouseType mouse, bool wwsmall = false);
     virtual void Revert_Mouse_Shape(void);
     virtual MouseType Get_Mouse_Shape(void) const
