@@ -422,14 +422,56 @@ static void Counter_Tick(void)
     }
 }
 
+/*
+** The palette entries to draw it in: nearest to (0,255,0) and the darkest. Looked at again after a
+** palette change, which the game makes every few frames when it cycles colours: the counter is
+** only drawn again if the entries it would use are no longer the ones it was drawn in.
+*/
+static void Counter_Pick_Colours(void)
+{
+    if (Ctr.colours_generation == Ctr.palette_generation) {
+        return;
+    }
+    // The brightest clearly green entry: most green, least red and blue (4g - (r+b)), and
+    // green must dominate (g > 1.5 max(r,b)). A palette with none (a movie's, say) gets the
+    // entry with the most of that score anyway: a bright yellow or white, still legible
+    // inside the dark outline.
+    int best_green = -(1 << 30), best_any = -(1 << 30), best_dark = 1 << 30;
+    Uint8 any = 0;
+    for (int i = 0; i < 256; ++i) {
+        int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
+        int score = 4 * g - (r + b);
+        if (g >= 100 && 2 * g > 3 * (r > b ? r : b) && score > best_green) {
+            best_green = score;
+            Ctr.green = Uint8(i);
+        }
+        if (score > best_any) {
+            best_any = score;
+            any = Uint8(i);
+        }
+        int k = r * 3 + g * 6 + b;
+        if (k < best_dark) {
+            best_dark = k;
+            Ctr.dark = Uint8(i);
+        }
+    }
+    if (best_green == -(1 << 30)) {
+        Ctr.green = any;
+    }
+    Ctr.colours_generation = Ctr.palette_generation;
+}
+
 // Does the screen need a present to bring the counter up to date?
 static bool Counter_Stale(void)
 {
     if (!Ctr.on) {
         return Ctr.shown;
     }
-    return Ctr.text[0] != '\0'
-           && (!Ctr.shown || strcmp(Ctr.text, Ctr.shown_text) != 0 || Ctr.colours_generation != Ctr.palette_generation);
+    if (Ctr.text[0] == '\0') {
+        return false;
+    }
+    Counter_Pick_Colours();
+    return !Ctr.shown || strcmp(Ctr.text, Ctr.shown_text) != 0 || Ctr.green != Ctr.fg || Ctr.dark != Ctr.bg;
 }
 
 // Is the counter on the screen as it was drawn, and where the screen still is?
@@ -537,8 +579,8 @@ static bool Counter_Overlay(SDL_Rect& changed)
         return false;
     }
     if (Ctr.shown) {
-        if (strcmp(Ctr.text, Ctr.shown_text) == 0 && Ctr.colours_generation == Ctr.palette_generation
-            && Counter_On_Screen()) {
+        Counter_Pick_Colours();
+        if (strcmp(Ctr.text, Ctr.shown_text) == 0 && Ctr.green == Ctr.fg && Ctr.dark == Ctr.bg && Counter_On_Screen()) {
             return false; // still there, untouched by this present
         }
         Counter_Remove(); // (to change it, or else a double draw would save the digits as the screen)
@@ -583,36 +625,7 @@ static bool Counter_Overlay(SDL_Rect& changed)
         }
     }
 
-    // The palette entries: nearest to (0,255,0) and the darkest, again after a palette change.
-    if (Ctr.colours_generation != Ctr.palette_generation) {
-        // The brightest clearly green entry: most green, least red and blue (4g - (r+b)), and
-        // green must dominate (g > 1.5 max(r,b)). A palette with none (a movie's, say) gets the
-        // entry with the most of that score anyway: a bright yellow or white, still legible
-        // inside the dark outline.
-        int best_green = -(1 << 30), best_any = -(1 << 30), best_dark = 1 << 30;
-        Uint8 any = 0;
-        for (int i = 0; i < 256; ++i) {
-            int r = physpal[i].r, g = physpal[i].g, b = physpal[i].b;
-            int score = 4 * g - (r + b);
-            if (g >= 100 && 2 * g > 3 * (r > b ? r : b) && score > best_green) {
-                best_green = score;
-                Ctr.green = Uint8(i);
-            }
-            if (score > best_any) {
-                best_any = score;
-                any = Uint8(i);
-            }
-            int k = r * 3 + g * 6 + b;
-            if (k < best_dark) {
-                best_dark = k;
-                Ctr.dark = Uint8(i);
-            }
-        }
-        if (best_green == -(1 << 30)) {
-            Ctr.green = any;
-        }
-        Ctr.colours_generation = Ctr.palette_generation;
-    }
+    Counter_Pick_Colours(); // (after a palette change)
     Ctr.fg = Ctr.green;
     Ctr.bg = Ctr.dark;
 
