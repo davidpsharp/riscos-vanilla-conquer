@@ -523,30 +523,6 @@ static void Put_Icon_On_Bar(void)
     }
 }
 
-/*
-** The way out of the game, whatever the cause (menu Quit, Message_Quit, the game's own exit, an error): runs
-** first of the exit handlers. UnixLib's thread ticker (an OS_CallEvery that sets a callback every 2 cs, running
-** __pthread_callback) was still running while SDL_Quit closed the Wimp task, and rarely a callback then ran with
-** the task's memory gone (prefetch abort in SVC mode at the game's address, in another task's time: seen on a
-** Pi 4 after menu-click Quit of RA, about 2 in 45). So: the audio and timer threads are stopped and joined (they
-** need the ticker to be joined), then the ticker is stopped, then the video is closed.
-*/
-void RISCOS_Exit_Cleanly(void)
-{
-    static bool done = false;
-    if (done) {
-        return;
-    }
-    done = true;
-    fprintf(stderr, "exit: closing the audio and timer threads\n");
-    SDL_QuitSubSystem(SDL_INIT_AUDIO | SDL_INIT_TIMER);
-    fprintf(stderr, "exit: stopping UnixLib's thread ticker\n");
-    __pthread_stop_ticker();
-    fprintf(stderr, "exit: closing the task (SDL_Quit)\n");
-    SDL_Quit();
-    fprintf(stderr, "exit: done\n");
-}
-
 static void Quit_Game(void)
 {
     fprintf(stderr, "desktop: quit from the icon bar\n");
@@ -632,6 +608,34 @@ static void Use_Game_Handlers(const HandlerType saved[])
     for (int i = 0; i < Swapped_Count; i++) {
         Set_Handler(Swapped_Handlers[i], saved[i]);
     }
+}
+
+/*
+** The way out of the game, whatever the cause (menu Quit, Message_Quit, the game's own exit, an error): runs
+** first of the exit handlers. UnixLib's thread ticker (an OS_CallEvery that sets a callback every 2 cs, running
+** __pthread_callback) was still running while SDL_Quit closed the Wimp task, and rarely a callback then ran with
+** the task's memory gone (prefetch abort in SVC mode at the game's address, in another task's time: seen on a
+** Pi 4 after menu-click Quit of RA, about 2 in 45). So: the audio and timer threads are stopped and joined (they
+** need the ticker to be joined), then the ticker is stopped, then the video is closed.
+*/
+void RISCOS_Exit_Cleanly(void)
+{
+    static bool done = false;
+    if (done) {
+        return;
+    }
+    done = true;
+    fprintf(stderr, "exit: closing the audio and timer threads\n");
+    SDL_QuitSubSystem(SDL_INIT_AUDIO | SDL_INIT_TIMER);
+    fprintf(stderr, "exit: stopping UnixLib's thread ticker\n");
+    __pthread_stop_ticker();
+    // Every handler UnixLib put in is handed back to the OS's (as around Wimp_Poll), so that nothing the OS or the
+    // Wimp does after the task's memory is gone (a pending callback, an event) can run at the game's addresses.
+    HandlerType ours[Swapped_Count];
+    Use_Default_Handlers(ours);
+    fprintf(stderr, "exit: handlers handed back; closing the task (SDL_Quit)\n");
+    SDL_Quit();
+    fprintf(stderr, "exit: done\n");
 }
 
 /*
