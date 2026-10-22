@@ -1,5 +1,5 @@
 # CMake toolchain file for GCCSDK 4.7.4 (arm-unknown-riscos), used inside the
-# vc-riscos-sdk container (see riscos/docker/Dockerfile).
+# vc-riscos-sdk-ticker container (see riscos/docker/Dockerfile).
 #
 # RISCOS_ARCH and RISCOS_TUNE select code generation: ARMv3 instructions, so the
 # same binaries run on every Risc PC CPU and the A7000, scheduled for the

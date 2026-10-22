@@ -6,7 +6,8 @@ Vanilla Conquer for RISC OS: Tiberian Dawn (`!VanillaTD`) and Red Alert (`!Vanil
 
 | Path | Purpose |
 | --- | --- |
-| `docker/Dockerfile` | Cross-build image: GCCSDK 4.7.4 (`arm-unknown-riscos`), CMake, Ninja, SDL 1.2 |
+| `docker/Dockerfile` | Cross-build image: GCCSDK 4.7.4 (`arm-unknown-riscos`), CMake, Ninja, SDL 1.2, UnixLib with the thread-ticker patch |
+| `unixlib-patch/` | The thread-ticker patch for UnixLib and the script that builds it into the image's `libunixlib.a` (see its README) |
 | `cmake/riscos-gccsdk.cmake` | CMake toolchain file (`-march=armv3 -mtune=strongarm -fsigned-char`, static link, `riscos_make_aif()`) |
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |

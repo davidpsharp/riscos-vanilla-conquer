@@ -22,5 +22,11 @@ RUN wget -q -O /tmp/sdl.zip ${SDL_PKG} \
  && cp /tmp/sdl/Apps/Library/!SDL/libSDL.a /tmp/sdl/Apps/Library/!SDL/libSDLmain.a /home/riscos/env/lib/ \
  && rm -rf /tmp/sdl /tmp/sdl.zip
 
+# The build context is riscos/ (scripts/sdk.sh). UnixLib with the thread-ticker patch (riscos/unixlib-patch/README.md): stock UnixLib's
+# pthread timer could crash the game on quit; the objects the patch changes replace the
+# stock ones in the static libunixlib.a the game links.
+COPY unixlib-patch/ /opt/unixlib-patch/
+RUN /opt/unixlib-patch/build-unixlib.sh
+
 ENV PATH=/home/riscos/cross/bin:$PATH
 WORKDIR /work
