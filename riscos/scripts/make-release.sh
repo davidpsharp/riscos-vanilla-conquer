@@ -77,7 +77,25 @@ fi
 cp "$WORK/hostfs/modules/SharedULib,ffa" "$WORK/hostfs/modules/DRenderer,ffa" "$APP/Modules/"
 cp "$ROOT/License.txt" "$APP/Licences/GPL-3,fff"
 sed -n '/^\/\* blast.h/,/\*\//p' "$ROOT/riscos/tools/vcprep/blast.h" > "$APP/Licences/Blast,fff"
-cp "$WORK/hostfs/modules/SharedULib-Copyright" "$APP/Licences/UnixLib,fff"
+{
+    cat "$WORK/hostfs/modules/SharedULib-Copyright"
+    cat <<'NOTE'
+
+Note on the C library in !RunImage
+----------------------------------
+
+The C library linked into !RunImage is GCCSDK's UnixLib (the licence above) with one
+change: the thread-ticker patch from https://github.com/adyoull/riscos-unixlib, an
+unofficial fork of UnixLib, which stops the game crashing when it quits. It replaces
+seven objects of the library (_context, _syslib, atexit, context, exec, pthinit and the
+new ticker). The patch (a diff against jhamby's riscos-gccsdk, commit
+64c6f814eab25486685677b1c5b5ce3d8214d82f) and the build that applies it are in the
+riscos/unixlib-patch directory of the source of this program,
+https://github.com/davidpsharp/riscos-vanilla-conquer (the riscos branch). The patched
+parts are under UnixLib's licence, in which the LGPL overrides; the source of the whole
+program is available there, so it can be relinked with another UnixLib.
+NOTE
+} > "$APP/Licences/UnixLib,fff"
 cp "$WORK/hostfs/modules/DRenderer-Copyright" "$APP/Licences/DRenderer,fff"
 cp "$WORK/hostfs/modules/SDL-Copyright" "$APP/Licences/SDL,fff"
 

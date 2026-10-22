@@ -266,7 +266,10 @@ from other people:
 The GPL means you can have the source code: it's at the GitHub address
 above. The sources of SharedUnixLibrary, DigitalRenderer and SDL 1.2
 are from the GCCSDK project at
-https://www.riscos.info/.
+https://www.riscos.info/. The C library in !RunImage is GCCSDK's UnixLib
+with the thread-ticker patch from an unofficial fork,
+https://github.com/adyoull/riscos-unixlib; the patch and its build are in
+riscos/unixlib-patch at the GitHub address above.
 
 Command & Conquer is a trademark of Electronic Arts. This project is not
 affiliated with or endorsed by Electronic Arts. The game data remains
