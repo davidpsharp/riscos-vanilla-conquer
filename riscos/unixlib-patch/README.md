@@ -16,8 +16,8 @@ stock library with ones built from patched UnixLib source.
   ticker (`pthread/ticker.c`, `internal/ticker.s`, the context switcher, `_syslib.s`, `pthinit.c`,
   `atexit.c`, `exec.c`, the `PThreadTicker` module source) and nothing else.
 - UnixLib is BSD licensed with LGPL parts, and the LGPL is the overriding licence (the
-  `Licences/UnixLib` file in the release zip says so). The patched objects are LGPL 2.1 or later
-  like the code they patch. Because the games are statically linked, the LGPL needs the means to
+  `Licences/UnixLib` file in the release zip says so). The patched objects are under the same
+  terms as the code they patch (UnixLib's, with the LGPL overriding). Because the games are statically linked, the LGPL needs the means to
   relink: this directory is the complete source of the change (the patch and the exact upstream
   commit), `riscos/docker/Dockerfile` the build, and the game's source is GPL-3 anyway.
 - The patch is as written by the fork's author; it is only applied here, not edited.
@@ -37,11 +37,12 @@ stock library with ones built from patched UnixLib source.
    code, so no halfword or long-multiply instructions);
 4. replaces `_context.o _syslib.o atexit.o context.o exec.o pthinit.o` in the toolchain's
    `/home/riscos/cross/arm-unknown-riscos/lib/libunixlib.a` and adds the new `ticker.o`
-   (`objects-changed-by-patch.txt` is the list; every other object stays the stock one; the stock
+   (the `OBJECTS` list in `build-unixlib.sh` names them; every other object stays the stock one; the stock
    library is kept next to it as `libunixlib.a.stock`).
 
 The image is `vc-riscos-sdk-ticker`; `riscos/scripts/sdk.sh` builds it on first use (needs network;
-about 10 minutes on an Apple-silicon Mac under amd64 emulation). To rebuild just the library, delete
+a few minutes on an Apple-silicon Mac under amd64 emulation; about 3 once the base image and
+downloads are cached). To rebuild just the library, delete
 the image (`docker rmi vc-riscos-sdk-ticker`). To check an image:
 
 ```sh
