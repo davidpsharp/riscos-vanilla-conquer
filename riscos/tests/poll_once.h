@@ -1,6 +1,6 @@
 /*
 ** Poll_Once_At_Start: for test programs that time things, run from an Obey file as a task of
-** their own (riscos/scripts, vcport-work). On the Risc PC (RISC OS 4.39, Kinetic StrongARM) on
+** their own (riscos/scripts, work). On the Risc PC (RISC OS 4.39, Kinetic StrongARM) on
 ** 2026-10-19 such a program ran from uncached pages until its first Wimp_Poll: about 28 times
 ** too slowly, though *Cache said on and the control register had both caches on. A program that
 ** has polled once stays fast, also after Wimp_CloseDown. So this becomes a Wimp task, polls for

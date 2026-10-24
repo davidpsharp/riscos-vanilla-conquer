@@ -3,3 +3,6 @@
 /.cache
 /.vscode
 .DS_Store
+
+# Local working files for the RISC OS port: game data, test builds, logs (riscos/README.md)
+/work/

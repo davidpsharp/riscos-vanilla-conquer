@@ -12,7 +12,7 @@ Vanilla Conquer for RISC OS: Tiberian Dawn (`!VanillaTD`) and Red Alert (`!Vanil
 | `compat/cxx11_compat.h` | Force-included; supplies the `std::snprintf`, `std::stof` and `std::to_string` family that GCCSDK's libstdc++ lacks |
 | `scripts/sdk.sh` | Run a command in the cross-build container with the repo at `/work` |
 | `scripts/setup-rpcemu-machines.sh` | Create the `VC SA RO371` and `VC SA RO530` StrongARM machines in RPCEmu Extended |
-| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `../vcport-work/hostfs/modules` |
+| `scripts/fetch-runtime.sh` | Download the SharedULib and DRenderer modules into `work/hostfs/modules` |
 | `scripts/screenshot.sh` | Grab a machine's screen as PNG over VNC |
 | `tests/` | Toolchain smoke tests: `hello`, `unaligned`, `sdltest` |
 
@@ -31,7 +31,7 @@ RPCEmu Extended must be installed at `/Applications/RPCEmu.app`, with its data d
 riscos/scripts/setup-rpcemu-machines.sh
 riscos/scripts/fetch-runtime.sh
 riscos/scripts/build-tests.sh
-mkdir -p ../vcport-work/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb ../vcport-work/hostfs/tests/
+mkdir -p work/hostfs/tests && cp build/riscos-tests/*,ff8 riscos/tests/runsdl,feb work/hostfs/tests/
 
 RPCEMU=/Applications/RPCEmu.app/Contents/MacOS
 $RPCEMU/rpcemu --machine "VC SA RO371" --headless &      # VNC 5920, HostCmd 5921
@@ -41,7 +41,7 @@ $RPCEMU/rpcemu-run --tcp 127.0.0.1:5921 -- 'Filer_Run HostFS:$.vc.tests.runsdl' 
 riscos/scripts/screenshot.sh 5920 build/shot.png
 ```
 
-`HostFS:$.vc` in each machine points at `../vcport-work/hostfs`.
+`HostFS:$.vc` in each machine points at `work/hostfs`.
 
 ## Findings so far
 
@@ -94,7 +94,7 @@ The games and their tools are built for ARMv3, so the same `!RunImage` runs on a
 
 The mixer now multiplies in 32 bits (a 16-bit sample times a gain of at most 0x10000 fits), and `Pixel_To_Lepton` multiplies by a reciprocal for pixels below 3072 (exact: checked against the division for every pixel from -2^23 to 2^23), in both games. Neither changes any result: all three builds end the benchmarks the same way.
 
-Raspberry Pi 3, RISC OS 5.30, ms per game frame, 2 to 4 runs each (`vcport-work/armv3/armv3-bench.sh`):
+Raspberry Pi 3, RISC OS 5.30, ms per game frame, 2 to 4 runs each (`work/armv3/armv3-bench.sh`):
 
 | | armv3m | armv3 | armv3 with the fixes |
 | --- | --- | --- | --- |
@@ -105,7 +105,7 @@ Raspberry Pi 3, RISC OS 5.30, ms per game frame, 2 to 4 runs each (`vcport-work/
 | RA Allied 1 | 5.28 | 5.34 (+1.2%) | 5.28 (0.0%) |
 | RA Allied 2 | 5.70 | 5.79 (+1.6%) | 5.72 (+0.4%) |
 
-TD's remaining 1.5% is in drawing, and isn't in the helper calls (about 200 a frame are left): apart from the functions that had long multiplies, the code is the same, so it is probably where the code now falls in the cache. The StrongARM Risc PC's figures are still to be measured (it was off): `vcport-work/armv3/README.md` has the builds and the one command that does it.
+TD's remaining 1.5% is in drawing, and isn't in the helper calls (about 200 a frame are left): apart from the functions that had long multiplies, the code is the same, so it is probably where the code now falls in the cache. The StrongARM Risc PC's figures are still to be measured (it was off): `work/armv3/README.md` has the builds and the one command that does it.
 
 **If one binary ever costs too much on a StrongARM:** two `!RunImage`s (armv3m and armv3) would each add about 0.9 MB (TD) or 1.2 MB (RA) to the zip, which is 1.1 MB and 1.5 MB now. `tools/cpuprobe.s` is a 436-byte absolute for `!Run` that sets `VanillaConquer$LongMul` to 1 only if `UMULL` gives the right answer, and to 0 if it gives a wrong one (RPCEmu's ARM610/710) or traps (it catches the undefined instruction with its own error handler). Tested on RISC OS 3.11 (ARM3, Arculator), 3.71 (ARM710, RPCEmu), 4.39 (StrongARM, RPCEmu) and 5.30 (Pi 3).
 
@@ -141,7 +141,7 @@ Tested using `-PLAYTEST` (Alt+W wins, Alt+L loses) and `-AUTOSTART=<G|N><n>[A-D]
 There's no OpenAL on RISC OS, so SDL builds without OpenAL use a small software mixer on SDL 1.2's audio callback (`common/mixer_sdl1.cpp`). Its channels mimic the OpenAL sources that `soundio_common.cpp` and the VQA player expect. `soundio_sdl1.cpp` handles effects, music and speech, and `vqaaudio_sdl1.cpp` handles movie soundtracks. On RISC OS, SDL plays through **DigitalRenderer**, which `!Run` loads from `System:Modules` or from `!VanillaTD.Modules`. If audio can't be opened, the game runs silently. With `VanillaTD$Sound` (or `VanillaRA$Sound`) set to `SharedSoundBuffer` in `!Run`, the mixer instead feeds SharedSoundBuffer and StreamManager (John Duffell's freeware, over SharedSound, not shipped) from a thread of its own (`common/riscos_ssb.cpp`), so the sound mixes with other programs'. It falls back to SDL if the modules aren't loaded. On RISC OS 4.39 in RPCEmu, SharedSoundBuffer 0.07 holds only one queued block when a usual block size is given, so none is. And while any program plays through DigitalRenderer, SharedSound's streams are silent.
 
 **How it was verified:**
-- **macOS:** `SDL_AUDIODRIVER=disk` writes the mixed output to a file. The logo, music, speech and effects all decode as real audio (zero-crossing rate 0.01–0.08). A capture is in `../vcport-work/td-audio-mac.wav`.
+- **macOS:** `SDL_AUDIODRIVER=disk` writes the mixed output to a file. The logo, music, speech and effects all decode as real audio (zero-crossing rate 0.01–0.08). A capture is in `work/td-audio-mac.wav`.
 - **RISC OS 3.71 and 5.30 (RPCEmu):** `scripts/capture-mixer.py` breaks on `Mixer_Callback` and reads back the buffer it filled. The output is real audio in both the logo movie and GDI 1. Playback is paced at 22009 and 22207 frames/s against 22050 expected (from `Mixer_Frames_Mixed`), so the sound hardware consumes it in real time.
 - **Cost:** the game still runs at 15.6 logic fps. Uncapped throughput drops by about 5.5% (827 vs 876 fps), mostly from UnixLib's pthread audio thread rather than the mixing itself.
 
@@ -204,7 +204,7 @@ The movies are about 430 MB per side and can be left out on small discs.
 
 ## Red Alert
 
-`deploy-ra.sh` builds `!VanillaRA` (`build/riscos-ra`, `-DBUILD_VANILLARA=ON`) with `Utils.vcprep` and `Utils.ramix`, and lays it out in `../vcport-work/hostfs/!VanillaRA`, hard-linking the data from `../vcport-work/ra` (the Allied and Soviet discs extracted to `CD1_ALLIES` and `CD2_Soviet`):
+`deploy-ra.sh` builds `!VanillaRA` (`build/riscos-ra`, `-DBUILD_VANILLARA=ON`) with `Utils.vcprep` and `Utils.ramix`, and lays it out in `work/hostfs/!VanillaRA`, hard-linking the data from `work/ra` (the Allied and Soviet discs extracted to `CD1_ALLIES` and `CD2_Soviet`):
 
 ```
 !VanillaRA.gamedata.MIX.REDALERT          the same on both discs
@@ -382,9 +382,9 @@ It leaves out the game data. `tools/riscos-zip.py` stores each `,xxx` filetype i
 VC_DEBUG=1 riscos/scripts/deploy-td.sh        # cross-build (with debug log) and deploy
 riscos/scripts/run-td.sh 371 -AUTOSTART=G1    # reset machine, launch TD
 riscos/scripts/screenshot.sh 5920 /tmp/s.png  # look at it
-tail ../vcport-work/hostfs/'!VanillaTD'/stderr # debug log (flushed in 1 KB blocks)
+tail work/hostfs/'!VanillaTD'/stderr # debug log (flushed in 1 KB blocks)
 ```
 
-When debugging, `rpcemu-debug trace config data_abort=1 prefetch_abort=1 undefined=1` stops the emulator at the faulting instruction. `scripts/guest-stack.py` gives a heuristic backtrace. On the Mac, `scripts/run-mac.sh build/mac-ubsan -AUTOSTART=G1` runs the sanitizer build and writes reports to `../vcport-work/ubsan.*`.
+When debugging, `rpcemu-debug trace config data_abort=1 prefetch_abort=1 undefined=1` stops the emulator at the faulting instruction. `scripts/guest-stack.py` gives a heuristic backtrace. On the Mac, `scripts/run-mac.sh build/mac-ubsan -AUTOSTART=G1` runs the sanitizer build and writes reports to `work/ubsan.*`.
 
-Game data, the HostFS deploy directory and the Mac run directory all live in `../vcport-work`, next to the repo (`VC_WORK` overrides it). They're kept outside the repo, since the game data isn't redistributable and the builds and logs run to gigabytes. Keep both out of cloud-synced folders: Synology sync once reverted local edits here.
+Game data, the HostFS deploy directory and the Mac run directory all live in `work/`, inside the checkout but ignored by git (`VC_WORK` overrides it). They're kept out of git, since the game data isn't redistributable and the builds and logs run to gigabytes. Keep both out of cloud-synced folders: Synology sync once reverted local edits here.

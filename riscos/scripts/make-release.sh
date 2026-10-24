@@ -14,7 +14,7 @@
 # the release. Any other word (preview, test) is a dev build and is named as given.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
+WORK=${VC_WORK:-$ROOT/work}
 VERSION=${1:?usage: make-release.sh <version> [--no-build]}
 # shellcheck source=riscos/scripts/version.sh
 source "$ROOT/riscos/scripts/version.sh"

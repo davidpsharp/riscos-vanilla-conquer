@@ -5,7 +5,7 @@
 ** them for every caller: the game, SDL, libstdc++ and UnixLib itself. UnixLib's copy
 ** moves single words (LDR/STR with write-back, and PLD hints, which a StrongARM ignores);
 ** these move blocks of 8 registers with LDM/STM, which the Risc PC's memory bus takes as
-** bursts. See vcport-work/reports/arm-optimisation-report.md, section 4.1.
+** bursts. See work/reports/arm-optimisation-report.md, section 4.1.
 **
 ** For every ARM a RISC OS machine has had since the ARM610:
 ** - ARMv3 instructions only: no halfword transfers, no long multiplies, no BX, no PLD;

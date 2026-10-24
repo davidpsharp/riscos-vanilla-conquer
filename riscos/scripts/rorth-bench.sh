@@ -9,7 +9,7 @@
 # "bench" lines. Afterwards it removes the battle and unsets the variables, so
 # the installed game is as it was, and releases the lease.
 #
-# The battle, ../vcport-work/bench/SCG01EA-battle.INI, is made from the GDI disc's
+# The battle, work/bench/SCG01EA-battle.INI, is made from the GDI disc's
 # GENERAL.MIX by riscos/bench/make-battle.py when it's missing: GDI 1 with 57
 # vehicles and 80 infantry set to Hunt and no win or lose triggers.
 #
@@ -18,11 +18,11 @@
 # BENCH_VARS="NAME=value ..." sets more variables for the run (unset afterwards).
 # BENCH_MISSION=G3 (say) plays that campaign mission as it is instead of the battle.
 # BENCH_ARGS adds arguments for the game, e.g. BENCH_ARGS=-LOWRES.
-# Red Alert: BENCH_GAME=ra benchmarks its battle (../vcport-work/bench/RA-SCG01EA-battle.INI,
+# Red Alert: BENCH_GAME=ra benchmarks its battle (work/bench/RA-SCG01EA-battle.INI,
 # from riscos/bench/make-ra-battle.py) with -AUTOSTART=A1, in VC_APP's !VanillaRA.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
+WORK=${VC_WORK:-$ROOT/work}
 RO=${RO_RUN:-/Users/david/code/RORTH/tools/ro-run}
 T=${RO_TARGET:-riscpc}
 APP=${VC_APP:-'IDEFS::HardDisc4b.$.VanillaConquer.!VanillaTD'}

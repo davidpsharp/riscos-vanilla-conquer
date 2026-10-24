@@ -5,7 +5,7 @@
 # VC_APP overrides the application path, e.g. VC_APP='ADFS::HardDisc4.$.!VanillaTD'.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
+WORK=${VC_WORK:-$ROOT/work}
 DATADIR=${RPCEMU_DATADIR:-$HOME/rpcemu/rpcemu-extended}
 M=/Applications/RPCEmu.app/Contents/MacOS
 case "$1" in

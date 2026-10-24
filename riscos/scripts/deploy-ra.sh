@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cross-build VanillaRA and assemble the !VanillaRA application in
-# ../vcport-work/hostfs next to the repo (seen by the test machines as HostFS:$.vc).
-# Game data is hard-linked from ../vcport-work/ra: the Allied and Soviet discs,
+# work/hostfs in the checkout (seen by the test machines as HostFS:$.vc).
+# Game data is hard-linked from work/ra: the Allied and Soviet discs,
 # extracted to ra/CD1_ALLIES and ra/CD2_Soviet.
 # Usage: [VC_DEBUG=1] deploy-ra.sh [--no-build]
 set -euo pipefail
@@ -9,7 +9,7 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 # VC_VERSION_* : the version this build says it is (see version.sh).
 # shellcheck source=riscos/scripts/version.sh
 source "$(dirname "$0")/version.sh"
-WORK=${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}
+WORK=${VC_WORK:-$ROOT/work}
 APP="$WORK/hostfs/!VanillaRA"
 
 if [ "${VC_DEBUG:-0}" = 1 ]; then

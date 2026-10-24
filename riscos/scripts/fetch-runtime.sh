@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch the RISC OS runtime modules our binaries need into ../vcport-work/hostfs/modules (next to the repo):
+# Fetch the RISC OS runtime modules our binaries need into work/hostfs/modules (in the checkout, ignored by git):
 #   SharedULib - SharedUnixLibrary, required by every GCCSDK program
 #   DRenderer  - digital sound renderer, used by SDL audio
 # along with each package's copyright notice (<module>-Copyright), which the
@@ -7,7 +7,7 @@
 # linked into !RunImage from the same package the build container uses.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-OUT="${VC_WORK:-$(cd "$ROOT/.." && pwd)/vcport-work}/hostfs/modules"
+OUT="${VC_WORK:-$ROOT/work}/hostfs/modules"
 BASE=https://www.riscos.info/packages/arm/Develop/gcc
 mkdir -p "$OUT"
 tmp=$(mktemp -d)
