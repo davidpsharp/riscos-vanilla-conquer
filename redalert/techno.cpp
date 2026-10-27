@@ -378,15 +378,22 @@ int TechnoClass::What_Weapon_Should_I_Use(TARGET target) const
     **	Get the value of the primary weapon verses the candidate target. Increase the
     **	value of the weapon if it happens to be in range.
     */
+    /*
+    ** The range and firing checks can only double a weight or zero it, so a weapon whose
+    ** weight is already zero (no such weapon, or a warhead that can't hurt this armour) is
+    ** not checked: the same answer, without the two range calculations.
+    */
     int w1 = 0;
     WeaponTypeClass const* wptr = ttype->PrimaryWeapon;
     if (wptr != NULL && wptr->WarheadPtr != NULL)
         w1 = wptr->WarheadPtr->Modifier[armor] * 1000;
-    if (In_Range(target, 0))
-        w1 *= 2;
-    FireErrorType ok = Can_Fire(target, 0);
-    if (ok == FIRE_CANT || ok == FIRE_ILLEGAL)
-        w1 = 0;
+    if (w1 != 0) {
+        if (In_Range(target, 0))
+            w1 *= 2;
+        FireErrorType ok = Can_Fire(target, 0);
+        if (ok == FIRE_CANT || ok == FIRE_ILLEGAL)
+            w1 = 0;
+    }
 
     /*
     **	Calculate a similar value for the secondary weapon.
@@ -395,11 +402,13 @@ int TechnoClass::What_Weapon_Should_I_Use(TARGET target) const
     wptr = ttype->SecondaryWeapon;
     if (wptr != NULL && wptr->WarheadPtr != NULL)
         w2 = wptr->WarheadPtr->Modifier[armor] * 1000;
-    if (In_Range(target, 1))
-        w2 *= 2;
-    ok = Can_Fire(target, 1);
-    if (ok == FIRE_CANT || ok == FIRE_ILLEGAL)
-        w2 = 0;
+    if (w2 != 0) {
+        if (In_Range(target, 1))
+            w2 *= 2;
+        FireErrorType ok = Can_Fire(target, 1);
+        if (ok == FIRE_CANT || ok == FIRE_ILLEGAL)
+            w2 = 0;
+    }
 
     /*
     **	Return with the weapon identifier that should be used to fire upon the
