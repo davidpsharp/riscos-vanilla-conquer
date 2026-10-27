@@ -13,7 +13,9 @@
 # vcprof.py. Results go in $OUT_DIR/<target>-<scenario>.{bin,log,txt,md}.
 #
 # The lease: taken (queueing) from $RORTH/host, where every ro-run here runs,
-# and released at the end. Variables set during it are put back by Rorth too.
+# and released at the end. It belongs to that directory, so a second copy of this
+# script started from the same Mac is let straight in: run one at a time per
+# target. Variables set during it are put back by Rorth too.
 #
 # Environment:
 #   RORTH       the Rorth checkout (~/code/RORTH)
@@ -58,7 +60,15 @@ if [ "${1:-}" = list ] || [ $# -eq 0 ]; then
     echo $ALL | tr ' ' '\n'
     exit 0
 fi
-for s in "$@"; do scenario "$s" || { echo "unknown scenario $s" >&2; exit 2; }; done
+scenario_any()
+{ # <name>-timers: the same run without the sampler, so the fine timers and counts are on
+    NOPROFILE=0
+    case "$1" in
+    *-timers) scenario "${1%-timers}" || return 1; VARS="$VARS VC_NOPROFILE=1"; NOPROFILE=1 ;;
+    *) scenario "$1" || return 1; case " $VARS " in *" VC_NOPROFILE=1 "*) NOPROFILE=1 ;; esac ;;
+    esac
+}
+for s in "$@"; do scenario_any "$s" || { echo "unknown scenario $s" >&2; exit 2; }; done
 
 mkdir -p "$OUT_DIR"
 cd "$RORTH/host" # the lease belongs to the directory ro-run runs from
@@ -74,7 +84,7 @@ cleanup()
     set +e
     if [ "$PUT_TD" = 1 ]; then ro cmd "Run $TD_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut gamedata.INI.SCG01EA; do ro rm "$TD_APP.$f" >/dev/null 2>&1; done; fi
     if [ "$PUT_RA" = 1 ]; then ro cmd "Run $RA_APP.ProfOff" >/dev/null 2>&1; for f in ProfImage ProfRun ProfOff ProfData ProfErr ProfOut gamedata.INI.SCG01EA; do ro rm "$RA_APP.$f" >/dev/null 2>&1; done; fi
-    for v in VC_BENCH VC_SEED VC_PARTIALPRESENT VC_NOSOUND VC_BENCHSCROLL VC_MOVIETEST VC_MOVIETEST_FROM VC_MOVIETEST_COUNT VC_PROFILE VC_PROFILE_SECS VC_FPSLOG; do
+    for v in VC_BENCH VC_SEED VC_PARTIALPRESENT VC_NOSOUND VC_BENCHSCROLL VC_MOVIETEST VC_MOVIETEST_FROM VC_MOVIETEST_COUNT VC_PROFILE VC_PROFILE_SECS VC_FPSLOG VC_NOPROFILE VC_FRAMEHASH; do
         ro cmd "Unset $v" >/dev/null 2>&1
     done
     [ "${NO_LEASE:-0}" != 1 ] && ro lease release >/dev/null 2>&1
@@ -100,9 +110,14 @@ RMEnsure SharedUnixLibrary 1.16 IfThere System:Modules.SharedULib Then RMLoad Sy
 RMEnsure SharedUnixLibrary 1.16 RMLoad <$var\$Dir>.Modules.SharedULib
 RMEnsure DigitalRenderer 0.56 IfThere System:Modules.DRenderer Then RMLoad System:Modules.DRenderer
 RMEnsure DigitalRenderer 0.56 RMLoad <$var\$Dir>.Modules.DRenderer
-Set VC_PROFILE <$var\$Dir>.ProfData
+Unset VC_PROFILE
+If "<VC_NOPROFILE>"="" Then Set VC_PROFILE <$var\$Dir>.ProfData
+| The settings (Choices:VConquer) of this copy only: the machine's own are left alone.
+Set ProfChoices\$Old <Choices\$Write>
+Set Choices\$Write <$var\$Dir>.Choices
 WimpSlot -min $slot -max $slot
 Run <$var\$Dir>.ProfImage %*0 >/<$var\$Dir>/ProfOut 2>/<$var\$Dir>/ProfErr
+Set Choices\$Write <ProfChoices\$Old>
 EOF
     echo "sending $(basename "$image") to $app.ProfImage..."
     ro put "$image" "$app.ProfImage" --type ff8 >/dev/null
@@ -112,7 +127,7 @@ EOF
 }
 
 for s in "$@"; do
-    scenario "$s"
+    scenario_any "$s"
     if [ "$GAME" = td ]; then
         APP=$TD_APP ELF=$TD_ELF BATTLE_INI=$WORK/bench/SCG01EA-battle.INI
         [ "$PUT_TD" = 1 ] || { prepare_app td; PUT_TD=1; }
@@ -140,6 +155,7 @@ for s in "$@"; do
         sleep 10
         if ro get "$APP.ProfErr" "$base.log" >/dev/null 2>&1; then
             if grep -q "^profile: .* written" "$base.log"; then result=ok; break; fi
+            if [ "${NOPROFILE:-0}" = 1 ] && grep -q "^bench objects at the end" "$base.log"; then result=ok; break; fi
             if grep -qE "Fatal|Abort|crash|SIGSEGV|exception" "$base.log"; then result=crashed; break; fi
             if grep -qE "^profile: (VC_PROFILE needs|can't|no dynamic|the handler)" "$base.log"; then result=no-profile; break; fi
         fi
@@ -158,8 +174,8 @@ for s in "$@"; do
     ro cmd "Run $APP.ProfOff" 2>&1 | grep -v "^profoff: 0 " | sed 's/^/   /' || true
     for v in $VARS; do ro cmd "Unset ${v%%=*}" >/dev/null 2>&1 || true; done
     echo "   $result after $(($(date +%s) - started)) s"
-    grep -E "^autosize: .*cpu|^bench:|^bench ms|^movie |^profile:" "$base.log" | sed 's/^/   /' || true
-    if [ "$result" = ok ] && ro get "$APP.ProfData" "$base.bin" >/dev/null 2>&1; then
+    grep -E "^autosize: .*cpu|^autosize: desktop|^bench:|^bench ms|^bench path|^bench object|^bench frame hash|^movie |^profile:" "$base.log" | sed 's/^/   /' || true
+    if [ "$result" = ok ] && [ "$NOPROFILE" != 1 ] && ro get "$APP.ProfData" "$base.bin" >/dev/null 2>&1; then
         elfkeep="$OUT_DIR/elf/$(md5 -q "$ELF" 2>/dev/null || md5sum "$ELF" | cut -d' ' -f1).elf"
         mkdir -p "$OUT_DIR/elf"; [ -f "$elfkeep" ] || cp "$ELF" "$elfkeep"
         echo "$elfkeep" >"$base.elfpath" # the ELF these samples belong to, for vcprof.py later

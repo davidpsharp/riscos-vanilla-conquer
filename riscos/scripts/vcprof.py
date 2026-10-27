@@ -8,6 +8,9 @@ Usage: vcprof.py <samples file> <elf> [options]
   --exclude S[,S..]   drop samples whose stack has a function containing S
   --from SECS / --to SECS   only samples in that time window (since the start)
   --callers F[,F..]   for each function whose name contains F: its callers and call sites
+  --lines F[,F..]     for each function whose name contains F: its self samples by source
+                      line (needs an ELF built with -g, and --addr2line CMD, e.g.
+                      "riscos/scripts/sdk.sh arm-unknown-riscos-addr2line -e build/riscos-ra/vanillara")
   --phases            split the time between the game's phases (see PHASES)
   --markdown          Markdown tables
   --drop-self F[,F..] leave out samples taken in these functions (RPCEmu over-samples
@@ -38,6 +41,8 @@ exclude = [x for x in (arg("--exclude") or "").split(",") if x]
 t_from = float(arg("--from", -1))
 t_to = float(arg("--to", 1e12))
 callers_of = [x for x in (arg("--callers") or "").split(",") if x]
+lines_of = [x for x in (arg("--lines") or "").split(",") if x]
+addr2line = arg("--addr2line")
 md = "--markdown" in sys.argv
 MASK = 0x03FFFFFC
 
@@ -170,6 +175,26 @@ table("Self time", [("%.1f%%" % (100.0 * w / total_w), "`%s`" % f if md else f) 
 table("Total time (on the stack)", [("%.1f%%" % (100.0 * w / total_w), "`%s`" % f if md else f) for f, w in incl.most_common(top)],
       ["total", "function"])
 
+for want in lines_of:
+    # Self samples by PC within the function, resolved to source lines.
+    by_pc = collections.Counter()
+    fn_total = 0
+    for sm, st in sel:
+        f, pc = st[0]
+        if want in f:
+            by_pc[pc] += sm[1]
+            fn_total += sm[1]
+    if fn_total == 0 or not addr2line:
+        print("\n== Lines of %s: %s" % (want, "no samples" if fn_total == 0 else "no --addr2line"))
+        continue
+    pcs = sorted(by_pc)
+    out = subprocess.run(addr2line.split() + ["-i"] * 0 + ["%#x" % pc for pc in pcs], capture_output=True, text=True).stdout.splitlines()
+    by_line = collections.Counter()
+    for pc, loc in zip(pcs, out):
+        loc = loc.split("/")[-1]
+        by_line[loc] += by_pc[pc]
+    rows = [("%.1f%%" % (100.0 * w / fn_total), loc) for loc, w in by_line.most_common(top)]
+    table("Lines of %s (self %.1f%% of all, %d samples)" % (want, 100.0 * fn_total / total_w, fn_total), rows, ["share", "line"])
 for want in callers_of:
     for f in sorted(set(f for f in selfw if want in f), key=lambda f: -selfw[f])[:4]:
         by_caller = collections.Counter()
