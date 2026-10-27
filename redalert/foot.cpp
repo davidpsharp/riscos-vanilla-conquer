@@ -78,6 +78,7 @@
  *   FootClass::Unlimbo -- Unlimbos object and performs special fixups.                        *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 
 /***********************************************************************************************
@@ -315,6 +316,7 @@ bool FootClass::Basic_Path(void)
 {
     assert(IsActive);
 
+    Phase_Path_Count(PATHC_BASIC);
     PathType* path; // Pointer to path control structure.
     CELL cell;
     int skip_path = false;
@@ -477,6 +479,7 @@ bool FootClass::Basic_Path(void)
         /*
         **	If a basic path couldn't be determined, then abort the navigation process.
         */
+        Phase_Path_Count(PATHC_BASIC_FAILED);
         Stop_Driver();
     }
     return (false);

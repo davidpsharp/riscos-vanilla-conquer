@@ -2080,6 +2080,7 @@ CELL MapClass::Nearby_Location(CELL cell,
     int count = 0;
     int xx = Cell_X(cell);
     int yy = Cell_Y(cell);
+    Phase_Path_Count(PATHC_NEARBY);
 
     /*
     **	Determine the limits of the scanning in the four directions so that
@@ -2126,6 +2127,15 @@ CELL MapClass::Nearby_Location(CELL cell,
         int dx_near = xx < box.X0 ? box.X0 - xx : (xx > box.X1 ? xx - box.X1 : 0);
         int dy_near = yy < box.Y0 ? box.Y0 - yy : (yy > box.Y1 ? yy - box.Y1 : 0);
         first_radius = dx_near > dy_near ? dx_near : dy_near;
+        /*
+        ** Within a ring, only its cells inside the box can be in the zone, so the rows and
+        ** columns are clipped to it too; the cells left out would all have failed the zone
+        ** test, so the ones found, and their order, are the same.
+        */
+        left = box.X0 > left ? box.X0 : left;
+        right = box.X1 < right ? box.X1 : right;
+        top = box.Y0 > top ? box.Y0 : top;
+        bottom = box.Y1 < bottom ? box.Y1 : bottom;
     }
 
     for (int radius = first_radius; radius < MAP_CELL_W && radius <= last_radius; radius++) {
@@ -2135,12 +2145,13 @@ CELL MapClass::Nearby_Location(CELL cell,
         /*
         **	Scan the top and bottom rows of the "box".
         */
-        for (int x = xx - radius; x <= xx + radius; x++) {
-            if (x >= left && x <= right) {
+        for (int x = xx - radius > left ? xx - radius : left; x <= xx + radius && x <= right; x++) {
+            {
                 int y = yy - radius;
-                if (y >= top) {
+                if (y >= top && y <= bottom) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(speed, false, false, zone, check)
                         && (!checkflagged || !cellptr->IsFlagged)) {
                         topten[count++] = newcell;
@@ -2150,9 +2161,10 @@ CELL MapClass::Nearby_Location(CELL cell,
                     break;
 
                 y = yy + radius;
-                if (y <= bottom) {
+                if (y <= bottom && y >= top) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(speed, false, false, zone, check)
                         && (!checkflagged || !cellptr->IsFlagged)) {
                         topten[count++] = newcell;
@@ -2169,12 +2181,13 @@ CELL MapClass::Nearby_Location(CELL cell,
         /*
         **	Scan the left and right columns of the "box".
         */
-        for (int y = yy - radius; y <= yy + radius; y++) {
-            if (y >= top && y <= bottom) {
+        for (int y = yy - radius > top ? yy - radius : top; y <= yy + radius && y <= bottom; y++) {
+            {
                 int x = xx - radius;
-                if (x >= left) {
+                if (x >= left && x <= right) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(speed, false, false, zone, check)
                         && (!checkflagged || !cellptr->IsFlagged)) {
                         topten[count++] = newcell;
@@ -2184,9 +2197,10 @@ CELL MapClass::Nearby_Location(CELL cell,
                     break;
 
                 x = xx + radius;
-                if (x <= right) {
+                if (x <= right && x >= left) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(speed, false, false, zone, check)
                         && (!checkflagged || !cellptr->IsFlagged)) {
                         topten[count++] = newcell;

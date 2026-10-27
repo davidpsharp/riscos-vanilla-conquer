@@ -73,6 +73,7 @@
  *   FootClass::~FootClass -- Default destructor for foot class objects.                       *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "common/irandom.h"
 
@@ -349,6 +350,7 @@ bool FootClass::Mark(MarkType mark)
  *=============================================================================================*/
 bool FootClass::Basic_Path(void)
 {
+    Phase_Path_Count(PATHC_BASIC);
     PathType* path; // Pointer to path control structure.
     CELL cell;
     int skip_path = false;
@@ -528,6 +530,7 @@ bool FootClass::Basic_Path(void)
         **	If a basic path couldn't be determined, then abort the navigation process.
         */
         //		NavCom = TARGET_NONE;
+        Phase_Path_Count(PATHC_BASIC_FAILED);
         Stop_Driver();
     }
     return (false);

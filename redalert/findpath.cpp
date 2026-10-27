@@ -87,6 +87,7 @@ static const int Passable_Value[MOVE_COUNT] = {
 */
 inline int FootClass::Passable_Cell(CELL cell, FacingType face, int threat, MoveType threshhold)
 {
+    Phase_Path_Count(PATHC_PASSABLE);
     if (threat == -1 && PathCacheOn && (unsigned)cell < MAP_CELL_TOTAL
         && (PathCache[cell] >> 3) == PathCacheGeneration) {
         unsigned move = PathCache[cell] & 7;
@@ -267,7 +268,9 @@ static CELL StartLocation;
  * HISTORY:                                                                *
  *   10/28/1994 SKB : Created.                                             *
  *=========================================================================*/
-int Point_Relative_To_Line(int x, int z, int x1, int z1, int x2, int z2)
+// Only Follow_Edge calls this, in its inner loop: inline lets GCC keep the line's
+// differences in registers across the loop.
+static inline int Point_Relative_To_Line(int x, int z, int x1, int z1, int x2, int z2)
 {
     return (((x - x2) * (z1 - z2)) - ((z - z2) * (x1 - x2)));
 }
@@ -401,6 +404,7 @@ bool FootClass::Register_Cell(PathType* path, CELL cell, FacingType dir, int cos
 #else
     int bit = (cell & 31) - 1;
 #endif
+    Phase_Path_Count(PATHC_REGISTER);
 
     /*
     ** See if this point has already been registered as on the list.  If so
@@ -892,7 +896,7 @@ bool FootClass::Follow_Edge(CELL start,
                             MoveType threshhold)
 {
     FacingType newdir; // Direction of facing before surrounding cell check.
-    CELL oldcell,      // Current cell.
+    int oldcell,       // Current cell (int, not CELL: the ARMv3 build has no halfword instructions).
         newcell;       // Tentative new cell.
     int cost;          // Working cost value.
     int startx;
@@ -904,7 +908,7 @@ bool FootClass::Follow_Edge(CELL start,
     int cellcount = 0;
     int forceout = false;
     FacingType firstdir = (FacingType)-1;
-    CELL firstcell = -1;
+    int firstcell = -1;
     bool stepped_off_line = false;
     startx = Cell_X(start);
     starty = Cell_Y(start);
@@ -913,12 +917,13 @@ bool FootClass::Follow_Edge(CELL start,
 
     if (!path)
         return (false);
+    Phase_Path_Count(PATHC_FOLLOW);
     path->LastOverlap = -1;
     path->LastFixup = -1;
 
     newdir = Next_Direction(olddir, search);
     oldcell = start;
-    newcell = Adjacent_Cell(oldcell, newdir);
+    newcell = Adjacent_Cell((CELL)oldcell, newdir);
 
     /*
     **	Continue until we find our target, find our original starting spot,
@@ -936,6 +941,7 @@ bool FootClass::Follow_Edge(CELL start,
             bool forcefail; // Is failure forced?
 
             forcefail = false;
+            Phase_Path_Count(PATHC_FOLLOW_STEPS);
 
             /*
             **	Rotate 45/90 degrees in desired direction.
@@ -949,10 +955,10 @@ bool FootClass::Follow_Edge(CELL start,
             **	impassable that we are moving around.
             */
             if (newdir & FACING_NE) {
-                CELL checkcell; // Non-diagonal check cell.
+                int checkcell; // Non-diagonal check cell.
                 // int	x,y;
 
-                checkcell = Adjacent_Cell(oldcell, Next_Direction(newdir, search));
+                checkcell = Adjacent_Cell((CELL)oldcell, Next_Direction(newdir, search));
 
                 if (checkcell == target) {
 
@@ -968,7 +974,7 @@ bool FootClass::Follow_Edge(CELL start,
                         **	scanning will terminate later.
                         */
                         newdir = Next_Direction(newdir, search);
-                        newcell = Adjacent_Cell(oldcell, newdir);
+                        newcell = Adjacent_Cell((CELL)oldcell, newdir);
                         break;
                     }
                 }
@@ -984,7 +990,7 @@ bool FootClass::Follow_Edge(CELL start,
                 **      the value that just happened to be in checkcell.
                 */
 
-                checkcell = Adjacent_Cell(oldcell, newdir);
+                checkcell = Adjacent_Cell((CELL)oldcell, newdir);
 
                 int checkx = Cell_X(checkcell);
                 int checky = Cell_Y(checkcell);
@@ -1014,7 +1020,7 @@ bool FootClass::Follow_Edge(CELL start,
             /*
             **	Get the new cell.
             */
-            newcell = Adjacent_Cell(oldcell, newdir);
+            newcell = Adjacent_Cell((CELL)oldcell, newdir);
 
             /*
             **	If we found a passable position, this is where we should move.
@@ -1044,9 +1050,11 @@ bool FootClass::Follow_Edge(CELL start,
                 ** a looping situation.  So we need to try and unravel the loop if
                 ** we can.
                 */
-                if (!Unravel_Loop(path, newcell, newdir, startx, starty, targetx, targety, threshhold)) {
+                CELL unravelled = (CELL)newcell; // Unravel_Loop takes the cell by reference
+                if (!Unravel_Loop(path, unravelled, newdir, startx, starty, targetx, targety, threshhold)) {
                     return (false);
                 }
+                newcell = unravelled;
                 /*
                 ** Since we need to eliminate a diagonal we must pretend the upon
                 ** attaining this square, we were moving turned further in the
@@ -1069,6 +1077,7 @@ bool FootClass::Follow_Edge(CELL start,
             }
             cellcount++;
             if (cellcount == MAX_PATH_EDGE_FOLLOW) {
+                Phase_Path_Count(PATHC_FOLLOW_FAILED);
                 return (false);
             }
         }
@@ -1367,10 +1376,12 @@ int FootClass::Passable_Cell_Slow(CELL cell, FacingType face, int threat, MoveTy
         if ((PathCache[cell] >> 3) == PathCacheGeneration) {
             move = MoveType(PathCache[cell] & 7);
         } else {
+            Phase_Path_Count(PATHC_PASSABLE_SLOW);
             move = Can_Enter_Cell(cell, face);
             PathCache[cell] = (unsigned char)(PathCacheGeneration << 3 | move);
         }
     } else {
+        Phase_Path_Count(PATHC_PASSABLE_SLOW);
         move = Can_Enter_Cell(cell, face);
     }
 

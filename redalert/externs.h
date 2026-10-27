@@ -387,7 +387,8 @@ extern signed char const Rotation16[256];
 extern unsigned char const Facing8[256];
 extern unsigned char const Pixel2Lepton[24];
 extern COORDINATE const StoppingCoordAbs[5];
-extern CELL const AdjacentCell[FACING_COUNT];
+// int, not CELL: the ARMv3 build has no halfword loads, so a short is two byte loads and an OR.
+extern int const AdjacentCell[FACING_COUNT];
 extern COORDINATE const AdjacentCoord[FACING_COUNT];
 extern unsigned char const RemapCiv2[];
 extern unsigned char const RemapCiv4[];

@@ -77,6 +77,32 @@ extern bool Bench_Seed_Set; // VC_SEED: the random seed, for the same battle eve
 extern int Bench_Seed;
 void Phase_Object_AI(int rtti, unsigned us);   // one object's AI, by its RTTI
 void Phase_Path(unsigned us);                  // one Find_Path call
+// Path-finding counts for the benchmark report (findpath.cpp, foot.cpp, map.cpp).
+enum PathCountId
+{
+    PATHC_BASIC,         // Basic_Path calls
+    PATHC_BASIC_FAILED,  // ...that found no path
+    PATHC_FOLLOW,        // Follow_Edge calls
+    PATHC_FOLLOW_FAILED, // ...that gave up at MAX_PATH_EDGE_FOLLOW cells
+    PATHC_FOLLOW_STEPS,  // directions tried in Follow_Edge
+    PATHC_REGISTER,      // Register_Cell calls
+    PATHC_PASSABLE,      // Passable_Cell calls
+    PATHC_PASSABLE_SLOW, // ...that asked Can_Enter_Cell (cache misses)
+    PATHC_NEARBY,        // Nearby_Location calls
+    PATHC_NEARBY_CELLS,  // cells it looked at
+    PATHC_MAX
+};
+extern unsigned Path_Counts[PATHC_MAX];
+#ifdef VC_PATH_COUNTS // profiling builds only: the counts sit in the path-finder's innermost loops
+inline void Phase_Path_Count(PathCountId id, unsigned n = 1)
+{
+    Path_Counts[id] += n;
+}
+#else
+inline void Phase_Path_Count(PathCountId, unsigned = 1)
+{
+}
+#endif
 // Names for the RTTI numbers in reports; Tiberian Dawn's are the default.
 void Phase_Set_Rtti_Names(const char* const* names, int count);
 // VC_BENCHSHOT=<n>[,<n>...]: a screenshot (as Insert) after those game frames of a benchmark.

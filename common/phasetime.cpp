@@ -58,6 +58,7 @@ static unsigned long long Bench_Rtti_Us[32];
 static unsigned Frame_Rtti_Us[32];
 static unsigned Frame_Paths, Frame_Path_Us, Frame_Path_Longest_Us;
 static unsigned long long Bench_Paths, Bench_Path_Us;
+unsigned Path_Counts[PATHC_MAX];
 unsigned long long Dirty_Partial, Dirty_Full_Unknown, Dirty_Full_Other, Dirty_Tiles_Copied, Dirty_Missed,
     Dirty_Unknown_Locks; // partial presents, from video_sdl1.cpp
 unsigned long long Dirty_Frames, Dirty_Tiles, Dirty_Tiles_Total, Dirty_Bands, Dirty_Bands_Total, Dirty_Box_Pixels,
@@ -368,6 +369,20 @@ void Phase_Bench_Report(unsigned frames)
             Bench_Us[PHASE_MISSION] * per,
             Bench_Us[PHASE_THREAT] * per,
             Bench_Us[PHASE_SIGHT] * per);
+    fprintf(stderr,
+            "bench path counts a frame: Basic_Path %.2f (failed %.2f), Follow_Edge %.2f (gave up %.2f) trying %.0f "
+            "directions, Register_Cell %.0f, Passable_Cell %.0f (Can_Enter_Cell %.0f), Nearby_Location %.2f looking "
+            "at %.0f cells\n",
+            double(Path_Counts[PATHC_BASIC]) / frames,
+            double(Path_Counts[PATHC_BASIC_FAILED]) / frames,
+            double(Path_Counts[PATHC_FOLLOW]) / frames,
+            double(Path_Counts[PATHC_FOLLOW_FAILED]) / frames,
+            double(Path_Counts[PATHC_FOLLOW_STEPS]) / frames,
+            double(Path_Counts[PATHC_REGISTER]) / frames,
+            double(Path_Counts[PATHC_PASSABLE]) / frames,
+            double(Path_Counts[PATHC_PASSABLE_SLOW]) / frames,
+            double(Path_Counts[PATHC_NEARBY]) / frames,
+            double(Path_Counts[PATHC_NEARBY_CELLS]) / frames);
     if (Bench_Frame_Hashing) {
         fprintf(stderr, "bench frame hash: %u frames, %08x\n", Bench_Hashed, Bench_Hash);
     }

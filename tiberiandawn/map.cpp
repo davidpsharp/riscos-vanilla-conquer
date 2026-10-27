@@ -51,6 +51,7 @@
  *   MapClass::Write_Binary -- writes the map's binary image file                              *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "common/phasetime.h"
 #include "function.h"
 #include "tile.h"
 
@@ -1981,6 +1982,7 @@ CELL MapClass::Nearby_Location(CELL cell) const //, SpeedType speed, int zone, M
     int count = 0;
     int xx = Cell_X(cell);
     int yy = Cell_Y(cell);
+    Phase_Path_Count(PATHC_NEARBY);
 
     /*
     **	Determine the limits of the scanning in the four directions so that
@@ -2008,6 +2010,7 @@ CELL MapClass::Nearby_Location(CELL cell) const //, SpeedType speed, int zone, M
                 if (y >= top) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(false, false)) {
                         topten[count++] = newcell;
                     }
@@ -2019,6 +2022,7 @@ CELL MapClass::Nearby_Location(CELL cell) const //, SpeedType speed, int zone, M
                 if (y <= bottom) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(false, false)) {
                         topten[count++] = newcell;
                     }
@@ -2040,6 +2044,7 @@ CELL MapClass::Nearby_Location(CELL cell) const //, SpeedType speed, int zone, M
                 if (x >= left) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(false, false)) {
                         topten[count++] = newcell;
                     }
@@ -2051,6 +2056,7 @@ CELL MapClass::Nearby_Location(CELL cell) const //, SpeedType speed, int zone, M
                 if (x <= right) {
                     newcell = XY_Cell(x, y);
                     cellptr = &Map[newcell];
+                    Phase_Path_Count(PATHC_NEARBY_CELLS);
                     if (Map.In_Radar(newcell) && cellptr->Is_Clear_To_Move(false, false)) {
                         topten[count++] = newcell;
                     }

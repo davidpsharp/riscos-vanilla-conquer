@@ -162,7 +162,7 @@ unsigned char const Pixel2Lepton[24] = {0x00, 0x0B, 0x15, 0x20, 0x2B, 0x35, 0x40
 **	offset that, when added to another cell, will achieve the adjacent cell
 **	in the indexed direction.
 */
-CELL const AdjacentCell[FACING_COUNT] = {
+int const AdjacentCell[FACING_COUNT] = {
     -(MAP_CELL_W),     // North
     -(MAP_CELL_W - 1), // North East
     1,                 // East
