@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "soscomp.h"
 #include <string.h>
 #include <assert.h>
@@ -55,7 +56,7 @@ void sosCODECInitStream(_SOS_COMPRESS_INFO* stream)
 static struct
 {
     int diff;
-    short index;
+    int index; // int, not short: the ARMv3 build has no halfword loads (the entry is 8 bytes either way)
 } SosDecompTable[NUM_INDEXES][NUM_NYBBLES];
 
 /* Flag if above table was initialized.  */
@@ -118,10 +119,32 @@ template <bool BITS_8> static unsigned sosCODECDecompressDataTemplate(_SOS_COMPR
     unsigned char* src = (unsigned char*)stream->lpSource;
     short* dst = (short*)(stream->lpDest);
     do {
-        short index = stream->Channels[channel].wIndex;
+        int index = stream->Channels[channel].wIndex;
         int sample = stream->Channels[channel].dwPredicted;
 
         int j = 0;
+        /*
+        ** Mono 16-bit (every sound effect and voice) into a word-aligned buffer: the two
+        ** samples of each byte are stored as one word. Without halfword stores, a short
+        ** store is two byte stores; the samples and the order are the same.
+        */
+        if (!BITS_8 && num_channels == 1 && ((uintptr_t)dst & 3) == 0) {
+            unsigned* wdst = (unsigned*)dst;
+            do {
+                unsigned char codebuf = *src++;
+                sample += SosDecompTable[index][codebuf & 0xF].diff;
+                sample = clamp(sample, -32768, 32767);
+                index = SosDecompTable[index][codebuf & 0xF].index;
+                unsigned first = (unsigned)sample & 0xFFFFu;
+                sample += SosDecompTable[index][codebuf >> 4].diff;
+                sample = clamp(sample, -32768, 32767);
+                index = SosDecompTable[index][codebuf >> 4].index;
+                *wdst++ = first | ((unsigned)sample << 16);
+            } while (++j < bytes);
+            stream->Channels[channel].dwPredicted = sample;
+            stream->Channels[channel].wIndex = index;
+            return full_length;
+        }
         do {
             unsigned char codebuf = *src;
             src += num_channels;
