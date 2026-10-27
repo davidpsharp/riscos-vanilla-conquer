@@ -188,9 +188,20 @@ inline COORDINATE XYP_COORD(int x, int y)
  * HISTORY:                                                                                    *
  *   08/21/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** The coordinate helpers below use shifts and masks rather than the COORD_COMPOSITE
+** bitfields on a little-endian machine: the same bits (checked against the bitfield
+** versions for every CELL and LEPTON and tens of millions of coordinates), but the
+** reference casts made GCC put the value in memory and read it back a byte at a time,
+** which the ARMv3 build (no halfword loads) does in every drawing and movement loop.
+*/
 inline CELL Coord_XCell(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.X.Sub.Cell);
+#else
+    return ((CELL)((coord >> 8) & 0xFF));
+#endif
 }
 
 /***********************************************************************************************
@@ -209,7 +220,11 @@ inline CELL Coord_XCell(COORDINATE coord)
  *=============================================================================================*/
 inline CELL Coord_YCell(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.Y.Sub.Cell);
+#else
+    return ((CELL)((coord >> 24) & 0xFF));
+#endif
 }
 
 /***********************************************************************************************
@@ -229,11 +244,7 @@ inline CELL Coord_YCell(COORDINATE coord)
  *=============================================================================================*/
 inline CELL XY_Cell(int x, int y)
 {
-    CELL_COMPOSITE cell;
-    cell.Cell = 0;
-    cell.Sub.X = x;
-    cell.Sub.Y = y;
-    return (cell.Cell);
+    return ((CELL)((x & 0x7F) | ((y & 0x7F) << 7))); // as the CELL_COMPOSITE bitfields would pack them
 }
 
 /***********************************************************************************************
@@ -276,10 +287,14 @@ inline LEPTON Cell_To_Lepton(int cell_distance)
  *=============================================================================================*/
 inline int Lepton_To_Cell(LEPTON lepton_distance)
 {
+#ifdef __BIG_ENDIAN__
     if (((LEPTON_COMPOSITE&)lepton_distance).Sub.Lepton >= (CELL_LEPTON_W / 2)) {
         return (((LEPTON_COMPOSITE&)lepton_distance).Sub.Cell + 1);
     }
     return (((LEPTON_COMPOSITE&)lepton_distance).Sub.Cell);
+#else
+    return ((lepton_distance >> 8) + ((lepton_distance & 0xFF) >= (CELL_LEPTON_W / 2) ? 1 : 0));
+#endif
 }
 
 /***********************************************************************************************
@@ -298,7 +313,11 @@ inline int Lepton_To_Cell(LEPTON lepton_distance)
  *=============================================================================================*/
 inline LEPTON Coord_X(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.X.Raw);
+#else
+    return ((LEPTON)(coord & 0xFFFF));
+#endif
 }
 
 /***********************************************************************************************
@@ -317,7 +336,11 @@ inline LEPTON Coord_X(COORDINATE coord)
  *=============================================================================================*/
 inline LEPTON Coord_Y(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.Y.Raw);
+#else
+    return ((LEPTON)(coord >> 16));
+#endif
 }
 
 /***********************************************************************************************
@@ -334,9 +357,14 @@ inline LEPTON Coord_Y(COORDINATE coord)
  * HISTORY:                                                                                    *
  *   08/21/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+** Shifts and masks rather than the CELL_COMPOSITE bitfields: the same bits, but the
+** reference cast made GCC put the cell in memory and read it back a byte at a time (the
+** ARMv3 build has no halfword loads), in every path-finding and drawing loop.
+*/
 inline int Cell_X(CELL cell)
 {
-    return (((CELL_COMPOSITE&)cell).Sub.X);
+    return (cell & 0x7F);
 }
 
 /***********************************************************************************************
@@ -355,7 +383,7 @@ inline int Cell_X(CELL cell)
  *=============================================================================================*/
 inline int Cell_Y(CELL cell)
 {
-    return (((CELL_COMPOSITE&)cell).Sub.Y);
+    return ((cell >> 7) & 0x7F);
 }
 
 /***********************************************************************************************
@@ -377,7 +405,11 @@ inline int Cell_Y(CELL cell)
  *=============================================================================================*/
 inline int Coord_XLepton(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton);
+#else
+    return ((int)(coord & 0xFF));
+#endif
 }
 
 /***********************************************************************************************
@@ -397,7 +429,11 @@ inline int Coord_XLepton(COORDINATE coord)
  *=============================================================================================*/
 inline int Coord_YLepton(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton);
+#else
+    return ((int)((coord >> 16) & 0xFF));
+#endif
 }
 
 /***********************************************************************************************
@@ -444,6 +480,7 @@ inline COORDINATE XYP_Coord(int x, int y)
  *=============================================================================================*/
 inline COORDINATE Cell_Coord(CELL cell)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Sub.Cell = (unsigned char)(((CELL_COMPOSITE&)cell).Sub.X);
@@ -451,6 +488,9 @@ inline COORDINATE Cell_Coord(CELL cell)
     coord.Sub.Y.Sub.Cell = (unsigned char)(((CELL_COMPOSITE&)cell).Sub.Y);
     coord.Sub.Y.Sub.Lepton = (unsigned char)(CELL_LEPTON_W / 2);
     return (coord.Coord);
+#else
+    return (((COORDINATE)Cell_X(cell) << 8) | ((COORDINATE)Cell_Y(cell) << 24) | ((CELL_LEPTON_W / 2) * 0x00010001u));
+#endif
 }
 
 /***********************************************************************************************
@@ -471,9 +511,13 @@ inline COORDINATE Cell_Coord(CELL cell)
  *=============================================================================================*/
 inline COORDINATE Coord_Snap(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton = CELL_LEPTON_W / 2;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton = CELL_LEPTON_W / 2;
     return (coord);
+#else
+    return ((coord & 0xFF00FF00u) | ((CELL_LEPTON_W / 2) * 0x00010001u));
+#endif
 }
 
 /***********************************************************************************************
@@ -493,9 +537,13 @@ inline COORDINATE Coord_Snap(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Fraction(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Cell = 0;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Cell = 0;
     return (coord);
+#else
+    return (coord & 0x00FF00FFu);
+#endif
 }
 
 /***********************************************************************************************
@@ -515,9 +563,13 @@ inline COORDINATE Coord_Fraction(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Whole(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton = 0;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton = 0;
     return (coord);
+#else
+    return (coord & 0xFF00FF00u);
+#endif
 }
 
 /***********************************************************************************************
@@ -539,6 +591,7 @@ inline COORDINATE Coord_Whole(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -546,6 +599,9 @@ inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)((int)(short)((COORD_COMPOSITE&)coord1).Sub.Y.Raw + (int)(short)((COORD_COMPOSITE&)coord2).Sub.Y.Raw);
     return (coord.Coord);
+#else
+    return (((coord1 + coord2) & 0xFFFFu) | (((coord1 >> 16) + (coord2 >> 16)) << 16));
+#endif
 }
 
 /***********************************************************************************************
@@ -568,6 +624,7 @@ inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
  *=============================================================================================*/
 inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -575,6 +632,9 @@ inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)((int)(short)((COORD_COMPOSITE&)coord1).Sub.Y.Raw - (int)(short)((COORD_COMPOSITE&)coord2).Sub.Y.Raw);
     return (coord.Coord);
+#else
+    return (((coord1 - coord2) & 0xFFFFu) | (((coord1 >> 16) - (coord2 >> 16)) << 16));
+#endif
 }
 
 /***********************************************************************************************
@@ -595,6 +655,7 @@ inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
  *=============================================================================================*/
 inline COORDINATE Coord_Mid(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -602,6 +663,9 @@ inline COORDINATE Coord_Mid(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)(((int)((COORD_COMPOSITE&)coord1).Sub.Y.Raw + (int)((COORD_COMPOSITE&)coord2).Sub.Y.Raw) / 2);
     return (coord.Coord);
+#else
+    return ((((coord1 & 0xFFFFu) + (coord2 & 0xFFFFu)) >> 1) | ((((coord1 >> 16) + (coord2 >> 16)) >> 1) << 16));
+#endif
 }
 
 /***********************************************************************************************

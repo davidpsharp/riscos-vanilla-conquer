@@ -162,14 +162,29 @@ extern int LParam;
 //#include <fast.h>
 
 extern int Frame;
+/*
+** The coordinate helpers below use shifts and masks rather than the COORD_COMPOSITE
+** bitfields on a little-endian machine: the same bits (checked against the bitfield
+** versions for every CELL and LEPTON and tens of millions of coordinates), but the
+** reference casts made GCC put the value in memory and read it back a byte at a time,
+** which the ARMv3 build (no halfword loads) does in every drawing and movement loop.
+*/
 inline CELL Coord_XCell(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.X.Sub.Cell);
+#else
+    return ((CELL)((coord >> 8) & 0xFF));
+#endif
 }
 
 inline CELL Coord_YCell(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.Y.Sub.Cell);
+#else
+    return ((CELL)((coord >> 24) & 0xFF));
+#endif
 }
 
 #include "miscasm.h"
@@ -771,11 +786,8 @@ inline int Lepton_To_Cell(int lepton)
 
 inline CELL XY_Cell(int x, int y)
 {
-    CELL_COMPOSITE cell;
-    cell.Cell = 0;
-    cell.Sub.X = x;
-    cell.Sub.Y = y;
-    return (cell.Cell);
+    // As the CELL_COMPOSITE bitfields would pack them.
+    return ((CELL)((x & ((1 << MAP_CELL_MAX_X_BITS) - 1)) | ((y & ((1 << MAP_CELL_MAX_Y_BITS) - 1)) << MAP_CELL_MAX_X_BITS)));
 }
 
 inline COORDINATE XY_Coord(int x, int y)
@@ -789,49 +801,79 @@ inline COORDINATE XY_Coord(int x, int y)
 
 inline int Coord_X(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.X.Raw);
+#else
+    return ((int)(coord & 0xFFFF));
+#endif
 }
 inline int Coord_Y(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (((COORD_COMPOSITE&)coord).Sub.Y.Raw);
+#else
+    return ((int)(coord >> 16));
+#endif
 }
 
+/*
+** Shifts and masks rather than the CELL_COMPOSITE bitfields: the same bits, but the
+** reference cast made GCC put the cell in memory and read it back a byte at a time (the
+** ARMv3 build has no halfword loads), in every path-finding and drawing loop.
+*/
 inline int Cell_X(CELL cell)
 {
-    return (((CELL_COMPOSITE&)cell).Sub.X);
+    return (cell & ((1 << MAP_CELL_MAX_X_BITS) - 1));
 }
 
 inline int Cell_Y(CELL cell)
 {
-    return (((CELL_COMPOSITE&)cell).Sub.Y);
+    return ((cell >> MAP_CELL_MAX_X_BITS) & ((1 << MAP_CELL_MAX_Y_BITS) - 1));
 }
 
 inline CELL Coord_XLepton(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (CELL)(((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton);
+#else
+    return ((CELL)(coord & 0xFF));
+#endif
 }
 
 inline CELL Coord_YLepton(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     return (CELL)(((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton);
+#else
+    return ((CELL)((coord >> 16) & 0xFF));
+#endif
 }
 
 inline COORDINATE Coord_Whole(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton = 0;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton = 0;
     return (coord);
+#else
+    return (coord & 0xFF00FF00u);
+#endif
 }
 
 inline COORDINATE Coord_Fraction(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Cell = 0;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Cell = 0;
     return (coord);
+#else
+    return (coord & 0x00FF00FFu);
+#endif
 }
 
 inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -839,10 +881,14 @@ inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)((int)(short)((COORD_COMPOSITE&)coord1).Sub.Y.Raw + (int)(short)((COORD_COMPOSITE&)coord2).Sub.Y.Raw);
     return (coord.Coord);
+#else
+    return (((coord1 + coord2) & 0xFFFFu) | (((coord1 >> 16) + (coord2 >> 16)) << 16));
+#endif
 }
 
 inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -850,17 +896,25 @@ inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)((int)(short)((COORD_COMPOSITE&)coord1).Sub.Y.Raw - (int)(short)((COORD_COMPOSITE&)coord2).Sub.Y.Raw);
     return (coord.Coord);
+#else
+    return (((coord1 - coord2) & 0xFFFFu) | (((coord1 >> 16) - (coord2 >> 16)) << 16));
+#endif
 }
 
 inline COORDINATE Coord_Snap(COORDINATE coord)
 {
+#ifdef __BIG_ENDIAN__
     ((COORD_COMPOSITE&)coord).Sub.X.Sub.Lepton = CELL_LEPTON_W / 2;
     ((COORD_COMPOSITE&)coord).Sub.Y.Sub.Lepton = CELL_LEPTON_W / 2;
     return (coord);
+#else
+    return ((coord & 0xFF00FF00u) | ((CELL_LEPTON_W / 2) * 0x00010001u));
+#endif
 }
 
 inline COORDINATE Coord_Mid(COORDINATE coord1, COORDINATE coord2)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Raw =
@@ -868,6 +922,9 @@ inline COORDINATE Coord_Mid(COORDINATE coord1, COORDINATE coord2)
     coord.Sub.Y.Raw =
         (LEPTON)(((int)((COORD_COMPOSITE&)coord1).Sub.Y.Raw + (int)((COORD_COMPOSITE&)coord2).Sub.Y.Raw) / 2);
     return (coord.Coord);
+#else
+    return ((((coord1 & 0xFFFFu) + (coord2 & 0xFFFFu)) >> 1) | ((((coord1 >> 16) + (coord2 >> 16)) >> 1) << 16));
+#endif
 }
 
 inline COORDINATE XYPixel_Coord(int x, int y)
@@ -920,6 +977,7 @@ inline CELL Confine_Old_Cell(CELL cell)
 
 inline COORDINATE Cell_Coord(CELL cell)
 {
+#ifdef __BIG_ENDIAN__
     COORD_COMPOSITE coord;
 
     coord.Sub.X.Sub.Cell = (unsigned char)(((CELL_COMPOSITE&)cell).Sub.X);
@@ -927,6 +985,9 @@ inline COORDINATE Cell_Coord(CELL cell)
     coord.Sub.Y.Sub.Cell = (unsigned char)(((CELL_COMPOSITE&)cell).Sub.Y);
     coord.Sub.Y.Sub.Lepton = (unsigned char)(CELL_LEPTON_W / 2);
     return (coord.Coord);
+#else
+    return (((COORDINATE)Cell_X(cell) << 8) | ((COORDINATE)Cell_Y(cell) << 24) | ((CELL_LEPTON_W / 2) * 0x00010001u));
+#endif
 }
 
 inline int Dir_Diff(DirType dir1, DirType dir2)
@@ -1140,6 +1201,17 @@ inline int Distance(CELL coord1, CELL coord2)
  *=============================================================================================*/
 inline CELL CellClass::Cell_Number(void) const
 {
+    /*
+    ** Map.ID is a virtual call and a division by sizeof(CellClass), which on ARMv3 (no long
+    ** multiply, so GCC can't use a reciprocal) is a call to __udivsi3 every time: 5-10% of a
+    ** busy battle's time on a Raspberry Pi, from Redraw_Objects, Occupy_Up/Down, Adjust_Threat
+    ** and Draw_It. 48 is 16 x 3, and x / 3 is exactly (x * 0xAAAB) >> 17 for x below 65536
+    ** (here at most 3 x MAP_CELL_TOTAL).
+    */
+    if (sizeof(CellClass) == 48 && MAP_CELL_TOTAL * 3 < 65536) {
+        unsigned offset = (unsigned)((char const*)this - (char const*)&Map[0]);
+        return (CELL)(((offset >> 4) * 0xAAABu) >> 17);
+    }
     return (Map.ID(this));
 }
 #if (0)
