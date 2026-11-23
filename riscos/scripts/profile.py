@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Poor man's sampling profiler for a program running under RPCEmu Extended.
 
 Repeatedly pauses the guest, records the user-mode PC and a heuristic call

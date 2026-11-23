@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** Hand-written ARM versions of the hottest transparent shape blitters (keybuff.cpp),
 ** for RISC OS. They do exactly what the C versions do, for count == 1 where fading

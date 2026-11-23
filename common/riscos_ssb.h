@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** Sound output through SharedSoundBuffer and StreamManager (John Duffell's freeware modules, over
 ** SharedSound), so the game's sound mixes with other programs' instead of taking DigitalRenderer

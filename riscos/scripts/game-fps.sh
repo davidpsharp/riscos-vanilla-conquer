@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Measure the running game's logic frame rate by sampling its global Frame
 # counter through the RPCEmu debugger. TD runs 15 logic frames/s at normal speed.
 # Usage: game-fps.sh <371|371-1mb|530> [seconds] [elf]

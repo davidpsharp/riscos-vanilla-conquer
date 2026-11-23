@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Minimal software mixer on top of SDL 1.2 audio.
 //
 // SDL 1.2 only offers a single audio callback, so this provides OpenAL-like

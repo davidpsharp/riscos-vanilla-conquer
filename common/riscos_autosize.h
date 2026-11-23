@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The game's screen size when the player hasn't chosen one ("auto", the RISC OS default): the
 ** largest that this machine can keep smooth, in the desktop's shape. A short speed test the first

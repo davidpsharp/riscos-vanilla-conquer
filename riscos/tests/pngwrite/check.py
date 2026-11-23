@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 import sys,subprocess
 from PIL import Image
 bad=0

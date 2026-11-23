@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Make the !VanillaTD or !VanillaRA application sprites from riscos/icons/vanilla<game>-icon.png.
 
 Writes two RISC OS sprite files (filetype &FF9), each holding a 34x34

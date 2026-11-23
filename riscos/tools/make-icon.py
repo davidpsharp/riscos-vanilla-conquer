@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Make the !VanillaTD and !VanillaRA icon pictures from the OpenTS banner.
 
 They match the OpenTS RISC OS port's icon: letters from the banner on a gold-rimmed bronze

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** Poll_Once_At_Start: for test programs that time things, run from an Obey file as a task of
 ** their own (riscos/scripts, work). On the Risc PC (RISC OS 4.39, Kinetic StrongARM) on

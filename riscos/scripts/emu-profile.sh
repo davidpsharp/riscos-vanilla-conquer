@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Profile the games on one of this project's RPCEmu machines ("VC SA RO371" by
 # default), with the in-game sampler (VC_PROFILE) and, alongside it, profile.py's
 # debugger sampling of the whole machine. Emulator figures: RPCEmu is much faster

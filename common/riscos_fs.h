@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // RISC OS filename mapping for 10 character filing systems.
 //
 // FileCore on RISC OS 3.x limits leaf names to 10 characters, and UnixLib maps

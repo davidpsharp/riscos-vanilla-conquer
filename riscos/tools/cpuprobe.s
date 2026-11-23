@@ -1,3 +1,4 @@
+@ RISC OS port, copyright David Sharp 2026
 @ cpuprobe: sets VanillaConquer$LongMul to 1 if this CPU runs UMULL (ARMv3M:
 @ StrongARM and later), or to 0 if it doesn't (ARM610, ARM710, ARM7500).
 @ !Run uses it to pick the program to run.

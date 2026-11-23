@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Palette switch test: fills the screen with colour index 1, then changes
 // palette entry 1 every 3 seconds (red, green, blue) via SDL_SetPalette with
 // SDL_PHYSPAL, the way the game does. Watch whether the display follows.

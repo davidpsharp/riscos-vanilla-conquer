@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Reset a test machine, wait for it to boot, then launch !VanillaTD as a
 # desktop task with the given arguments. Output goes to !VanillaTD.stdout/stderr.
 # Usage: run-td.sh <371|371-1mb|530> [game args...]    e.g. run-td.sh 371 -AUTOSTART=G1

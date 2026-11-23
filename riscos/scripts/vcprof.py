@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Turn a VC_PROFILE sample file (common/riscos_profile.cpp) into profiles.
 
 Usage: vcprof.py <samples file> <elf> [options]

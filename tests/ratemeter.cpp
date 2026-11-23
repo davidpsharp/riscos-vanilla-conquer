@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Tests the frame counter's timing (common/ratemeter.h) with made-up times: no window, no clock.
 #include "common/ratemeter.h"
 

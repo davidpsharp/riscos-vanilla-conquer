@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Make Red Alert's benchmark battle: Allied mission 1 with two big armies and no triggers.
 
 Usage: make-ra-battle.py <SCG01EA.INI> <out.INI>

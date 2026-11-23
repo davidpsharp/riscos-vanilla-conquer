@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Launch TD straight into a mission on a test machine, skipping movies with Esc,
 # and wait until the in-game tab bar is showing.
 # Usage: start-mission.sh <371|371-1mb|530> <vnc port> <G1|N1|...> [extra args]

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** membench: times the kinds of inner loop the games spend their time in, on the
 ** machine it runs on, to judge what hand-written ARM code could gain there:

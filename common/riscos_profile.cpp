@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** A sampling profiler for real RISC OS hardware: see riscos_profile.h.
 **

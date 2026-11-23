@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // SDL 1.2 implementation of the sound backend used by soundio_common.cpp,
 // built on the software mixer in mixer_sdl1.cpp.
 #include "soundio_imp.h"

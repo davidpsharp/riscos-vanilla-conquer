@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # Phase 0 smoke tests for the RISC OS toolchain. Build with riscos/scripts/build-tests.sh.
 cmake_minimum_required(VERSION 3.25)
 project(RiscosSmokeTests C CXX)

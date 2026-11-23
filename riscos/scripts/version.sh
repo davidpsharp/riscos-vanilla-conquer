@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # The version of this build, worked out from git and the VERSION file (the one place the
 # number lives). Meant to be sourced by deploy-td.sh, deploy-ra.sh and make-release.sh; run
 # on its own it prints what it found.

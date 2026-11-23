@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The screen size for "auto" (see riscos_autosize.h): the speed test's results are kept in the
 ** settings file, and the choice is made again from them for the desktop as it is.

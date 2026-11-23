@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Time TD start-up on a test machine: launch -> title screen -> main menu.
 # Usage: time-menu.sh <371|371-1mb|530> <vnc port>
 set -euo pipefail

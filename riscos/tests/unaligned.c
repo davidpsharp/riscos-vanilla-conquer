@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /* Probes what unaligned loads and stores do on this CPU, in each instruction
  * form GCC emits. ARMv4 (StrongARM) does not fault: LDR returns the aligned
  * word rotated, STR writes the aligned word, and halfword accesses at odd

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /* Time reading a file the way the game streams movies, to check whether the
 ** filing system can keep up. Usage: readspeed <file> [megabytes]
 ** 1. Plain sequential reads in 32 KB blocks.

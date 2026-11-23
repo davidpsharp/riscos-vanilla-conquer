@@ -1,3 +1,4 @@
+| RISC OS port, copyright David Sharp 2026
 RMEnsure SharedUnixLibrary 1.16 RMLoad HostFS:$.vc.modules.SharedULib
 Dir HostFS:$.vc.tests
 WimpSlot -min 2048K

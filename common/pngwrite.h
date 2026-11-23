@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // A minimal PNG writer for screenshots: 8-bit paletted, no compression (stored deflate blocks).
 // No libpng or zlib, and nothing here needs more than ARMv3 (bytes and 32-bit words only).
 #ifndef COMMON_PNGWRITE_H

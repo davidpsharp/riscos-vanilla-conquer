@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /* Allocates one 40MB block, like caching SCORES.MIX, and shows where it lands.
  * On RISC OS 3.x the application slot ends at 28MB (&1C00000); anything above
  * that is in a dynamic area. */

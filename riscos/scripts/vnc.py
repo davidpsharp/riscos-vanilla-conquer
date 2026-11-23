@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Drive an RPCEmu machine's screen, mouse and keyboard over VNC.
 
 Reuses the VNC client in RPCEmu Extended's MCP server. Run it with that

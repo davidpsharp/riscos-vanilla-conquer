@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # Minimal platform description for RISC OS via GCCSDK/UnixLib, which presents
 # a POSIX-like environment. Treat it as UNIX so posix code paths are picked.
 set(UNIX 1)

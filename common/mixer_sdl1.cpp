@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 #include "mixer_sdl1.h"
 
 #include "phasetime.h"

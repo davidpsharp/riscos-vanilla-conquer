@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** discid.h: tells which freeware Westwood CD image a file is, from a few KB of it: the
 ** ISO 9660 primary volume descriptor and the root directory. Each disc is known by a file

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // SDL 1.2 smoke test: opens an 8bpp palettised screen (the mode Vanilla Conquer
 // uses), draws a palette gradient and logs input events to sdltest/log.
 // Usage: sdltest [seconds] [w] [h]

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Build UnixLib's patched objects from jhamby's riscos-gccsdk at a pinned commit plus
 # ticker-only.diff, and put them into the toolchain's static libunixlib.a.
 # Run as root inside the cross-build image (riscos/docker/Dockerfile does); see README.md.

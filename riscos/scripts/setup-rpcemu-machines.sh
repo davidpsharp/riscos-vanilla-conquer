@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Create the StrongARM Risc PC test machines in RPCEmu Extended:
 #   "VC SA RO371": RISC OS 3.71, cloned from the "RISC OS 3.71" machine
 #   "VC SA RO371 1MB": as above but with 1MB VRAM and 64MB RAM

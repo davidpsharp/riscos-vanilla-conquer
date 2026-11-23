@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** vcprep: install Tiberian Dawn data into !VanillaTD from a C&C95 (C&C Gold)
 ** CD image, the freeware GDI or Nod disc. Reads the ISO directly (no CDFS

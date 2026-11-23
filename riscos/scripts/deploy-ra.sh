@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Cross-build VanillaRA and assemble the !VanillaRA application in
 # work/hostfs in the checkout (seen by the test machines as HostFS:$.vc).
 # Game data is hard-linked from work/ra: the Allied and Soviet discs,

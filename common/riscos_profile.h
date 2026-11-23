@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // A sampling profiler for real RISC OS hardware (VC_PROFILE), where there's no
 // debugger to pause the machine (riscos/scripts/profile.py does that on RPCEmu).
 //

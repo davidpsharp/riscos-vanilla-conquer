@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Make the benchmark battle: GDI mission 1 with two big armies and no triggers.
 
 Usage: make-battle.py <GDI GENERAL.MIX> <out.INI>

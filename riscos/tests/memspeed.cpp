@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** memspeed: times UnixLib's memcpy, memmove and memset against the program's own
 ** (common/riscos_memory.cpp, built here as vc_memcpy and so on), and the present and

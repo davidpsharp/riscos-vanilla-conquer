@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** memcpy, memmove, memset (and bcopy, bzero) for RISC OS, replacing UnixLib's.
 **

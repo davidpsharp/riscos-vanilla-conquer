@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** mixtest: runs the sound mixer (common/mixer_sdl1.cpp, included here, with SDL's audio and
 ** SharedSoundBuffer stubbed out) over fixed inputs and hashes what it produces: the output

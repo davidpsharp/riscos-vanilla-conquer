@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Save a PNG of an emulated machine's screen via its VNC server.
 # Usage: screenshot.sh <vnc port> <out.png>
 # Reuses the VNC client in RPCEmu Extended's MCP server.

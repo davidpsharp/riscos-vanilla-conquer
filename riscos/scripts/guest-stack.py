@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Heuristic backtrace of a running RISC OS program under RPCEmu Extended.
 
 Pauses the machine, samples until the CPU is in user code (mode 0 = USR26,

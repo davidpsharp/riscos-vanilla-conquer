@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // The game's frame rate and how busy it is, for the frame counter (Shift+F8).
 //
 // The game reports each frame it finishes (its main loop pass) with the time and the total time it

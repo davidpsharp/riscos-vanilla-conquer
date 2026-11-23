@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** A short test of this machine's speed (about three quarters of a second), and the largest
 ** screen size in the desktop's shape that the game keeps smooth at that speed. Used for the

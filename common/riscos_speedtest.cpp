@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The speed test and the screen size it leads to (see riscos_speedtest.h).
 **

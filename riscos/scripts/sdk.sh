@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Run a command inside the RISC OS cross-build container with the repo mounted
 # at /work. Builds the image on first use.
 set -euo pipefail

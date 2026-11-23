@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Run the battle benchmark on a Rorth target (normally the real Risc PC).
 #
 #   rorth-bench.sh [frames] [seed]       e.g. rorth-bench.sh 1200 1

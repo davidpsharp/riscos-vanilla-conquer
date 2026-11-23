@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // profoff: remove the profiler's interrupt handler (VC_PROFILE, common/riscos_profile.cpp)
 // if a profiled run of the game died without removing it. Safe to run at any time.
 #include "riscos_profile.h"

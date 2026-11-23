@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Zip a directory tree for RISC OS, keeping filetypes.
 
 Files named NAME,xxx (the HostFS/NFS convention) are stored as NAME with the

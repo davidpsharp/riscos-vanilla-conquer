@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Checks that the C++11 features Vanilla Conquer relies on (std::chrono,
 // std::stof, std::snprintf) plus libstdc++ and UnixLib work on the target.
 #include <chrono>

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Assemble Tiberian Dawn game data from a C&C Gold (C&C95) CD image into
 # work/tddata (in the checkout, ignored by git). Local testing only; the data is not redistributable.
 # Usage: prepare-td-data.sh <CNC95_GDI.iso> [--movies] [--nod <CNC95_Nod.iso>]

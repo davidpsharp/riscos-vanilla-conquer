@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Fail if a RISC OS binary has instructions an ARM610, ARM710 or ARM7500 can't run:
 # long multiplies (UMULL, SMULL, UMLAL, SMLAL: ARMv3M) and halfword or signed-byte
 # transfers (LDRH, STRH, LDRSH, LDRSB: ARMv4, and unsafe on a real Risc PC anyway).

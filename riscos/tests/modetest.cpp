@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Screen mode and palette check: sets the game's 640x400x8 mode the way
 // video_sdl1.cpp does, logs what RISC OS actually selected, then shows a
 // colour chart for 20 seconds (or until a key is pressed). Top to bottom the

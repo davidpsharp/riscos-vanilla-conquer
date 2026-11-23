@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Run riscos/tests/membench on a Rorth target, with the caches on and then (where
 # *Cache works: the Risc PC, RISC OS 3.7-4.x) off, and fetch the results.
 #

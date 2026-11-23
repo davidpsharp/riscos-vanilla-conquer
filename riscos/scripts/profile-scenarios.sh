@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # Profiling scenarios, shared by rorth-profile.sh (real machines, through Rorth) and
 # emu-profile.sh (an RPCEmu machine on this computer). Sourced, not run.
 # Scenarios: game, -AUTOSTART mission (which also skips the wait for a click; the movie

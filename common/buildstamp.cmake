@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # Writes buildstamp.cpp with the current UTC date and time. Run on every build
 # (see common/CMakeLists.txt) so the binary always records when it was built.
 string(TIMESTAMP BUILD_STAMP "%Y-%m-%d %H:%M UTC" UTC)

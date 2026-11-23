@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The low resolution (320x200, DOSMode) interface from the Windows 95 data.
 **

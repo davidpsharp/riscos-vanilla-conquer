@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # Tools shipped inside !VanillaTD. Built by riscos/scripts/deploy-td.sh; they
 # also build natively (cmake -S riscos/tools -B build/tools) for testing.
 cmake_minimum_required(VERSION 3.25)

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Fetch the RISC OS runtime modules our binaries need into work/hostfs/modules (in the checkout, ignored by git):
 #   SharedULib - SharedUnixLibrary, required by every GCCSDK program
 #   DRenderer  - digital sound renderer, used by SDL audio

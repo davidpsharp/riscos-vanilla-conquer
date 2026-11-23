@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** memtest: checks the program's memcpy, memmove, memset, bcopy and bzero
 ** (common/riscos_memory.cpp, built here as vc_memcpy and so on, beside UnixLib's) and

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** vcfiles.h: the files Tiberian Dawn and Red Alert need from each freeware CD image, with
 ** their sizes and CRC-32s, and where they go. Shared by Utils.vcprep, which installs and checks

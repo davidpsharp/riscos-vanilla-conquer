@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Run a native macOS build of VanillaTD in portable mode from a work
 # directory outside the Synology-synced tree, logging UBSan reports.
 # Usage: run-mac.sh [build dir] [game args...]   e.g. run-mac.sh build/mac-ubsan -AUTOSTART=G1

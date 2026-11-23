@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # CMake toolchain file for GCCSDK 4.7.4 (arm-unknown-riscos), used inside the
 # vc-riscos-sdk-ticker container (see riscos/docker/Dockerfile).
 #

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** scaletest: checks the faster pixel doubling (VC_Double_Row, common/riscos_memory.h, used
 ** for 320x200 on a screen with no mode that size) and movie interpolation (common/winasm.cpp)

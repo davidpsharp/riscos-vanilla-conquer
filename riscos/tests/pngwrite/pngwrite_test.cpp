@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 #include <string>
 #include "pngwrite.h"
 #include <stdlib.h>

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** Copies for RISC OS on ARM: the block copies the presents and the map tiles use. The
 ** program's memcpy, memmove and memset are in riscos_memory.cpp too, replacing UnixLib's.

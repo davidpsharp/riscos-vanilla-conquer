@@ -388,3 +388,5 @@ tail work/hostfs/'!VanillaTD'/stderr # debug log (flushed in 1 KB blocks)
 When debugging, `rpcemu-debug trace config data_abort=1 prefetch_abort=1 undefined=1` stops the emulator at the faulting instruction. `scripts/guest-stack.py` gives a heuristic backtrace. On the Mac, `scripts/run-mac.sh build/mac-ubsan -AUTOSTART=G1` runs the sanitizer build and writes reports to `work/ubsan.*`.
 
 Game data, the HostFS deploy directory and the Mac run directory all live in `work/`, inside the checkout but ignored by git (`VC_WORK` overrides it). They're kept out of git, since the game data isn't redistributable and the builds and logs run to gigabytes. Keep both out of cloud-synced folders: Synology sync once reverted local edits here.
+
+RISC OS port, copyright David Sharp 2026.

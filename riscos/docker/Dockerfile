@@ -1,3 +1,4 @@
+# RISC OS port, copyright David Sharp 2026
 # RISC OS cross-build environment: GCCSDK 4.7.4 (arm-unknown-riscos) + SDL 1.2.
 # The official GCCSDK SVN host is gone, so we start from the prebuilt
 # riscos.info image and add a modern CMake/Ninja plus the packaged SDL 1.2.

@@ -58,3 +58,5 @@ contains the ticker code if `strings` finds `UnixLib$TickerStats` in it.
 To move to a newer patch or upstream commit: replace `ticker-only.diff` (a `git diff` against the
 pinned commit, paths `a/gcc4/recipe/files/gcc/libunixlib/...`), change `GCCSDK_SHA` and the
 `OBJECTS` list in `build-unixlib.sh` to the objects the new patch changes, and rebuild the image.
+
+RISC OS port, copyright David Sharp 2026.

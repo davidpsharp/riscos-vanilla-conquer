@@ -1,3 +1,4 @@
+| RISC OS port, copyright David Sharp 2026
 | !Run for Vanilla Conquer: Red Alert
 Set VanillaRA$Dir <Obey$Dir>
 IconSprites <VanillaRA$Dir>.!Sprites

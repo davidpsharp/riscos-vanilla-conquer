@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /* Lists a directory the way common/file_posix.cpp does and reports which
  * entries match a pattern, to check UnixLib's readdir name translation.
  * Usage: dirprobe <dir> <pattern> */

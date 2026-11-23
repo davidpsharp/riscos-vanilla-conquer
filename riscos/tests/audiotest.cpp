@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Times SDL audio initialisation on the target, step by step.
 #include <SDL.h>
 #include <cstdio>

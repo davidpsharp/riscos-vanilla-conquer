@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Profile the games on a Rorth target with the in-game sampler (VC_PROFILE,
 # common/riscos_profile.cpp), one scenario after another, under one lease.
 #

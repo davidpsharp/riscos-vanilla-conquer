@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Where the time goes, for tuning on slow machines (VC_FPSLOG).
 //
 // PhaseTimer adds the time spent in a scope to one of the phases below;

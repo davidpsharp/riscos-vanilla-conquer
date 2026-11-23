@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The movie player's clock on RISC OS (vqaaudio_sdl1.cpp, VQA_GetTime): its ticks are 1/60 s,
 ** and RISC OS counts centiseconds (OS_Word 14's real-time clock).

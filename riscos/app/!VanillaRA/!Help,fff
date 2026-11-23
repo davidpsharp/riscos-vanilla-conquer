@@ -7,6 +7,8 @@ Command & Conquer: Red Alert (1996) for the Risc PC and the Raspberry Pi,
 built from the Vanilla Conquer source code, which is based on the game's
 source code as released by Electronic Arts under the GNU GPL.
 
+RISC OS port, copyright David Sharp 2026.
+
 Source code, updates and bug reports:
   https://github.com/davidpsharp/riscos-vanilla-conquer
 

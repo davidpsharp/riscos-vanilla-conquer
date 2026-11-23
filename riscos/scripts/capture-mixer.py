@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Capture what the game's SDL audio callback produces on a RISC OS guest.
 
 Breaks on Mixer_Callback, runs it to its return, then reads the output buffer

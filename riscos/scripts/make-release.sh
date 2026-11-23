@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Build the release zip: !VanillaTD (or with RELEASE_GAME=ra, !VanillaRA) with the
 # game, its tools (Utils.vcprep installs the data from CD images dragged onto the
 # icon), the runtime modules and licences, but no game data.

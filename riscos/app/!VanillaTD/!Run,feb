@@ -1,3 +1,4 @@
+| RISC OS port, copyright David Sharp 2026
 | !Run for Vanilla Conquer: Tiberian Dawn
 Set VanillaTD$Dir <Obey$Dir>
 IconSprites <VanillaTD$Dir>.!Sprites

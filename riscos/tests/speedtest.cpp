@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // The game's speed test on its own (common/riscos_speedtest.cpp): prints this machine's speeds
 // and the screen size the game would pick for the desktop, at 30 and 60 presents a second.
 // For calibrating the test on real machines; run it from the desktop (a task window will do).

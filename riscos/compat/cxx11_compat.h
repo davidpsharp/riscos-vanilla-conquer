@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 // Force-included into every C++ translation unit by riscos-gccsdk.cmake.
 //
 // GCCSDK's libstdc++ (GCC 4.7.4) is built without _GLIBCXX_USE_C99 because

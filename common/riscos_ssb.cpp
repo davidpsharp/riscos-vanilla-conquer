@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** Sound output through SharedSoundBuffer and StreamManager (see riscos_ssb.h).
 **

@@ -1,3 +1,4 @@
+// RISC OS port, copyright David Sharp 2026
 /*
 ** The game on the RISC OS desktop (see riscos_desktop.h).
 **

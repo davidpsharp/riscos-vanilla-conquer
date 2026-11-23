@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# RISC OS port, copyright David Sharp 2026
 # Cross-build the smoke tests into build/riscos-tests.
 set -euo pipefail
 exec "$(dirname "$0")/sdk.sh" bash -c '

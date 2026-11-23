@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# RISC OS port, copyright David Sharp 2026
 """Time from launching !VanillaTD to the game's screen mode and to the first
 non-black movie frame. Run after the machine has booted to the desktop.
 Usage: time-launch.py <hostcmd port> <vnc port> [app path]"""
